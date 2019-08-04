@@ -79,5 +79,5 @@ function convert_arguments(::Type{<: Poly}, fc::GeoInterface.FeatureCollection{G
                 """
             )
 
-    cs
+    (cs,)
 end
