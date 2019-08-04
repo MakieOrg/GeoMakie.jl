@@ -5,6 +5,8 @@ import AbstractPlotting: convert_arguments, convert_attributes
 
 import GeoInterface, Proj4
 
+using GeometryTypes
+
 include("conversions.jl")
 
 # export choropleth
