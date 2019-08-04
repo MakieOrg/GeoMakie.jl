@@ -25,3 +25,6 @@ states_geo = GeoJSON.parse(read(states, String))
 poly(states_geo, strokecolor = :blue, strokewidth = 1)
 ```
 ![US simple example](assets/us-simple.png)
+
+These plots can be arbitrarily colored using the `color` keyword, and the Makie poly interface is also exposed.
+All that this package is (as of now) is some definitions for argument conversion.
