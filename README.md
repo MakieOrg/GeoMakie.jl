@@ -1,5 +1,5 @@
 # GeoMakie
-## Geographic plotting utilities for [`Makie.jl`](https://githubb.com/JuliaPlots/Makie.jl)
+## Geographic plotting utilities for [Makie.jl](https://github.com/JuliaPlots/Makie.jl)
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://asinghvi17.github.io/GeoMakie.jl/stable)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://asinghvi17.github.io/GeoMakie.jl/dev)
