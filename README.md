@@ -18,7 +18,7 @@ This package is **in development** and will **break often**.  As it is currently
 
 ```julia
 using GeoJSON, GeoMakie, Makie
-states = states = download("https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json")
+states = download("https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json")
 
 states_geo = GeoJSON.parse(read(states, String))
 
