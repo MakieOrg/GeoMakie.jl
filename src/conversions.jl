@@ -42,6 +42,12 @@ end
 
 # # Argument conversions
 
+# ## Vectors of points
+
+function convert_arguments(::Plot, arr::Vector{GeoInterface.Point}) 
+    (GeometryTypes.Point{length(coordinates(arr[1])}.(coordinates.(arr)),)
+end
+
 # ## Polygons
 
 convert_arguments(::Poly, poly::GeoInterface.Polygon) = (toPointVecs(poly)[1],)
@@ -81,3 +87,5 @@ function convert_arguments(::Type{<: Poly}, fc::GeoInterface.FeatureCollection{G
 
     (cs,)
 end
+    
+ 
