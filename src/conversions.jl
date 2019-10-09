@@ -45,7 +45,7 @@ end
 # ## Vectors of points
 
 function convert_arguments(::Plot, arr::Vector{GeoInterface.Point}) 
-    (GeometryTypes.Point{length(coordinates(arr[1])}.(coordinates.(arr)),)
+    (GeometryTypes.Point{length(coordinates(arr[1]))}.(coordinates.(arr)),)
 end
 
 # ## Polygons
