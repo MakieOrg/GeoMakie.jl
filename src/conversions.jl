@@ -40,11 +40,28 @@ function imprecise(arr)
     return !any(nonzero.(dif))
 end
 
+function toMesh(mp::Vector{Vector{Point2{T}}}) where T
+
+    meshes = GLNormalMesh[]
+
+    for pol in mp # TODO WARNING we don't check for holes here, should probably do that...
+        triangle_faces = EarCut.triangulate([pol])
+
+        v = map(x-> Point3{T}(x[1], x[2], 0), pol)
+
+        push!(meshes, GLNormalMesh(vertices=v, faces=triangle_faces))
+    end
+
+    length(mp) == 1 && return meshes[1]
+
+    return merge(meshes)
+end
+
 # # Argument conversions
 
 # ## Polygons
 
-convert_arguments(::Poly, poly::GeoInterface.Polygon) = (toPointVecs(poly)[1],)
+convert_arguments(::AbstractPlotting.Poly, poly::GeoInterface.Polygon) = (toPointVecs(poly)[1],)
 
 convert_arguments(::Poly, mp::GeoInterface.MultiPolygon) = (toPointVecs(mp),)
 
@@ -58,7 +75,7 @@ function convert_arguments(::Type{<: Poly}, fc::GeoInterface.FeatureCollection{G
 
     for feature in features
         for coord in toPointVecs(feature.geometry)
-            if imprecise(coord)
+            if imprecise(coord) || length(coord) <= 4
                 @warn(
                     """
                     Imprecise coordinates!  You may want to consider reprojecting to a different coordinate system.
@@ -80,4 +97,20 @@ function convert_arguments(::Type{<: Poly}, fc::GeoInterface.FeatureCollection{G
             )
 
     (cs,)
+
 end
+
+function AbstractPlotting.convert_arguments(::Type{<: Mesh}, fc::GeoInterface.FeatureCollection{GeoInterface.Feature})
+    return (fc.features .|> GeoInterface.geometry .|> toPointVecs .|> toMesh,) # return a Vector of meshes
+end
+
+
+# function plot!(plot::Poly{<: Tuple{GeoInterface.FeatureCollection{GeoInterface.Feature}}})5ytgtcx89o9lo
+
+function Proj4.transform(src, dest, pt::Point2{T}) where T
+    if isnan(pt[1]) && isnan(pt[2])
+        return Point2{T}(NaN)
+    end
+    return Point2{T}(transform(src, dest, Vector(pt)))
+end
+# Base.Broadcast.broadcastable(p::Projection) = Ref(p)
