@@ -113,4 +113,4 @@ function Proj4.transform(src, dest, pt::Point2{T}) where T
     end
     return Point2{T}(transform(src, dest, Vector(pt)))
 end
-# Base.Broadcast.broadcastable(p::Projection) = Ref(p)
+Base.Broadcast.broadcastable(p::Projection) = Ref(p)
