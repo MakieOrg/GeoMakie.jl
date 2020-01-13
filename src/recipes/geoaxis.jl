@@ -1,0 +1,284 @@
+const frameattrs = (
+    width = 1,
+    color = RGBA(Colors.colorant"light grey", 0.7),
+    visible = true,
+    style = nothing
+)
+
+const TOP = Top()
+const LEFT = Left()
+const RIGHT = Right()
+const BOTTOM = Bottom()
+
+WGS84() = Projection("+proj=longlat +datum=WGS84")
+
+to2tuple(x1, x2) = (x1, x2)
+
+yaxisattrs = (
+    tick = (
+    # tick marks
+        ticks   = MakieLayout.WilkinsonTicks(),
+        autolimitmargin = 0.05f0,
+        size    = 10f0,
+        visible = true,
+        color   = RGBf0(0, 0, 0),
+        align   = 0f0,
+        width   = 1f0,
+        style   = nothing,
+
+        # tick labels
+        label = (
+            size      = 20f0,
+            formatter = Formatting.format,
+            visible   = true,
+            font      = "DejaVu Sans",
+            color     = RGBf0(0, 0, 0),
+            spacing   = 20f0,
+            padding   = 5f0,
+            rotation  = 0f0,
+            align     = (:center, :top),
+            position  = Left()::MakieLayout.Side
+
+        ),
+    ),
+)
+
+xaxisattrs = (
+    tick = (
+    # tick marks
+        ticks   = MakieLayout.WilkinsonTicks(),
+        autolimitmargin = 0.05f0,
+        size    = 10f0,
+        visible = true,
+        color   = RGBf0(0, 0, 0),
+        align   = 0f0,
+        width   = 1f0,
+        style   = nothing,
+
+        # tick labels
+        label = (
+            size      = 20f0,
+            formatter = Formatting.format,
+            visible   = true,
+            font      = "DejaVu Sans",
+            color     = RGBf0(0, 0, 0),
+            spacing   = 20f0,
+            padding   = 5f0,
+            rotation  = 0f0,
+            align     = (:center, :top),
+            position  = Bottom()
+
+        ),
+    ),
+)
+
+@recipe(GeoAxis, limits) do scene
+    Theme(
+        samples = 100,
+
+        frames = (
+            top = frameattrs,
+            left = frameattrs,
+            right = frameattrs,
+            bottom = frameattrs
+        ),
+
+        grid = (
+            visible = true,
+            color   = RGBf0(0, 0, 0),
+            width   = 1f0,
+            style   = nothing
+        ),
+
+        x = xaxisattrs,
+        y = yaxisattrs,
+
+        crs = (
+            source = WGS84(),
+            dest   = WGS84()
+        )
+    )
+end
+
+convert_arguments(::Type{<: GeoAxis}, xmin::Real, xmax::Real, ymin::Real, ymax::Real) = (FRect2D(xmin, ymin, xmax - xmin, ymax - ymin),)
+
+function convert_arguments(::Type{<: GeoAxis}, xs::Tuple, ys::Tuple)
+    xmin, xmax = xs
+    ymin, ymax = ys
+    return (FRect2D(xmin, ymin, xmax - xmin, ymax - ymin),)
+end
+
+
+function AbstractPlotting.plot!(plot::GeoAxis{T}) where T
+
+    @extract plot (x, y)
+
+    draw_frames!(plot)
+
+    draw_ticks!(plot)
+
+end
+
+function draw_frames!(plot::GeoAxis{T}) where T
+
+    @extract plot (frames, crs, samples)
+
+    @extract frames (top, bottom, left, right)
+
+    @extract crs (source, dest)
+
+    # initialize frames
+    topline = Node(Vector{Point2f0}())
+    bottomline = Node(Vector{Point2f0}())
+    leftline = Node(Vector{Point2f0}())
+    rightline = Node(Vector{Point2f0}())
+
+    # initialize the line vectors
+    lift(plot.limits, source, dest, samples) do lims, source, dest, samples
+
+        topline[] = Point2f0.(transform.(source, dest, [Point2f0(lims[TOP], lon) for lon in LinRange(lims[LEFT], lims[RIGHT], samples)]))
+        leftline[] = Point2f0.(transform.(source, dest, [Point2f0(lat, lims[LEFT]) for lat in LinRange(lims[TOP], lims[BOTTOM], samples)]))
+        rightline[] = Point2f0.(transform.(source, dest, [Point2f0(lat, lims[RIGHT]) for lat in LinRange(lims[TOP], lims[BOTTOM], samples)]))
+        topline[] = Point2f0.(transform.(source, dest, [Point2f0(lims[BOTTOM], lon) for lon in LinRange(lims[LEFT], lims[RIGHT], samples)]))
+
+    end
+
+    # plot the frames
+    lines!.(plot, (top, bottom, left, right), (topline, bottomline, leftline, rightline))
+
+end
+
+function draw_ticks!(plot::GeoAxis)
+
+    @extract plot (x, y)
+
+    xtickvalues = Node{Vector{<: AbstractFloat}}(Vector{Float64}())
+    ytickvalues = Node{Vector{<: AbstractFloat}}(Vector{Float64}())
+
+    xlinevec = Node(Vector{Point2f0}())
+    ylinevec = Node(Vector{Point2f0}())
+
+    xtickannotations = Node(Vector{Tuple{String, Point2f0}}())
+    ytickannotations = Node(Vector{Tuple{String, Point2f0}}())
+
+    lift(x.tick.ticks, y.tick.ticks, x.tick.label.position, y.tick.label.position, plot.limits, plot.samples, plot.crs.source, plot.crs.dest) do xticks_struct, yticks_struct, xtickp, ytickp, limits, samples, source, dest
+        xtickvalues[] = MakieLayout.compute_tick_values(xticks_struct, limits[LEFT], limits[RIGHT], 100f0)
+        ytickvalues[] = MakieLayout.compute_tick_values(yticks_struct, limits[TOP], limits[BOTTOM], 100f0)
+
+        xticklabels = MakieLayout.get_tick_labels(xticks_struct, xtickvalues[])
+        yticklabels = MakieLayout.get_tick_labels(yticks_struct, ytickvalues[])
+
+        # silently update the backend value without calling
+        # these Observables' listener functions.
+        xlinevec.val = Vector{Point2f0}()
+        ylinevec.val = Vector{Point2f0}()
+
+        for xtick in xtickvalues[]
+            append!(xlinevec.val, transform.(source, dest, Point2f0.(xtick, LinRange(limits[BOTTOM], limits[TOP], samples))))
+            push!(xlinevec.val, Point2f0(NaN))
+        end
+        for ytick in ytickvalues[]
+            append!(ylinevec.val, transform.(source, dest, Point2f0.(LinRange(limits[LEFT], limits[RIGHT], samples), ytick)))
+            push!(ylinevec.val, Point2f0(NaN))
+        end
+
+        # notify the observables that they have changed
+        AbstractPlotting.notify!(xlinevec)
+        AbstractPlotting.notify!(ylinevec)
+
+        # now for the tick placement
+
+        # first, we do the y ticks (latitude)
+        ytickpositions, ytickstrings = (nothing, nothing)
+
+        if typeof(ytickp) <: MakieLayout.Side
+
+            xpos = limits[ytickp]
+
+            ytickpositions = Point2f0.(xpos, ytickvalues[])
+
+            ytickstrings = yticklabels
+
+        elseif ytickp isa NTuple{2, <: MakieLayout.Side}
+
+            xpos1 = limits[ytickp[1]]
+            xpos2 = limits[ytickp[2]]
+
+            ytickpositions = Point2f0.([(x, y) for x in (xpos1, xpos2), y in ytickvalues[]])
+
+            ytickstrings = repeat(yticklabels, 2)
+
+        else
+            @warn "Unsupported tick position format given!"
+        end
+
+        (isnothing(ytickstrings) || isnothing(ytickpositions)) || (ytickannotations[] = to2tuple.(ytickstrings, transform.(source, dest, ytickpositions)))
+
+        xtickpositions, xtickstrings = (nothing, nothing)
+
+        if typeof(xtickp) <: MakieLayout.Side
+
+            ypos = limits[xtickp]
+
+            xtickpositions = Point2f0.(ypos, xtickvalues[])
+
+            xtickstrings = xticklabels
+
+        elseif ytickp isa NTuple{2, <: MakieLayout.Side}
+
+            ypos1 = limits[ytickp[1]]
+            ypos2 = limits[ytickp[2]]
+
+            xtickpositions = Point2f0.([(x, y) for y in (ypos1, ypos2), x in xtickvalues[]])
+
+            xtickstrings = repeat(xticklabels, 2)
+
+        else
+            @warn "Unsupported tick position format given!" xtickp
+        end
+
+        (isnothing(xtickstrings) || isnothing(xtickpositions)) || (xtickannotations[] = to2tuple.(xtickstrings, transform.(source, dest, xtickpositions)))
+
+
+    end
+
+    # plot the damn thing
+
+    # x ticks
+    lines!(
+        plot,
+        xlinevec;
+        size    = x.tick.size,
+        visible = x.tick.visible,
+        color   = x.tick.color,
+        align   = x.tick.align,
+        linewidth = x.tick.width,
+        linestyle = x.tick.style,
+    )
+    # y ticks
+    lines!(
+        plot,
+        ylinevec;
+        size    = y.tick.size,
+        visible = y.tick.visible,
+        color   = y.tick.color,
+        align   = y.tick.align,
+        linewidth = y.tick.width,
+        linestyle = y.tick.style,
+    )
+
+    # annotations
+
+    annotations!(
+        plot,
+        x.tick.label,
+        xtickannotations;
+    )
+
+    annotations!(
+        plot,
+        y.tick.label,
+        ytickannotations;
+    )
+
+end

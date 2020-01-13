@@ -11,7 +11,7 @@ import AbstractPlotting: convert_arguments, convert_attribute
 
 
 include("conversions.jl")
-include("recipes.jl")
+include("recipes/geoaxis.jl")
 
 export geoaxis, WGS84
 
