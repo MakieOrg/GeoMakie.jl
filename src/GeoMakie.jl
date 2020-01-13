@@ -1,15 +1,19 @@
 module GeoMakie
 
-using AbstractPlotting
-import AbstractPlotting: convert_arguments, convert_attributes
+using GeometryTypes, EarCut, Colors, MakieLayout, AbstractPlotting
 
-import GeoInterface, Proj4
+using MakieLayout: Formatting
 
-using GeometryTypes
+using GeoInterface, Proj4
+
+import AbstractPlotting: convert_arguments, convert_attribute
+
+
 
 include("conversions.jl")
+include("recipes.jl")
 
-# export choropleth
+export geoaxis, WGS84
 
 end # module
 
