@@ -1,6 +1,6 @@
-const frameattrs = (
+frameattrs = (
     width = 1,
-    color = RGBA(Colors.colorant"light grey", 0.7),
+    color = :black,
     visible = true,
     style = nothing
 )
@@ -17,11 +17,11 @@ to2tuple(x1, x2) = (x1, x2)
 yaxisattrs = (
     tick = (
     # tick marks
-        ticks   = MakieLayout.WilkinsonTicks(),
+        ticks   = MakieLayout.WilkinsonTicks(; k_min = 5, k_ideal = 7, k_max = 15),#ManualTicks([-90.0, -60.0, -30.0, 0.0, 30.0, 60.0, 90.0], [-90.0, -60.0, -30.0, 0.0, 30.0, 60.0, 90.0] .|> string),
         autolimitmargin = 0.05f0,
         size    = 10f0,
         visible = true,
-        color   = RGBf0(0, 0, 0),
+        color   = RGBA(Colors.colorant"light grey", 0.7),
         align   = 0f0,
         width   = 1f0,
         style   = nothing,
@@ -46,11 +46,11 @@ yaxisattrs = (
 xaxisattrs = (
     tick = (
     # tick marks
-        ticks   = MakieLayout.WilkinsonTicks(),
+        ticks   = MakieLayout.WilkinsonTicks(; k_min = 5, k_ideal = 7, k_max = 12),#ManualTicks(-180:30:180, -180:30:180 .|> string),#
         autolimitmargin = 0.05f0,
         size    = 10f0,
         visible = true,
-        color   = RGBf0(0, 0, 0),
+        color   = RGBA(Colors.colorant"light grey", 0.7),
         align   = 0f0,
         width   = 1f0,
         style   = nothing,
@@ -100,12 +100,12 @@ xaxisattrs = (
     )
 end
 
-convert_arguments(::Type{<: GeoAxis}, xmin::Real, xmax::Real, ymin::Real, ymax::Real) = (FRect2D(xmin, ymin, xmax - xmin, ymax - ymin),)
+convert_arguments(::Type{<: GeoAxis}, xmin::Real, xmax::Real, ymin::Real, ymax::Real) = (FRect2D(xmin, xmax, ymin, ymax),)
 
 function convert_arguments(::Type{<: GeoAxis}, xs::Tuple, ys::Tuple)
     xmin, xmax = xs
     ymin, ymax = ys
-    return (FRect2D(xmin, ymin, xmax - xmin, ymax - ymin),)
+    return (FRect2D(xmin, xmax, ymin, ymax),)
 end
 
 
@@ -136,10 +136,13 @@ function draw_frames!(plot::GeoAxis{T}) where T
     # initialize the line vectors
     lift(plot.limits, source, dest, samples) do lims, source, dest, samples
 
-        topline[] = Point2f0.(transform.(source, dest, [Point2f0(lims[TOP], lon) for lon in LinRange(lims[LEFT], lims[RIGHT], samples)]))
-        leftline[] = Point2f0.(transform.(source, dest, [Point2f0(lat, lims[LEFT]) for lat in LinRange(lims[TOP], lims[BOTTOM], samples)]))
-        rightline[] = Point2f0.(transform.(source, dest, [Point2f0(lat, lims[RIGHT]) for lat in LinRange(lims[TOP], lims[BOTTOM], samples)]))
-        topline[] = Point2f0.(transform.(source, dest, [Point2f0(lims[BOTTOM], lon) for lon in LinRange(lims[LEFT], lims[RIGHT], samples)]))
+        lonrange = LinRange(lims[LEFT], lims[RIGHT], samples)
+        latrange = LinRange(lims[BOTTOM], lims[TOP], samples)
+
+        topline[] = Point2f0.(transform.(source, dest, [Point2f0(lon, lims[TOP]) for lon in lonrange]))
+        leftline[] = Point2f0.(transform.(source, dest, [Point2f0(lims[LEFT], lat) for lat in latrange]))
+        rightline[] = Point2f0.(transform.(source, dest, [Point2f0(lims[RIGHT], lat) for lat in latrange]))
+        bottomline[] = Point2f0.(transform.(source, dest, [Point2f0(lon, lims[BOTTOM]) for lon in lonrange]))
 
     end
 
@@ -162,8 +165,9 @@ function draw_ticks!(plot::GeoAxis)
     ytickannotations = Node(Vector{Tuple{String, Point2f0}}())
 
     lift(x.tick.ticks, y.tick.ticks, x.tick.label.position, y.tick.label.position, plot.limits, plot.samples, plot.crs.source, plot.crs.dest) do xticks_struct, yticks_struct, xtickp, ytickp, limits, samples, source, dest
+
         xtickvalues[] = MakieLayout.compute_tick_values(xticks_struct, limits[LEFT], limits[RIGHT], 100f0)
-        ytickvalues[] = MakieLayout.compute_tick_values(yticks_struct, limits[TOP], limits[BOTTOM], 100f0)
+        ytickvalues[] = MakieLayout.compute_tick_values(yticks_struct, limits[BOTTOM], limits[TOP], 100f0)
 
         xticklabels = MakieLayout.get_tick_labels(xticks_struct, xtickvalues[])
         yticklabels = MakieLayout.get_tick_labels(yticks_struct, ytickvalues[])
@@ -220,7 +224,7 @@ function draw_ticks!(plot::GeoAxis)
 
             ypos = limits[xtickp]
 
-            xtickpositions = Point2f0.(ypos, xtickvalues[])
+            xtickpositions = Point2f0.(xtickvalues[], ypos)
 
             xtickstrings = xticklabels
 
@@ -243,12 +247,11 @@ function draw_ticks!(plot::GeoAxis)
     end
 
     # plot the damn thing
-
+    Main.@infiltrate
     # x ticks
     lines!(
         plot,
         xlinevec;
-        size    = x.tick.size,
         visible = x.tick.visible,
         color   = x.tick.color,
         align   = x.tick.align,
@@ -259,7 +262,6 @@ function draw_ticks!(plot::GeoAxis)
     lines!(
         plot,
         ylinevec;
-        size    = y.tick.size,
         visible = y.tick.visible,
         color   = y.tick.color,
         align   = y.tick.align,
