@@ -27,11 +27,12 @@ poly(states_geo, strokecolor = :blue, strokewidth = 1)
 ![US simple example](assets/us-simple.png)
 
 These plots can be arbitrarily colored using the `color` keyword, and the Makie poly interface is also exposed.
-All that this package is (as of now) is some definitions for argument conversion.
+
+Check the examples in the `test` folder for more recent examples of usage.
 
 ## Performance
 
-Since this is Makie, all the plots are pretty interactive; however, sometimes the triangulation routines native to GLMakie cann take some time - for me, it takes 20 seconds to plot 402 polygons with them.  However, I've got an experimental technique using Earcut.jl working, which cuts this time down to 0.1 seconds.  When I integrate that fully with a recipe for meshes / polys, then I'll push that.
+We use Earcut.jl for added performance when converting polygons to triangular meshes; it decreases time to mesh by an order of magnitude from the Makie implementation.
 
 ## Planned features
 - A `choropleth` recipe which can read data from the properties of a FeatureCollection
