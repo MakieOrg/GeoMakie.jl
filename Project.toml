@@ -13,6 +13,7 @@ GeoInterface = "cf35fbd7-0cd7-5166-be24-54bfbe79505f"
 GeometryTypes = "4d00f742-c7ba-57c2-abde-4428a4b178cb"
 MakieLayout = "5a521ce4-ebb9-4793-b5b7-b334dfe8393c"
 Proj4 = "9a7e659c-8ee8-5706-894e-f68f43bc57ea"
+Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 
 [compat]
 julia = "1.1"
