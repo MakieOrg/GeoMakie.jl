@@ -73,6 +73,7 @@ xaxisattrs = (
 )
 
 @recipe(GeoAxis, limits) do scene
+    merge(scene.attributes,
     Theme(
         samples = 100,
         show_axis = false,
@@ -98,6 +99,7 @@ xaxisattrs = (
             source = WGS84(),
             dest   = WGS84()
         )
+    )
     )
 end
 
@@ -229,7 +231,7 @@ function draw_ticks!(plot::GeoAxis)
 
             xtickstrings = xticklabels
 
-        elseif ytickp isa NTuple{2, <: MakieLayout.Side}
+        elseif xtickp isa NTuple{2, <: MakieLayout.Side}
 
             ypos1 = limits[ytickp[1]]
             ypos2 = limits[ytickp[2]]

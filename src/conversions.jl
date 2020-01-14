@@ -40,11 +40,28 @@ function imprecise(arr)
     return !any(nonzero.(dif))
 end
 
+function toMesh(mp::Vector{Vector{Vector{Point2{T}}}}) where T
+
+    meshes = GLNormalMesh[]
+
+    for pol in mp # we check for holes here
+        triangle_faces = EarCut.triangulate(pol)
+
+        v = map(x-> Point3{T}(x[1], x[2], 0), vcat(pol...))
+
+        push!(meshes, GLNormalMesh(vertices=v, faces=triangle_faces))
+    end
+
+    length(mp) == 1 && return meshes[1]
+
+    return merge(meshes)
+end
+
 function toMesh(mp::Vector{Vector{Point2{T}}}) where T
 
     meshes = GLNormalMesh[]
 
-    for pol in mp # TODO WARNING we don't check for holes here, should probably do that...
+    for pol in mp # WARNING we don't check for holes here, should probably do that...
         triangle_faces = EarCut.triangulate([pol])
 
         v = map(x-> Point3{T}(x[1], x[2], 0), pol)
