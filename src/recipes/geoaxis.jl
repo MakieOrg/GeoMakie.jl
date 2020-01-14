@@ -111,19 +111,19 @@ function convert_arguments(::Type{<: GeoAxis}, xs::Tuple, ys::Tuple)
     return (FRect2D(xmin, xmax, ymin, ymax),)
 end
 
-function AbstractPlotting.calculated_attributes!(plot::GeoAxis)
-    @extract plot (x, y, crs, limits)
-
-    lift(limits, crs.source, crs.dest, x.tick.label.size, y.tick.label.size) do limits, source, dest, xticklabelsize, yticklabelsize
-        newrect = transform(source, dest, [limits[LEFT] limits[TOP]; limits[RIGHT] limits[BOTTOM]])
-        textscale = maximum(diff.(eachcol(newrect)))
-
-        x.tick.label.textsize[] = xticklabelsize * textscale/100
-        y.tick.label.textsize[] = yticklabelsize * textscale/100
-
-    end
-
-end
+# function AbstractPlotting.calculated_attributes!(plot::GeoAxis)
+#     @extract plot (x, y, crs, limits)
+#
+#     lift(limits, crs.source, crs.dest, x.tick.label.size, y.tick.label.size) do limits, source, dest, xticklabelsize, yticklabelsize
+#         newrect = transform(source, dest, [limits[LEFT] limits[TOP]; limits[RIGHT] limits[BOTTOM]])
+#         textscale = maximum(diff.(eachcol(newrect)))
+#
+#         x.tick.label.textsize[] = xticklabelsize * textscale/100
+#         y.tick.label.textsize[] = yticklabelsize * textscale/100
+#
+#     end
+#
+# end
 
 function AbstractPlotting.plot!(plot::GeoAxis{T}) where T
 
