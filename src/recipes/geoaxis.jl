@@ -17,7 +17,7 @@ to2tuple(x1, x2) = (x1, x2)
 yaxisattrs = (
     tick = (
     # tick marks
-        ticks   = MakieLayout.WilkinsonTicks(; k_min = 5, k_ideal = 7, k_max = 15),#ManualTicks([-90.0, -60.0, -30.0, 0.0, 30.0, 60.0, 90.0], [-90.0, -60.0, -30.0, 0.0, 30.0, 60.0, 90.0] .|> string),
+        ticks   = MakieLayout.WilkinsonTicks(; k_min = 5, k_ideal = 7, k_max = 15),
         autolimitmargin = 0.05f0,
         size    = 10f0,
         visible = true,
@@ -46,7 +46,7 @@ yaxisattrs = (
 xaxisattrs = (
     tick = (
     # tick marks
-        ticks   = MakieLayout.WilkinsonTicks(; k_min = 5, k_ideal = 7, k_max = 12),#ManualTicks(-180:30:180, -180:30:180 .|> string),#
+        ticks   = MakieLayout.WilkinsonTicks(; k_min = 5, k_ideal = 7, k_max = 12),
         autolimitmargin = 0.05f0,
         size    = 10f0,
         visible = true,
@@ -75,6 +75,7 @@ xaxisattrs = (
 @recipe(GeoAxis, limits) do scene
     Theme(
         samples = 100,
+        show_axis = false,
 
         frames = (
             top = frameattrs,
@@ -247,7 +248,7 @@ function draw_ticks!(plot::GeoAxis)
     end
 
     # plot the damn thing
-    Main.@infiltrate
+
     # x ticks
     lines!(
         plot,
