@@ -111,6 +111,19 @@ function convert_arguments(::Type{<: GeoAxis}, xs::Tuple, ys::Tuple)
     return (FRect2D(xmin, xmax, ymin, ymax),)
 end
 
+function AbstractPlotting.calculated_attributes!(plot::GeoAxis)
+    @extract plot (x, y, crs, limits)
+
+    lift(limits, crs.source, crs.dest, x.tick.label.size, y.tick.label.size) do limits, source, dest, xticklabelsize, yticklabelsize
+        newrect = transform(source, dest, [limits[LEFT] limits[TOP]; limits[RIGHT] limits[BOTTOM]])
+        textscale = maximum(diff.(eachcol(newrect)))
+
+        x.tick.label.textsize[] = xticklabelsize * textscale/100
+        y.tick.label.textsize[] = yticklabelsize * textscale/100
+
+    end
+
+end
 
 function AbstractPlotting.plot!(plot::GeoAxis{T}) where T
 
@@ -167,7 +180,7 @@ function draw_ticks!(plot::GeoAxis)
     xtickannotations = Node(Vector{Tuple{String, Point2f0}}())
     ytickannotations = Node(Vector{Tuple{String, Point2f0}}())
 
-    lift(x.tick.ticks, y.tick.ticks, x.tick.label.position, y.tick.label.position, plot.limits, plot.samples, plot.crs.source, plot.crs.dest) do xticks_struct, yticks_struct, xtickp, ytickp, limits, samples, source, dest
+    lift(x.tick.ticks, y.tick.ticks, x.tick.label.position, y.tick.label.position, plot.limits, plot.samples, plot.crs.source, plot.crs.dest, x.tick.label.size, y.tick.label.size) do xticks_struct, yticks_struct, xtickp, ytickp, limits, samples, source, dest, xticklabelsize, yticklabelsize
 
         xtickvalues[] = MakieLayout.compute_tick_values(xticks_struct, limits[LEFT], limits[RIGHT], 100f0)
         ytickvalues[] = MakieLayout.compute_tick_values(yticks_struct, limits[BOTTOM], limits[TOP], 100f0)
@@ -245,7 +258,6 @@ function draw_ticks!(plot::GeoAxis)
         end
 
         (isnothing(xtickstrings) || isnothing(xtickpositions)) || (xtickannotations[] = to2tuple.(xtickstrings, transform.(source, dest, xtickpositions)))
-
 
     end
 

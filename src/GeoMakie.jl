@@ -19,6 +19,7 @@ const volume = AbstractPlotting.volume
 
 include("conversions.jl")
 include("utils.jl")
+include("projections.jl")
 include("recipes/geoaxis.jl")
 
 isdefined(MakieLayout, :WilkinsonTicks) || include("tick_compat.jl")
