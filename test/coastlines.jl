@@ -1,20 +1,24 @@
 # setup
 using ZipFile
-mkdir("ne_110m_coastline")
-zip = Base.download("https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/110m/physical/ne_110m_coastline.zip")
 
-# read the Zip file
-r = ZipFile.Reader(zip);
+function get_coastline_shapefile()
+    dir = mktempdir()
+    zip = Base.download("https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/110m/physical/ne_110m_coastline.zip")
 
-# populate the folder
-cd("ne_110m_coastline") do
-    for f in r.files
-        open(f.name, "w") do file
-            write(file, read(f, String))
+    # read the Zip file
+    r = ZipFile.Reader(zip);
+
+    # populate the folder
+    cd(dir) do
+        for f in r.files
+            open(f.name, "w") do file
+                write(file, read(f, String))
+            end
         end
     end
-end
 
+    return dir
+end
 
 using Proj4, Shapefile, GeoInterface, Makie, MakieLayout, PlotUtils
 
@@ -75,6 +79,8 @@ end
 linevec_transformed = to_nansep_vec(data) do datum
     transform.(src_proj, dest_proj, datum)
 end
+
+plv = Point2f0.(linevec_transformed)
 
 linevec_original = to_nansep_vec(identity, data) .|> Point2f0
 
