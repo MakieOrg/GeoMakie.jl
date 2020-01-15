@@ -1,7 +1,11 @@
-using GeoMakie, Makie, Proj4
+using GeoMakie, Makie, Proj4, PlotUtils
 
-lons = -90:90
-lats = -180:180
+using Images, FileIO
+const HOME = expanduser("~")
+img = load("$HOME/NASAobs/neo.sci.gsfc.nasa.gov/archive/geotiff/CERES_NETFLUX_M/CERES_NETFLUX_M_2006-07.TIFF")
+
+lons = LinRange(-89, 90, size(img)[1])
+lats = LinRange(-179, 180, size(img)[2])
 
 source = WGS84()
 dest = Projection("+proj=robin")
@@ -11,7 +15,9 @@ faces  = GeoMakie.grid_triangle_faces(lats, lons)
 
 colorfunc(i) = (sin.(lats .+ i) .+ cos.(lons'))[:]
 
-scene = poly(points, faces; color = colorfunc(0), show_axis = false)
+# img =
+
+scene = poly(points, faces; color = img[:], show_axis = false)
 
 geoaxis!(scene, -180, 180, -90, 90; crs = (dest = dest,))
 

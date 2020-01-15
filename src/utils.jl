@@ -39,7 +39,7 @@ end
 
 Returns a Vector of Points of a grid formed by xs and ys.
 """
-gridpoints(xs, ys) = [Point2f0(x, y) for x in xs, y in ys][:]
+gridpoints(xs, ys) = vec([Point2f0(x, y) for x in xs, y in ys])
 
 
 const __TupTypes = Union{
