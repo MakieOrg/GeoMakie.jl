@@ -5,15 +5,6 @@ frameattrs = (
     style = nothing
 )
 
-const TOP = Top()
-const LEFT = Left()
-const RIGHT = Right()
-const BOTTOM = Bottom()
-
-WGS84() = Projection("+proj=longlat +datum=WGS84")
-
-to2tuple(x1, x2) = (x1, x2)
-
 yaxisattrs = (
     tick = (
     # tick marks

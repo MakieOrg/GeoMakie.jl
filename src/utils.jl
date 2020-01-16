@@ -1,3 +1,10 @@
+const TOP = Top()
+const LEFT = Left()
+const RIGHT = Right()
+const BOTTOM = Bottom()
+
+to2tuple(x1, x2) = (x1, x2)
+
 rec_point(x::Vector{<: AbstractFloat}) = Point2f0(x)
 rec_point(x) = rec_point.(x)
 

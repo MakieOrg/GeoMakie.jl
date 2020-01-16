@@ -1,4 +1,11 @@
 """
+    WGS84()
+
+Standard latitude-longitude grid.
+"""
+WGS84() = Projection("+proj=longlat +datum=WGS84")
+
+"""
     TransverseMercator(; central_longitude=0.0, central_latitude=0.0, false_easting=0.0, false_northing=0.0, scale_factor=1.0, units = "m")
 
 ## Parameters
