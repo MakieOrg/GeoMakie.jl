@@ -34,7 +34,7 @@ export WGS84, Mercator, TransverseMercator, UTM, AlbersEqualArea, Robinson, Wink
 
 # export utilities
 
-export rec_project, rec_point
+export rec_project, rec_point, triangulated_grid
 
 end # module
 

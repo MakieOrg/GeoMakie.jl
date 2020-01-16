@@ -192,7 +192,7 @@ function WinkelTripel(;
         )
 
     proj4_params = [
-        ("proj", "robin"),
+        ("proj", "wintri"),
         ("lon_0", central_longitude),
         ("lat_1", first_parallel),
         ("x_0", false_easting),

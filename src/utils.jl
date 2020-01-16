@@ -41,6 +41,13 @@ Returns a Vector of Points of a grid formed by xs and ys.
 """
 gridpoints(xs, ys) = vec([Point2f0(x, y) for x in xs, y in ys])
 
+"""
+    triangulated_grid(xs, ys) -> points, faces
+
+Takes in two ranges, and returns a triangulated regular grid based on those ranges.
+"""
+triangulated_grid(xs, ys) = (gridpoints(xs, ys), grid_triangle_faces(xs, ys))
+
 
 const __TupTypes = Union{
                     Tuple{String, Any},
