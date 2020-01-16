@@ -137,3 +137,69 @@ function AlbersEqualArea(; central_longitude=0.0, central_latitude=0.0,
 
     return Projection(proj4_params)
 end
+
+"""
+    Robinson(; central_longitude=0.0, false_easting=0.0, false_northing=0.0, units = "m")
+
+The Robinson projection is the successor of the van der Grinten series of projections,
+and was created specifically for the purpose of world mapping.
+
+## Parameters
+* `central_longitude`:
+    The central longitude. Defaults to 0.
+* `false_easting`:
+    X offset from planar origin in metres. Defaults to 0.
+* `false_northing`:
+    Y offset from planar origin in metres. Defaults to 0.
+
+"""
+function Robinson(;
+    central_longitude=0.0,
+    radius = nothing,
+    false_easting=0.0,
+    false_northing=0.0,
+    units = "m"
+    )
+
+    proj4_params = [
+        ("proj", "robin"),
+        ("lon_0", central_longitude),
+        ("x_0", false_easting),
+        ("y_0", false_northing),
+    ]
+
+    if radius !== nothing
+        push!(proj4_params, ("R", radius))
+    end
+
+    return Projection(proj4_params)
+
+end
+
+"""
+WinkelTripel(; central_longitude = 0, first_parallel = 0, false_easting=0,
+            false_northing=0, units = "m")
+
+The Winkel tripel projection was the successor of the Robinson projection, and
+minimizes the triplet (_tripel_) of distortions: area, direction, and distance.
+"""
+function WinkelTripel(;
+            central_longitude = 0,
+            first_parallel = 0,
+            false_easting=0,
+            false_northing=0,
+            units = "m"
+        )
+
+    proj4_params = [
+        ("proj", "robin"),
+        ("lon_0", central_longitude),
+        ("lat_1", first_parallel),
+        ("x_0", false_easting),
+        ("y_0", false_northing),
+        ("units", units)
+    ]
+
+
+    return Projection(proj4_params)
+end

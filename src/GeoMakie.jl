@@ -30,7 +30,7 @@ export geoaxis, geoaxis!
 
 # export projections
 
-export WGS84
+export WGS84, Mercator, TransverseMercator, UTM, AlbersEqualArea, Robinson, WinkelTripel
 
 # export utilities
 
