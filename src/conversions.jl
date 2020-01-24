@@ -8,7 +8,7 @@ Point2{T}(a::Vector{T}) where T = Point2(a[1], a[2])
 Creates a vector of [`Point`](@ref)s from the given polygon.
 Returns a `Vector{Vector{Point}}`, with one element.
 """
-toPointVecs(poly::GeoInterface.Polygon) = [Point2.(poly.coordinates[1])]
+toPointVecs(poly::GeoInterface.Polygon) = [Point2.(cs) for cs in poly.coordinates]
 
 """
     toPointVecs(mp::MultiPolygon)

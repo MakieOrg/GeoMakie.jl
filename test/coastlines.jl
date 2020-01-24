@@ -22,21 +22,11 @@ end
 
 using Proj4, Shapefile, GeoInterface, Makie, MakieLayout, PlotUtils
 
-# some hacks
-Base.Broadcast.broadcastable(p::Projection) = Ref(p)
-
-function Proj4.transform(src, dest, pt::Point2{T}) where T
-    if isnan(pt[1]) && isnan(pt[2])
-        return Point2{T}(NaN)
-    end
-    return Point2{T}(transform(src, dest, Vector(pt)))
-end
-
 # path to shapefile of coastline
 path = "ne_110m_coastline/ne_110m_coastline.shp"
 
 # plain projection
-src_proj = Projection("+proj=longlat +datum=LonLat +no_defs")
+src_proj = Projection("+proj=longlat +datum=WGS84 +no_defs")
 
 # Robinson projection
 dest_proj = Projection("+proj=robin")
