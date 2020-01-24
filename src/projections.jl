@@ -1,9 +1,27 @@
+function Projection(args::Pair...)
+
+    str = ""
+
+    for (arg, val) in args
+        if val === nothing
+            str *= "+" * string(arg)
+        else
+            str *= "+$arg=$val"
+        end
+        str *= " "
+    end
+
+    return Projection(str)
+end
+
+
 """
-    WGS84()
+    LonLat()
 
 Standard latitude-longitude grid.
 """
-WGS84() = Projection("+proj=longlat +datum=WGS84")
+LonLat() = Projection("+proj=longlat +datum=WGS84")
+const PlateCarree = LonLat
 
 """
     TransverseMercator(; central_longitude=0.0, central_latitude=0.0, false_easting=0.0, false_northing=0.0, scale_factor=1.0, units = "m")
@@ -206,7 +224,6 @@ function WinkelTripel(;
         ("y_0", false_northing),
         ("units", units)
     ]
-
 
     return Projection(proj4_params)
 end

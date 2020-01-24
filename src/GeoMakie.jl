@@ -19,7 +19,6 @@ const volume = AbstractPlotting.volume
 
 include("conversions.jl")
 include("utils.jl")
-include("projections.jl")
 include("recipes/geoaxis.jl")
 
 isdefined(MakieLayout, :WilkinsonTicks) || include("tick_compat.jl")
@@ -30,7 +29,7 @@ export geoaxis, geoaxis!
 
 # export projections
 
-export WGS84, Mercator, TransverseMercator, UTM, AlbersEqualArea, Robinson, WinkelTripel
+export LonLat, PlateCarree, Mercator, TransverseMercator, UTM, AlbersEqualArea, Robinson, WinkelTripel
 
 # export utilities
 

@@ -87,8 +87,8 @@ xaxisattrs = (
         y = yaxisattrs,
 
         crs = (
-            source = WGS84(),
-            dest   = WGS84()
+            source = LonLat(),
+            dest   = LonLat()
         )
     )
     )

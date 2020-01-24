@@ -36,7 +36,7 @@ end
 path = "ne_110m_coastline/ne_110m_coastline.shp"
 
 # plain projection
-src_proj = Projection("+proj=longlat +datum=WGS84 +no_defs")
+src_proj = Projection("+proj=longlat +datum=LonLat +no_defs")
 
 # Robinson projection
 dest_proj = Projection("+proj=robin")
@@ -175,8 +175,8 @@ function draw_geo_axis!(
         scene,
         data,
         attributes::Attributes;
-        source = crs(data) === nothing ? Projection("+proj=longlat +datum=WGS84 +no_defs") : crs(data),
-        dest = Projection("+proj=longlat +datum=WGS84 +no_defs")
+        source = crs(data) === nothing ? Projection("+proj=longlat +datum=LonLat +no_defs") : crs(data),
+        dest = Projection("+proj=longlat +datum=LonLat +no_defs")
     )
 
     limits = boundingbox(data)

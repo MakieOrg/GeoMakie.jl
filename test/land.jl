@@ -4,7 +4,7 @@ shp = Shapefile.Table("/Users/anshul/Downloads/ne_110m_land/ne_110m_land.shp") |
 
 points = rec_point(coordinates.(shp))
 
-source = WGS84()
+source = LonLat()
 
 dest = Projection("+proj=fouc")
 

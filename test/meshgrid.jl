@@ -15,10 +15,10 @@ img = load(joinpath(imgdir, "CERES_NETFLUX_M_2006-07.TIFF"))
 lons = LinRange(-89, 90, size(img)[1])
 lats = LinRange(-179, 180, size(img)[2])
 
-source = WGS84()
+source = LonLat()
 dest = Projection("+proj=robin")
 
-points = GeoMakie.transform.(WGS84(), dest, GeoMakie.gridpoints(lats, lons))
+points = GeoMakie.transform.(LonLat(), dest, GeoMakie.gridpoints(lats, lons))
 faces  = GeoMakie.grid_triangle_faces(lats, lons)
 
 
