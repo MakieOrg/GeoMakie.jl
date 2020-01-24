@@ -66,6 +66,8 @@ function to_nansep_vec(f::Function, data::Vector{Vector{T}}) where T
 
 end
 
+to_nansep_vec(data::Vector{Vector{T}}) where T = to_nansep_vec(identity, data)
+
 linevec_transformed = to_nansep_vec(data) do datum
     transform.(src_proj, dest_proj, datum)
 end

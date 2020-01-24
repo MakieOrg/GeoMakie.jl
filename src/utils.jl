@@ -58,3 +58,35 @@ triangulated_grid(xs, ys) = (gridpoints(xs, ys), grid_triangle_faces(xs, ys))
 
 date_regex(dirname, ext) = Regex("$(dirname)_(\\d{4})-(\\d{2}).$(uppercase(ext))")
 imflip(img) = reverse(vec(transpose(reverse(img; dims=2))))
+
+"""
+    to_nansep_vec([f::Function,] data::Vector{Vector{T}}) where T
+
+Flattens the given Vector of Vectors into a single Vector,
+while inserting NaN separations between each individual sub-
+vector.
+
+If `f` is given, then `f` will be executed on each subvector
+before it is merged into the main vector.  If it is not, the data
+will remain unchanged.
+"""
+function to_nansep_vec(f::Function, data::AbstractVector{AbstractVector{T}}) where T
+
+    length_of_data = sum(length.(data)) + length(data)
+
+    lvec = Vector{T}(undef, length_of_data)
+
+    pos = 1
+
+    for (i, datum) in enumerate(data)
+        lvec[pos:(pos+length(datum)-1)] .= f(datum)
+        pos += length(datum)
+        lvec[pos] = Point2f0(NaN, NaN)
+        pos += 1
+    end
+
+    return lvec
+
+end
+
+to_nansep_vec(data::Vector{Vector{T}}) where T = to_nansep_vec(identity, data)
