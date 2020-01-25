@@ -9,6 +9,7 @@ using MakieLayout: Formatting
 @reexport using GeoInterface, Proj4
 
 import AbstractPlotting: convert_arguments, convert_attribute
+using AbstractPlotting.DocStringExtensions
 
 # fix conflicts
 const AbstractGeometry = GeometryTypes.AbstractGeometry
