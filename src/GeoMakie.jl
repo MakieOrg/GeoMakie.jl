@@ -22,7 +22,7 @@ include("projections.jl")
 include("utils.jl")
 include("recipes/geoaxis.jl")
 
-isdefined(MakieLayout, :WilkinsonTicks) || include("tick_compat.jl")
+include("tick_compat.jl")
 
 # export recipes
 
