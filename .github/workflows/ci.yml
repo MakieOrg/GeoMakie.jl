@@ -1,0 +1,33 @@
+name: CI
+
+name: Run tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        julia-version: [stable, nightly]
+        julia-arch: [x64, x86]
+        os: [ubuntu-latest, macOS-latest]
+        exclude:
+          - os: macOS-latest
+            julia-arch: x86
+
+    steps:
+      - uses: actions/checkout@v1.0.0
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@latest
+        with:
+          version: ${{ matrix.julia-version }}
+      - name: Add package versions
+        run: julia -e 'using Pkg; pkg"add MakieLayout#master AbstractPlotting#master CairoMakie#master Proj4#master NASAEarthObservations#master"'
+      - name: Run tests
+        uses: julia-actions/julia-runtest@master
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v1.0.0
+        with:
+          name: Ceres net flux video
+          path: ./ceres_netflux.mp4
