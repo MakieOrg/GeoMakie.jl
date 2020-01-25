@@ -7,7 +7,7 @@ imgdir = observations("geotiff/CERES_NETFLUX_M")
 
 date_regex(dirname, ext) = Regex("$(dirname)_(\\d{4})-(\\d{2}).$(uppercase(ext))")
 
-img = load(joinpath(imgdir, "CERES_NETFLUX_M_2006-07.TIFF"))
+img = ImageMagick.load(joinpath(imgdir, "CERES_NETFLUX_M_2006-07.TIFF"))
 
 lons = LinRange(-89, 90, size(img)[1])
 lats = LinRange(-179, 180, size(img)[2])
