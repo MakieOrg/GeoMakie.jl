@@ -18,11 +18,12 @@ titletext = Node(join(match(re, basename(imgpaths[1])).captures, '-'))
 lons = LinRange(-179.5, 179.5, size(img)[2])
 lats = LinRange(89.5, -89.5, size(img)[1])
 
-points, faces = GeoMakie.triangulated_grid(lons, lats)
+xs = [lon for lat in lats, lon in lons]
+ys = [lat for lat in lats, lon in lons]
 
-tpoints = transform.(source, dest, points)
+Proj4.transform!(source, dest, vec(xs), vec(ys))
 
-scene = poly(tpoints, faces; color = img[:], show_axis = false);
+scene = surface(xs, ys, zeros(size(xs)); color = img, shading = false, show_axis = false)
 
 geoaxis!(scene, -180, 180, -90, 90; crs = (src = src, dest = dest,));
 

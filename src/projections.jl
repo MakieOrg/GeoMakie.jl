@@ -14,6 +14,19 @@ function Projection(args::Pair...)
     return Projection(str)
 end
 
+function Proj4.transform!(src::Projection, dest::Projection, x::Vector{Float64}, y::Vector{Float64}, z::Vector{Float64} = zeros(length(y)); radians = false)
+    @assert length(x) == length(y) == length(z) "Input vectors must have the same length!"
+    if !radians && is_latlong(src)
+        x .= deg2rad.(x)
+        y .= deg2rad.(y)
+    end
+    Proj4._transform!(src.rep, dest.rep, length(x), 1, x, y, z)
+    if !radians && is_latlong(dest)
+        x .= deg2rad.(x)
+        y .= deg2rad.(y)
+    end
+    position
+end
 
 """
     LonLat()

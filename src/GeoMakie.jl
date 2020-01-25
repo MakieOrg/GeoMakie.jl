@@ -18,6 +18,7 @@ const transform! = Proj4.transform!
 const volume = AbstractPlotting.volume
 
 include("conversions.jl")
+include("projections.jl")
 include("utils.jl")
 include("recipes/geoaxis.jl")
 

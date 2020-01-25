@@ -14,4 +14,5 @@ makedocs(;
 
 deploydocs(;
     repo="github.com/asinghvi17/GeoMakie.jl",
+    push_preview = true
 )
