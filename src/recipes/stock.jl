@@ -5,7 +5,7 @@
     )
 end
 
-function plot!(p::Coastlines)
+function AbstractPlotting.plot!(p::Coastlines)
 
     @extract p (crs,)
 
@@ -15,10 +15,13 @@ function plot!(p::Coastlines)
         new_linevec[] = Proj4.transform.(source, dest, COASTLINES_LINEVEC)
     end
 
-    lines!(p, p.attributes, )
+    lines!(p, new_linevec)
 end
 
-@recipe(Earth) do scene
+coastlines(; kwargs...) = coastlines(1; kwargs...)
+coastlines!(sc = AbstractPlotting.current_scene(); kwargs...) = coastlines!(sc, 1; kwargs...)
+
+@recipe(Earth, bbox) do scene
     merge(
         default_theme(scene, Surface),
         Theme(
@@ -31,25 +34,28 @@ end
     )
 end
 
-function plot!(p::Earth)
+function AbstractPlotting.plot!(p::Earth)
 
     @extract p (crs,)
 
-    lons = LinRange(-179, 180, size(EARTH_IMG)[2])
-    lats = LinRange(90, -89, size(EARTH_IMG)[1])
+    lons = LinRange(-180, 179, size(EARTH_IMG)[2])
+    lats = LinRange(89.5, -89.5, size(EARTH_IMG)[1])
 
     xs = Node([lon for lat in lats, lon in lons])
     ys = Node([lat for lat in lats, lon in lons])
 
-    lift(crs.source, crs.dest) do src, dest
+    lift(crs.source, crs.dest) do source, dest
 
         xs.val = [lon for lat in lats, lon in lons]
         ys.val = [lat for lat in lats, lon in lons]
-        Proj4.transform!(source, dest, vec(xs), vec(ys))
+        Proj4.transform!(source, dest, vec(xs.val), vec(ys.val))
 
-        notify!(xs)
-        notify!(ys)
+        xs[] = xs[]
+        ys[] = ys[]
     end
 
-    surface!(p, p.attributes, xs, ys, zeros(size(xs)); color = EARTH_IMG, shading = false, show_axis = false)
+    surface!(p, xs, ys, zeros(size(xs[])); color = EARTH_IMG, shading = false, show_axis = false)
 end
+
+earth(; kwargs...) = earth(1; kwargs...)
+earth!(sc = AbstractPlotting.current_scene(); kwargs...) = earth!(sc, 1; kwargs...)
