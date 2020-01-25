@@ -8,7 +8,7 @@ frameattrs = (
 yaxisattrs = (
     tick = (
     # tick marks
-        ticks   = MakieLayout.WilkinsonTicks(; k_min = 5, k_ideal = 7, k_max = 15),
+        ticks   = WilkinsonTicks(; k_min = 5, k_ideal = 7, k_max = 15),
         autolimitmargin = 0.05f0,
         size    = 10f0,
         visible = true,
@@ -37,7 +37,7 @@ yaxisattrs = (
 xaxisattrs = (
     tick = (
     # tick marks
-        ticks   = MakieLayout.WilkinsonTicks(; k_min = 5, k_ideal = 7, k_max = 12),
+        ticks   = WilkinsonTicks(; k_min = 5, k_ideal = 7, k_max = 12),
         autolimitmargin = 0.05f0,
         size    = 10f0,
         visible = true,
