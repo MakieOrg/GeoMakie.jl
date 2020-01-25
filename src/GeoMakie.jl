@@ -20,9 +20,10 @@ const volume = AbstractPlotting.volume
 include("conversions.jl")
 include("projections.jl")
 include("utils.jl")
+include("tick_compat.jl")
+
 include("recipes/geoaxis.jl")
 
-include("tick_compat.jl")
 
 # export recipes
 
