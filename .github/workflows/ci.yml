@@ -8,11 +8,8 @@ jobs:
     strategy:
       matrix:
         julia-version: [stable, nightly]
-        julia-arch: [x64, x86]
+        julia-arch: [x64]
         os: [ubuntu-latest, macOS-latest]
-        exclude:
-          - os: macOS-latest
-            julia-arch: x86
 
     steps:
       - uses: actions/checkout@v1.0.0
