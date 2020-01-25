@@ -1,4 +1,4 @@
-function Projection(args::Pair...)
+function Projection(args::Vector{<: Pair})
 
     str = ""
 
@@ -13,6 +13,8 @@ function Projection(args::Pair...)
 
     return Projection(str)
 end
+
+Projection(args::Pair...) = Projection(args)
 
 function Proj4.transform!(src::Projection, dest::Projection, x::Vector{Float64}, y::Vector{Float64}, z::Vector{Float64} = zeros(length(y)); radians = false)
     @assert length(x) == length(y) == length(z) "Input vectors must have the same length!"
