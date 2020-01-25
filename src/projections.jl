@@ -1,4 +1,4 @@
-function Projection(args::Vector{<: Pair})
+function Projection(args::Vector{<: Union{Pair, Tuple{String, Any}}})
 
     str = ""
 
