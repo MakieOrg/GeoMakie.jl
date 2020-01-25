@@ -23,13 +23,13 @@ Proj4.transform!(source, dest, vec(xs), vec(ys))
 
 scene = surface(xs, ys, zeros(size(xs)); color = img, shading = false, show_axis = false)
 
-geoaxis!(scene, -180, 180, -90, 90; crs = (src = src, dest = dest,));
+geoaxis!(scene, -180, 180, -90, 90; crs = (src = source, dest = dest,));
 
 titletext = Node("07/2016")
 
 fullsc = title(sc, titletext; fontsize = 40);
 
-record(fullsc, "ceres_netflux.mp4", filter!(x -> uppercase(splitext(x)[2]) == ".TIFF", sort(readdir(imgdir))); framerate = 10) do img
+record(fullsc, "particulates.mp4", filter!(x -> uppercase(splitext(x)[2]) == ".TIFF", sort(readdir(imgdir))); framerate = 10) do img
 
     year, month = match(re, img).captures
 
