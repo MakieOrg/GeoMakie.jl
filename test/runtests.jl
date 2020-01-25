@@ -27,7 +27,7 @@ geoaxis!(scene, -180, 180, -90, 90; crs = (src = source, dest = dest,));
 
 titletext = Node("07/2016")
 
-fullsc = title(sc, titletext; fontsize = 40);
+fullsc = title(scene, titletext; fontsize = 40);
 
 record(fullsc, "particulates.mp4", filter!(x -> uppercase(splitext(x)[2]) == ".TIFF", sort(readdir(imgdir))); framerate = 10) do img
 
