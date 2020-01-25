@@ -1,27 +1,29 @@
-using GeoMakie, CairoMakie, AbstractPlotting, ImageMagick, NASAEarthObservations
+using GeoMakie, CairoMakie, AbstractPlotting, ImageMagick, NASAEarthObservations, Glob
 using Test
 
-
-# download data - ~140 MB
-imgdir = observations("geotiff/CERES_NETFLUX_M")
-
-date_regex(dirname, ext) = Regex("$(dirname)_(\\d{4})-(\\d{2}).$(uppercase(ext))")
-
-img = ImageMagick.load(joinpath(imgdir, "CERES_NETFLUX_M_2006-07.TIFF"))
-
-lons = LinRange(-89, 90, size(img)[1])
-lats = LinRange(-179, 180, size(img)[2])
-
 source = LonLat()
-dest = Projection("+proj=robin")
+dest = WinkelTripel()
 
-points = GeoMakie.transform.(LonLat(), dest, GeoMakie.gridpoints(lats, lons))
-faces  = GeoMakie.grid_triangle_faces(lats, lons)
+imgdir = observations("rgb/MYDAL2_M_AER_RA")
 
+imgpaths = sort(Glob.glob(joinpath(relpath(imgdir), "*.PNG"))) # change this to your requirements
 
-scene = poly(points, faces; color = imflip(img), show_axis = false);
+img = ImageMagick.load(imgpaths[1])
 
-geoaxis!(scene, -180, 180, -90, 90; crs = (dest = dest,));
+re = GeoMakie.date_regex("MYDAL2_M_AER_RA", "PNG")
+titletext = Node(join(match(re, basename(imgpaths[1])).captures, '-'))
+
+lons = LinRange(-179.5, 179.5, size(img)[2])
+lats = LinRange(89.5, -89.5, size(img)[1])
+
+xs = [lon for lat in lats, lon in lons]
+ys = [lat for lat in lats, lon in lons]
+
+Proj4.transform!(source, dest, vec(xs), vec(ys))
+
+scene = surface(xs, ys, zeros(size(xs)); color = img, shading = false, show_axis = false)
+
+geoaxis!(scene, -180, 180, -90, 90; crs = (src = src, dest = dest,));
 
 titletext = Node("07/2016")
 
@@ -31,6 +33,6 @@ record(fullsc, "ceres_netflux.mp4", filter!(x -> uppercase(splitext(x)[2]) == ".
 
     year, month = match(re, img).captures
 
-    scene.plots[1].color = imflip(ImageMagick.load(joinpath(imgdir,img)))
+    scene.plots[1].color = ImageMagick.load(joinpath(imgdir,img))
     titletext[] = "$month/$year"
 end
