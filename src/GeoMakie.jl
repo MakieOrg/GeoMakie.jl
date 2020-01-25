@@ -1,7 +1,7 @@
 module GeoMakie
 
 using Reexport
-using GeometryTypes, EarCut, Colors, MakieLayout, AbstractPlotting
+using GeometryTypes, EarCut, Colors, MakieLayout, AbstractPlotting, ImageMagick, GeoJSON
 
 using MakieLayout: Formatting
 
@@ -22,8 +22,10 @@ include("conversions.jl")
 include("projections.jl")
 include("utils.jl")
 include("tick_compat.jl")
+include("data.jl")
 
 include("recipes/geoaxis.jl")
+include("recipes/stock.jl")
 
 
 # export recipes

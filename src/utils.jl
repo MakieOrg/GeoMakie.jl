@@ -70,11 +70,11 @@ If `f` is given, then `f` will be executed on each subvector
 before it is merged into the main vector.  If it is not, the data
 will remain unchanged.
 """
-function to_nansep_vec(f::Function, data::AbstractVector{AbstractVector{T}}) where T
+function to_nansep_vec(f::Function, data::AbstractVector{T}, outtyp = Point2f0) where T
 
     length_of_data = sum(length.(data)) + length(data)
 
-    lvec = Vector{T}(undef, length_of_data)
+    lvec = Vector{outtyp}(undef, length_of_data)
 
     pos = 1
 
@@ -89,4 +89,4 @@ function to_nansep_vec(f::Function, data::AbstractVector{AbstractVector{T}}) whe
 
 end
 
-to_nansep_vec(data::Vector{Vector{T}}) where T = to_nansep_vec(identity, data)
+to_nansep_vec(data::Vector{Vector{T}}, outtyp = Point2f0) where T = to_nansep_vec(identity, data, outtyp)

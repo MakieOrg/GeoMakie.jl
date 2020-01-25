@@ -1,5 +1,3 @@
-using Pkg
-pkg"add https://github.com/asinghvi17/NASAEarthObservations.jl"
 using GeoMakie, Makie, NASAEarthObservations, Glob
 using ImageMagick
 
