@@ -28,6 +28,16 @@ function Proj4.transform!(src::Projection, dest::Projection, x::Vector{Float64},
     position
 end
 
+const PtrOrVecCdouble = Union{Ptr{Cdouble}, Vector{Cdouble}}
+"Low level interface to libproj transform, C_NULL can be passed in for z, if it's 2-dimensional"
+function Proj4._transform!(src_ptr::Ptr{Cvoid}, dest_ptr::Ptr{Cvoid}, point_count::Integer, point_stride::Integer,
+                     x::PtrOrVecCdouble, y::PtrOrVecCdouble, z::PtrOrVecCdouble)
+    @assert src_ptr != C_NULL && dest_ptr != C_NULL
+    err = ccall((:pj_transform, Proj4.libproj), Cint, (Ptr{Cvoid}, Ptr{Cvoid}, Clong, Cint, Ptr{Cdouble}, Ptr{Cdouble},
+                Ptr{Cdouble}), src_ptr, dest_ptr, point_count, point_stride, x, y, z)
+    err != 0 && error("transform error: $(_strerrno(err))")
+end
+
 """
     LonLat()
 
