@@ -1,22 +1,19 @@
-Julia 1.1:
-  image: julia:1.1
-  script: julia --project='@.' -e 'using Pkg; Pkg.build(); Pkg.test(; coverage=true)'
-  coverage: /Test Coverage (\d+\.\d+%)/
-  after_script:
-    - julia -e 'using Printf; using Pkg; Pkg.add("Coverage"); using Coverage; c, t = get_summary(process_folder()); @printf "Test Coverage %.2f%%\n" 100c/t'
-pages:
-  image: julia:1.1
-  stage: deploy
+include:
+  - 'https://raw.githubusercontent.com/JuliaGPU/gitlab-ci/master/templates/v6.yml'
+  
+variables:
+  MODERNGL_DEBUGGING: "true"
+  JULIA_DEPOT_PATH: "$CI_PROJECT_DIR/.julia/"
+  CI_DEV_PKGS: "Makie#master AbstractPlotting#master GLMakie#master MakieLayout#master Proj4#master"
+
+
+test:1.3:
+  extends:
+    - .julia:1.3
   script:
-    - julia --project=docs -e '
-          using Pkg;
-          Pkg.develop(PackageSpec(path=pwd()));
-          Pkg.instantiate();
-          include("docs/make.jl");'
-    - mkdir -p public
-    - mv docs/build public/dev
-  artifacts:
-    paths:
-      - public
-  only:
-    - master
+    - julia -e 'using Pkg; pkg"add $CI_DEV_PKGS"'
+    - julia --project -e 'using Pkg;
+                      Pkg.instantiate();
+                      Pkg.build();
+                      Pkg.test(; coverage=true);'
+                      
