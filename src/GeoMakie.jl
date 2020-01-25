@@ -6,7 +6,7 @@ using GeometryTypes, EarCut, Colors, MakieLayout, AbstractPlotting, ImageMagick,
 using MakieLayout: Formatting
 
 @reexport using Colors, AbstractPlotting
-@reexport using GeoInterface, Proj4
+@reexport using GeoInterface, Proj4, NASAEarthObservations
 
 import AbstractPlotting: convert_arguments, convert_attribute
 using AbstractPlotting.DocStringExtensions
