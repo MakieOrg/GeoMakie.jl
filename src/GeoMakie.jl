@@ -40,6 +40,11 @@ export LonLat, PlateCarree, Mercator, TransverseMercator, UTM, AlbersEqualArea, 
 
 export rec_project, rec_point, triangulated_grid
 
+function __init__()
+    Base.delete_method(methods(coastlines!).ms[6])
+    Base.delete_method(methods(earth!).ms[6])
+end
+
 end # module
 
 ## TODOS

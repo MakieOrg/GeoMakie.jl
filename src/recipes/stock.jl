@@ -19,7 +19,9 @@ function AbstractPlotting.plot!(p::Coastlines)
 end
 
 coastlines(; kwargs...) = coastlines(1; kwargs...)
-coastlines!(sc = AbstractPlotting.current_scene(); kwargs...) = coastlines!(sc, 1; kwargs...)
+coastlines!(sc = AbstractPlotting.current_scene(); kwargs...) = plot!(sc, Coastlines, Attributes(attributes), 1)
+coastlines!(; attributes...) = plot!(AbstractPlotting.current_scene(), Coastlines, Attributes(attributes), 1)
+
 
 @recipe(Earth, bbox) do scene
     merge(
@@ -58,4 +60,5 @@ function AbstractPlotting.plot!(p::Earth)
 end
 
 earth(; kwargs...) = earth(1; kwargs...)
-earth!(sc = AbstractPlotting.current_scene(); kwargs...) = earth!(sc, 1; kwargs...)
+earth!(sc = AbstractPlotting.current_scene(); attributes...) = plot!(sc, Earth, Attributes(attributes), 1)
+earth!(; attributes...) = plot!(AbstractPlotting.current_scene(), Earth, Attributes(attributes), 1)
