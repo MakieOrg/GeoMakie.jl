@@ -1,15 +1,35 @@
+########################################
+#            Side constants            #
+########################################
+
 const TOP = Top()
 const LEFT = Left()
 const RIGHT = Right()
 const BOTTOM = Bottom()
 
+
+################################################################################
+#                              Utility functions                               #
+################################################################################
+
 to2tuple(x1, x2) = (x1, x2)
 
+"""
+Recursively convert every element in the collection to a Point2f0.
+"""
 rec_point(x::Vector{<: AbstractFloat}) = Point2f0(x)
 rec_point(x) = rec_point.(x)
 
+"""
+Recurses through the given structure until it reaches a Point2f0, then projects it.
+"""
 rec_project(source::Projection, dest::Projection, array) = rec_project.(source, dest, array)
 rec_project(source::Projection, dest::Projection, point::Point2f0) = transform(source, dest, point)
+
+
+########################################
+#          Grid tessellation           #
+########################################
 
 """
     grid_triangle_faces(lats, lons)
@@ -22,7 +42,7 @@ function grid_triangle_faces(lons, lats)
     xmax = length(lons)
 
     i = 1
-
+    # TODO optimize this with broadcast
     for lon in eachindex(lons)[1:end-1]
 
         for lat in eachindex(lats)[1:end-1]
@@ -59,6 +79,10 @@ triangulated_grid(xs, ys) = (gridpoints(xs, ys), grid_triangle_faces(xs, ys))
 date_regex(dirname, ext) = Regex("$(dirname)_(\\d{4})-(\\d{2}).$(uppercase(ext))")
 imflip(img) = reverse(vec(transpose(reverse(img; dims=2))))
 
+########################################
+#       Nested array flattening        #
+########################################
+
 """
     to_nansep_vec([f::Function,] data::Vector{Vector{T}}) where T
 
@@ -81,7 +105,7 @@ function to_nansep_vec(f::Function, data::AbstractVector{T}, outtyp = Point2f0) 
     for (i, datum) in enumerate(data)
         lvec[pos:(pos+length(datum)-1)] .= f(datum)
         pos += length(datum)
-        lvec[pos] = Point2f0(NaN, NaN)
+        lvec[pos] = outtyp(NaN)
         pos += 1
     end
 
@@ -90,3 +114,37 @@ function to_nansep_vec(f::Function, data::AbstractVector{T}, outtyp = Point2f0) 
 end
 
 to_nansep_vec(data::Vector{Vector{T}}, outtyp = Point2f0) where T = to_nansep_vec(identity, data, outtyp)
+
+########################################
+#     Matrix-based grid generation     #
+########################################
+
+"""
+    xygrid(lons::Vector, lats::Vector; projection = LatLon()) -> (x::Matrix, y::Matrix)
+
+Generates a grid of x and y coordinates in lat-lon space from the given ranges.
+
+Optionally, also projects them into the specified CRS before returning them.
+
+!!! note
+    Materializing the matrices is necessary for C-interoperability,
+    since passing the matrix to C implies that it can't
+    be stored lazily and generated on the fly.
+"""
+function xygrid(lons::AbstractVector{<: Number}, lats::AbstractVector{<: Number}; projection = LatLon())
+
+    # sort the inputs - conform to Proj ordering
+    lons = sort(lons)
+    lats = sort(lats; rev = true)
+
+    xs = [lon for lat in lats, lon in lons]  # xs / longitudes
+    ys = [lat for lat in lats, lon in lons]  # ys / latitudes
+
+    # this will internally reinterpret the matrices as vectors,
+    # and transform them in place in C.  The matrices will
+    # then hold the modified values.
+    projection == LatLon() || Proj4.transform!(LatLon(), projection, xs, ys)
+
+    return xs, ys
+
+end

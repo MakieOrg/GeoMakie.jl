@@ -38,7 +38,7 @@ export LonLat, PlateCarree, Mercator, TransverseMercator, UTM, AlbersEqualArea, 
 
 # export utilities
 
-export rec_project, rec_point, triangulated_grid
+export rec_project, rec_point, xygrid
 
 function __init__()
     Base.delete_method(methods(coastlines!).ms[6])
