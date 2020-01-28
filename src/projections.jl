@@ -16,6 +16,32 @@ end
 
 Projection(args::Pair...) = Projection(args)
 
+function Proj4.transform(
+        src::Projection, dest::Projection,
+        x::AbstractVecOrMat{<: AbstractFloat},
+        y::AbstractVecOrMat{<: AbstractFloat},
+        z::AbstractVecOrMat{<: AbstractFloat} = zeros(size(y))
+    )
+
+    @assert size(x) == size(y) == size(z)
+
+    xv, yv, zv = vec(Float64.(x)), vec(Float64.(y)), vec(Float64.(z))
+
+    Proj4.transform!(src, dest, xv, yv, zv)
+
+    return xv, yv, zv
+end
+
+function Proj4.transform!(
+    src::Projection, dest::Projection,
+    x::VecOrMat{Float64},
+    y::VecOrMat{Float64},
+    z::VecOrMat{Float64} = zeros(size(y))
+    )
+
+    return Proj4.transform!(src, dest, vec(x), vec(y), vec(z))
+end
+
 function Proj4.transform!(src::Projection, dest::Projection, x::Vector{Float64}, y::Vector{Float64}, z::Vector{Float64} = zeros(length(y)); radians = false)
     @assert length(x) == length(y) == length(z) "Input vectors must have the same length!"
     if !radians && is_latlong(src)
