@@ -18,6 +18,7 @@ Proj4 = "9a7e659c-8ee8-5706-894e-f68f43bc57ea"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 
 [compat]
+AbstractPlotting = "0.9"
 Proj4 = "0.6"
 julia = "1.1"
 
