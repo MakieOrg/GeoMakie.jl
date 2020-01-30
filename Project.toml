@@ -20,6 +20,7 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 [compat]
 AbstractPlotting = "0.9"
 Colors = "0"
+NASAEarthObservations = "0.1"
 GeoJSON = "0.5"
 ImageMagick = "1"
 GeometryTypes = "0.7"
