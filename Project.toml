@@ -19,6 +19,7 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 
 [compat]
 AbstractPlotting = "0.9"
+GeoJSON = "0.5"
 Proj4 = "0.6"
 julia = "1.1"
 
