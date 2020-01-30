@@ -19,8 +19,9 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 
 [compat]
 AbstractPlotting = "0.9"
-GeoJSON = "0.5"
 Colors = "0"
+GeoJSON = "0.5"
+ImageMagick = "1"
 GeometryTypes = "0.7"
 EarCut = "1"
 Proj4 = "0.6"
