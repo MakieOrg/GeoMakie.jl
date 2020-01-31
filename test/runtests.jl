@@ -19,9 +19,10 @@ lats = LinRange(89.5, -89.5, size(img)[1])
 xs = [lon for lat in lats, lon in lons]
 ys = [lat for lat in lats, lon in lons]
 
-Proj4.transform!(source, dest, vec(xs), vec(ys))
+points, faces = GeoMakie.triangulated_grid(lons, lats)
+tpoints = Proj4.transform(source, dest, points)
 
-scene = surface(xs, ys, zeros(size(xs)); color = img, shading = false, show_axis = false)
+scene = mesh(tpoints, faces; color = img[:], shading = false, show_axis = false, scale_plot = false)
 
 geoaxis!(scene, -180, 180, -90, 90; crs = (src = source, dest = dest,));
 
