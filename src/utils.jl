@@ -131,20 +131,27 @@ Optionally, also projects them into the specified CRS before returning them.
     since passing the matrix to C implies that it can't
     be stored lazily and generated on the fly.
 """
-function xygrid(lons::AbstractVector{<: Number}, lats::AbstractVector{<: Number}; projection = LatLon())
+function xygrid(lons::AbstractVector{<: Number}, lats::AbstractVector{<: Number}; projection = LonLat())
 
-    # sort the inputs - conform to Proj ordering
-    lons = sort(lons)
-    lats = sort(lats; rev = true)
+    lats = Float64.(lats)
+    lons = Float64.(wrap_lon(lons))
 
-    xs = [lon for lat in lats, lon in lons]  # xs / longitudes
-    ys = [lat for lat in lats, lon in lons]  # ys / latitudes
+    xs = [lon for lon in lons, lat in lats]  # xs / longitudes
+    ys = [lat for lon in lons, lat in lats]  # ys / latitudes
 
     # this will internally reinterpret the matrices as vectors,
     # and transform them in place in C.  The matrices will
     # then hold the modified values.
-    projection == LatLon() || Proj4.transform!(LatLon(), projection, xs, ys)
+    projection == LonLat() || Proj4.transform!(LonLat(), projection, vec(xs), vec(ys))
 
     return xs, ys
 
 end
+
+"""
+    wrap_lon(x)
+
+Wraps the input longitude (or Vector of longitudes)
+into the domain `(-180, 180)`.
+"""
+wrap_lon(x) = -180 .+ (360 .+ ((x.+180) .% 360)) .% 360

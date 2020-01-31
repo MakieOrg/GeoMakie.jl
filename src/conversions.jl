@@ -8,7 +8,7 @@ Point2{T}(a::Vector{T}) where T = Point2(a[1], a[2])
 Creates a vector of [`Point`](@ref)s from the given polygon.
 Returns a `Vector{Vector{Point}}`, with one element.
 """
-toPointVecs(poly::GeoInterface.Polygon) = [Point2.(cs) for cs in poly.coordinates]
+toPointVecs(poly::T) where T <: GeoInterface.AbstractPolygon = [Point2.(cs) for cs in coordinates(poly)]
 
 """
     toPointVecs(mp::MultiPolygon)
@@ -20,7 +20,13 @@ Returns a `Vector{Vector{Point}}`.
     There is no support for holes in this function at present; that will need to
     wait for GeometryBasics.jl to become complete, possibly replacing GeoInterface.
 """
-toPointVecs(mp::GeoInterface.MultiPolygon) = map(x -> Point2.(x[1]), mp.coordinates)
+function toPointVecs(mp::T) where T <: GeoInterface.AbstractMultiPolygon
+
+    polys = []
+
+end
+
+
 
 """
     nonzero(pt::GeometryTypes.Point{2, T}) where T
@@ -40,47 +46,57 @@ function imprecise(arr)
     return !any(nonzero.(dif))
 end
 
-function toMesh(mp::Vector{Vector{Vector{Point2{T}}}}) where T
+"""
+    toMeshes(mp::Vector{Vector{Vector{Point2}}})::Vector{GLNormalUVMesh}
+    toMeshes(p::Vector{Vector{Point2}})::Vector{GLNormalUVMesh}
+
+Takes in a polygon, or a multipolygon, and returns a vector of meshes
+(which may only contain one mesh).
+"""
+function toMeshes(mp::Vector{Vector{Vector{Point2{T}}}}) where T
 
     meshes = GLNormalMesh[]
+    # give a hint for the size of the vector so we don't dynamically allocate
+    sizehint!(meshes, length(mp))
 
-    for pol in mp # we check for holes here
+    for pol in mp
+        # this **should** account for holes...
         triangle_faces = EarCut.triangulate(pol)
 
-        v = map(x-> Point3{T}(x[1], x[2], 0), vcat(pol...))
+        v = map(x-> Point3f0(x[1], x[2], 0), vcat(pol...))
 
         push!(meshes, GLNormalMesh(vertices=v, faces=triangle_faces))
     end
 
-    length(mp) == 1 && return meshes[1]
-
-    return merge(meshes)
+    return meshes
 end
 
-function toMesh(mp::Vector{Vector{Point2{T}}}) where T
+function toMeshes(mp::Vector{Vector{Point2{T}}}) where T
 
-    meshes = GLNormalMesh[]
+    triangle_faces = EarCut.triangulate(mp)
 
-    for pol in mp # WARNING we don't check for holes here, should probably do that...
-        triangle_faces = EarCut.triangulate([pol])
+    v = map(x-> Point3{T}(x[1], x[2], 0), vcat(mp...))
 
-        v = map(x-> Point3{T}(x[1], x[2], 0), pol)
+    return [GLNormalMesh(vertices=v, faces=triangle_faces)]
+end
 
-        push!(meshes, GLNormalMesh(vertices=v, faces=triangle_faces))
+function toMeshes(mps::Vector{<: GeoInterface.AbstractMultiPolygon})
+    meshes = GLNormalUVMesh[]
+    sizehint!(meshes, length(mps))
+    for mp in mps
+        polys = coordinates(mp) |> rec_point
+        push!(meshes, merge(vcat(toMeshes.(polys)...)))
     end
 
-    length(mp) == 1 && return meshes[1]
-
-    return merge(meshes)
+    return meshes
 end
-
 # # Argument conversions
 
 # ## Polygons
 
-convert_arguments(::AbstractPlotting.Poly, poly::GeoInterface.Polygon) = (toPointVecs(poly)[1],)
+convert_arguments(::Type{<: Poly}, poly::T) where T <: GeoInterface.AbstractPolygon = (toPointVecs(poly)[1],)
 
-convert_arguments(::Poly, mp::GeoInterface.MultiPolygon) = (toPointVecs(mp),)
+convert_arguments(::Type{<: Poly}, mp::T) where T <: GeoInterface.AbstractMultiPolygon = (toPointVecs(mp),)
 
 # Only converts polygons and multipolygons
 function convert_arguments(::Type{<: Poly}, fc::GeoInterface.FeatureCollection{GeoInterface.Feature})
@@ -118,11 +134,15 @@ function convert_arguments(::Type{<: Poly}, fc::GeoInterface.FeatureCollection{G
 end
 
 function AbstractPlotting.convert_arguments(::Type{<: Mesh}, fc::GeoInterface.FeatureCollection{GeoInterface.Feature})
-    return (fc.features .|> GeoInterface.geometry .|> toPointVecs .|> toMesh,) # return a Vector of meshes
+    return (fc.features .|> GeoInterface.geometry .|> toPointVecs .|> toMeshes,) # return a Vector of meshes
 end
 
+convert_arguments(::Type{<: Mesh}, polys::Vector{<:GeoInterface.AbstractMultiPolygon}) = (toMeshes(polys),)
 
-# function plot!(plot::Poly{<: Tuple{GeoInterface.FeatureCollection{GeoInterface.Feature}}})5ytgtcx89o9lo
+# set the default plot type for Vectors of polygons,
+# so that they are plotted using the most efficient method!
+plottype(::Vector{<: GeoInterface.AbstractMultiPolygon}) = Mesh
+plottype(::Vector{<: GeoInterface.AbstractPolygon}) = Mesh
 
 function Proj4.transform(src, dest, pt::Point2{T}) where T
     if isnan(pt[1]) && isnan(pt[2])
