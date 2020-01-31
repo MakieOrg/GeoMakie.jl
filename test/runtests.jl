@@ -20,7 +20,7 @@ xs = [lon for lat in lats, lon in lons]
 ys = [lat for lat in lats, lon in lons]
 
 points, faces = GeoMakie.triangulated_grid(lons, lats)
-tpoints = Proj4.transform(source, dest, points)
+tpoints = Proj4.transform.(source, dest, points)
 
 scene = mesh(tpoints, faces; color = img[:], shading = false, show_axis = false, scale_plot = false)
 

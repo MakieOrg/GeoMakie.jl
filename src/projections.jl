@@ -56,6 +56,10 @@ function Proj4.transform!(src::Projection, dest::Projection, x::Vector{Float64},
     position
 end
 
+Proj4.transform(src::Projection, dest::Projection, x::Point2f0) = Proj4.transform(src, dest, [x[1], x[2]])
+
+# Proj4.transform!(src::Projection, dest::Projection, points::T) where T <: StructVector{Point2f0} = Proj4.transform!(src, dest, points.data)
+
 const PtrOrVecCdouble = Union{Ptr{Cdouble}, Vector{Cdouble}}
 "Low level interface to libproj transform, C_NULL can be passed in for z, if it's 2-dimensional"
 function Proj4._transform!(src_ptr::Ptr{Cvoid}, dest_ptr::Ptr{Cvoid}, point_count::Integer, point_stride::Integer,

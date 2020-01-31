@@ -1,7 +1,7 @@
 name = "GeoMakie"
 uuid = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
 authors = ["Anshul Singhvi"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 AbstractPlotting = "537997a7-5e4e-5d89-9595-2241ea00577e"
@@ -16,20 +16,22 @@ MakieLayout = "5a521ce4-ebb9-4793-b5b7-b334dfe8393c"
 NASAEarthObservations = "9526e54e-4491-4e9f-a840-d78b79cb5e3b"
 Proj4 = "9a7e659c-8ee8-5706-894e-f68f43bc57ea"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
 
 [compat]
-Reexport = "0"
-GeoInterface = "0.5"
-Glob = "1"
 AbstractPlotting = "0.9"
-MakieLayout = "0"
 Colors = "0"
-NASAEarthObservations = "0"
-GeoJSON = "0.5"
-ImageMagick = "1"
-GeometryTypes = "0.7"
 EarCut = "1"
+GeoInterface = "0.5"
+GeoJSON = "0.5"
+GeometryTypes = "0.7"
+Glob = "1"
+ImageMagick = "1"
+MakieLayout = "0"
+NASAEarthObservations = "0"
 Proj4 = "0.6"
+Reexport = "0"
+StructArrays = "0.4"
 julia = "1.1"
 
 [extras]
