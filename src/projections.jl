@@ -56,7 +56,7 @@ function Proj4.transform!(src::Projection, dest::Projection, x::Vector{Float64},
     position
 end
 
-Proj4.transform(src::Projection, dest::Projection, x::Point2f0) = Proj4.transform(src, dest, [x[1], x[2]])
+Proj4.transform(src::Projection, dest::Projection, x::Point2f0) = Point2f0(Proj4.transform(src, dest, [x[1], x[2]]))
 
 # Proj4.transform!(src::Projection, dest::Projection, points::T) where T <: StructVector{Point2f0} = Proj4.transform!(src, dest, points.data)
 
