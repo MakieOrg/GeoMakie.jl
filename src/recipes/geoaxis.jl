@@ -102,6 +102,12 @@ function convert_arguments(::Type{<: GeoAxis}, xs::Tuple, ys::Tuple)
     return (FRect2D(xmin, xmax, ymin, ymax),)
 end
 
+function convert_arguments(::Type{<: GeoAxis}, xs::AbstractVector{<: Number}, ys::AbstractVector{<: Number})
+    xmin, xmax = extrema(xs)
+    ymin, ymax = extrema(ys)
+    return (FRect2D(xmin, xmax, ymin, ymax),)
+end
+
 # function AbstractPlotting.calculated_attributes!(plot::GeoAxis)
 #     @extract plot (x, y, crs, limits)
 #
