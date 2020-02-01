@@ -142,7 +142,7 @@ function xygrid(lons::AbstractVector{<: Number}, lats::AbstractVector{<: Number}
     # this will internally reinterpret the matrices as vectors,
     # and transform them in place in C.  The matrices will
     # then hold the modified values.
-    Proj4.transform!(source, projection, vec(xs), vec(ys))
+    # Proj4.transform!(source, projection, vec(xs), vec(ys))
 
     return xs, ys
 
