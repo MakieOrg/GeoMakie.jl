@@ -44,10 +44,6 @@ textnode = Node(" ")
 
 text!(popup, textnode, textsize = 30, position = textpos, color = :darkred, align = (:center, :center), raw = true, visible = visible)
 
-text_field = popup[end]
-
-x = Node(false)
-
 on(scene.events.mouseposition) do pos
     if ispressed(scene, Mouse.left)
         visible[] = true
