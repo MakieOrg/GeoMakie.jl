@@ -1,9 +1,10 @@
-using GeoMakie, CairoMakie, MakieGallery, Pkg
-using Test
+using GeoMakie, MakieGallery, Pkg
 
-if success(`glxinfo`) && GLMakie in keys(Pkg.project().dependencies)
+if success(`glxinfo`) && "GLMakie" in keys(Pkg.project().dependencies)
     using GLMakie
     GLMakie.activate!()
+else
+    using CairoMakie
 end
 
 # Download reference images from master
