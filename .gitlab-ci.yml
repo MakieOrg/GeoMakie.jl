@@ -4,7 +4,7 @@ include:
 variables:
   MODERNGL_DEBUGGING: "true"
   JULIA_DEPOT_PATH: "$CI_PROJECT_DIR/.julia/"
-  CI_DEV_PKGS: "Makie#master AbstractPlotting#master GLMakie#master MakieLayout#master Proj4#master"
+  CI_DEV_PKGS: "Makie#master AbstractPlotting#master GLMakie#master MakieGallery#master MakieLayout#master Proj4#master"
 
 
 test:1.3:
