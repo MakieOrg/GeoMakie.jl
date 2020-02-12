@@ -14,7 +14,7 @@ MakieGallery.current_ref_version[] = "master"
 MakieGallery.load_database(["geomakie.jl"]);
 
 filter!(MakieGallery.database) do entry
-    !(entry.title ∈ ("Air particulates"))
+    !(entry.title ∈ ("Air particulates",))
 end
 
 tested_diff_path = joinpath(@__DIR__, "tested_different")
