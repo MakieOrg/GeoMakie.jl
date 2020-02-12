@@ -17,32 +17,26 @@ This package is **in development** and will **break often**.  As it is currently
 ## Examples
 
 ```julia
-using GeoMakie, Makie, NASAEarthObservations, Glob, ImageMagick
+using GeoMakie, Makie
+
+lons = LinRange(-179.5, 179.5, 360)
+lats = LinRange(-89.5, 89.5, 180)
+
+field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
 source = LonLat()
 dest = WinkelTripel()
 
-imgdir = observations("rgb/MYDAL2_M_AER_RA")
-
-imgpaths = sort(Glob.glob(joinpath(relpath(imgdir), "*.PNG"))) # change this to your requirements
-
-img = ImageMagick.load(imgpaths[1])
-
-re = GeoMakie.date_regex("MYDAL2_M_AER_RA", "PNG")
-titletext = Node(join(match(re, basename(imgpaths[1])).captures, '-'))
-
-lons = LinRange(-179.5, 179.5, size(img)[2])
-lats = LinRange(89.5, -89.5, size(img)[1])
-
-xs = [lon for lat in lats, lon in lons]
-ys = [lat for lat in lats, lon in lons]
-
+xs, ys = xygrid(lons, lats)
 Proj4.transform!(source, dest, vec(xs), vec(ys))
 
-scene = surface(xs, ys, zeros(size(xs)); color = img, shading = false, show_axis = false)
-geoaxis!(scene, -180, 180, -90, 90; crs = (src = src, dest = dest,))
+scene = surface(xs, ys; color = field, shading = false, show_axis = false, scale_plot = false)
+
+geoaxis!(scene, -180, 180, -90, 90; crs = (src = source, dest = dest,))
+
+coastlines!(scene, 1; crs = (src = source, dest = dest,))
 ```
-![aerosol](https://user-images.githubusercontent.com/32143268/73116039-d3d7ba80-3efd-11ea-9d75-fb5cb6dd1318.png)
+![simple](https://user-images.githubusercontent.com/32143268/74341805-5bcf1880-4d76-11ea-86ee-d0822ba70ab4.png)
 
 These plots can be arbitrarily colored using the `color` keyword, and the full Makie interface is also exposed.
 
