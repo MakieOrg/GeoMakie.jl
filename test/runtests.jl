@@ -1,16 +1,16 @@
-using GeoMakie, MakieGallery, Pkg
+using GeoMakie, MakieGallery, MakieLayout, GLMakie, Test
 
-if success(`glxinfo`) && "GLMakie" in keys(Pkg.project().dependencies)
-    using GLMakie
-    GLMakie.activate!()
-else
-    using CairoMakie
-end
+const OPENGL = GLMakie.WORKING_OPENGL
+
+@show OPENGL
+
+OPENGL && begin @info "OpenGL detected"; using GLMakie; end
+OPENGL || begin @warn "No OpenGL detected!  Using CairoMakie instead."; using CairoMakie; CairoMakie.activate!(); end
 
 # Download reference images from master
 MakieGallery.current_ref_version[] = "master"
 
-
+# Load only the GeoMakie examples
 MakieGallery.load_database(["geomakie.jl"]);
 
 filter!(MakieGallery.database) do entry

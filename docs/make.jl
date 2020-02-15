@@ -9,7 +9,6 @@ makedocs(;
     repo="https://github.com/JuliaPlots/GeoMakie.jl/blob/{commit}{path}#L{line}",
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi",
-    assets=String[],
 )
 
 deploydocs(;
