@@ -28,7 +28,7 @@ mkpath(test_record_path)
 
 examples = MakieGallery.record_examples(test_record_path)
 
-@test length(examples) == length(database)
+@test length(examples) == length(MakieGallery.database)
 
 # MakieGallery.generate_preview(test_record_path, joinpath(homedir(), "Desktop", "index.html"))
 # MakieGallery.generate_thumbnails(test_record_path)
