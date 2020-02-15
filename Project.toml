@@ -37,7 +37,8 @@ julia = "1"
 [extras]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+MakieGallery = "dbd62bd0-c9f5-5087-a2e1-f5c4bb0cec90"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "GLMakie", "CairoMakie"]
+test = ["Test", "GLMakie", "CairoMakie", "MakieGallery"]
