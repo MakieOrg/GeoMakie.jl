@@ -1,10 +1,10 @@
 using CoordinateTransformations
 
-struct LogTransformation{T} {where T} <: CoordinateTransformations.Transformation
+struct LogTransformation{T <: Real} <: CoordinateTransformations.Transformation
     base
 end
 
-struct PowerTransformation{T} <: CoordinateTransformations.Transformation
+struct PowerTransformation{T <: Real} <: CoordinateTransformations.Transformation
     base::T
 end
 
@@ -21,3 +21,6 @@ end
 
 Base.inv(lt::LogTransformation) = PowerTransformation(lt.base)
 Base.inv(pt::PowerTransformation) = LogTransformation(pt.base)
+
+compose(lt::LogTransformation, pt::PowerTransformation) = lt.base == pt.base ? IdentityTransformation() : ComposedTransformation(lt, pt)
+compose(pt::PowerTransformationlt::LogTransformation) = lt.base == pt.base ? IdentityTransformation() : ComposedTransformation(pt, lt)
