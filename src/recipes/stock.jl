@@ -1,9 +1,65 @@
-@recipe(Coastlines) do scene
-    merge(
-        default_theme(scene, Lines),
-        Theme(crs = (source = LonLat(), dest = LonLat()),)
-    )
+# @macroexpand @recipe(Coastlines) do scene
+#     merge(
+#         default_theme(scene, Lines),
+#         Theme(crs = (source = LonLat(), dest = LonLat()),)
+#     )
+# end
+
+coastlines() = coastlines!(Scene())
+
+const Coastlines{ArgType} = AbstractPlotting.Combined{coastlines, ArgType}
+
+(Base).show(var"#34#io"::IO, ::Type{<:Coastlines}) = begin
+        #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:154 =#
+        AbstractPlotting.print(var"#34#io", "Coastlines", "{...}")
 end
+
+function coastlines(var"#39#attributes"...)
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:13 =#
+    var"#36#attr" = AbstractPlotting.Attributes(var"#39#attributes")
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:14 =#
+    var"#37#kw" = AbstractPlotting.extract_scene_attributes!(var"#36#attr")
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:15 =#
+    AbstractPlotting.plot!(AbstractPlotting.Scene(; var"#37#kw"...), Coastlines, var"#36#attr", 1)
+end
+
+#= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:19 =#
+function coastlines!(; var"#41#attributes"...)
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:20 =#
+    AbstractPlotting.plot!(AbstractPlotting.current_scene(), Coastlines, AbstractPlotting.Attributes(var"#41#attributes"), 1)
+end
+#= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:23 =#
+function coastlines!(var"#42#scene"::AbstractPlotting.SceneLike; var"#44#attributes"...)
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:24 =#
+    AbstractPlotting.plot!(var"#42#scene", Coastlines, AbstractPlotting.Attributes(var"#44#attributes"), 1)
+end
+#= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:27 =#
+function coastlines(var"#47#attributes"::AbstractPlotting.Attributes, var"#48#args"...; var"#49#kw_attributes"...)
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:28 =#
+    var"#45#merged" = AbstractPlotting.merge!(AbstractPlotting.Attributes(var"#49#kw_attributes"), var"#47#attributes")
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:29 =#
+    var"#46#kw" = AbstractPlotting.extract_scene_attributes!(var"#45#merged")
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:30 =#
+    AbstractPlotting.plot!(AbstractPlotting.Scene(; var"#46#kw"...), Coastlines, var"#45#merged", 1)
+end
+#= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:33 =#
+function coastlines!(var"#50#attributes"::AbstractPlotting.Attributes, var"#51#args"...; var"#52#kw_attributes"...)
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:34 =#
+    AbstractPlotting.plot!(AbstractPlotting.current_scene(), Coastlines, AbstractPlotting.merge!(AbstractPlotting.Attributes(var"#52#kw_attributes"), var"#50#attributes"), 1)
+end
+#= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:37 =#
+function coastlines!(var"#53999#scene"::AbstractPlotting.SceneLike, var"#54999#attributes"::AbstractPlotting.Attributes, var"#55999#args"...; var"#56999#kw_attributes"...)
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:38 =#
+    AbstractPlotting.plot!(var"#53999#scene", Coastlines, AbstractPlotting.merge!(AbstractPlotting.Attributes(var"#56999#kw_attributes"), var"#54999#attributes"), 1)
+end
+
+
+AbstractPlotting.default_theme(var"#57999#scene", ::Type{<:Coastlines}) = begin
+        (((scene,)->begin
+                merge(default_theme(scene, Lines), Theme(crs = (source = LonLat(), dest = LonLat())))
+            end))(var"#57999#scene")
+    end
+export Coastlines, coastlines, coastlines!
 
 function AbstractPlotting.plot!(p::Coastlines)
 
@@ -18,23 +74,70 @@ function AbstractPlotting.plot!(p::Coastlines)
     lines!(p, new_linevec)
 end
 
-coastlines(; kwargs...) = coastlines(1; kwargs...)
-coastlines!(sc = AbstractPlotting.current_scene(); kwargs...) = plot!(sc, Coastlines, Attributes(attributes), 1)
-coastlines!(; attributes...) = plot!(AbstractPlotting.current_scene(), Coastlines, Attributes(attributes), 1)
+earth() = earth!(Scene())
 
+const Earth{ArgType} = AbstractPlotting.Combined{earth, ArgType}
 
-@recipe(Earth, bbox) do scene
-    merge(
-        default_theme(scene, Surface),
-        Theme(
-            crs = (
-                source = LonLat(),
-                dest = LonLat()
-            ),
-            shading = false
-        )
-    )
+(Base).show(var"#34#io"::IO, ::Type{<:Earth}) = begin
+        #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:154 =#
+        AbstractPlotting.print(var"#34#io", "Earth", "{...}")
 end
+
+function earth(var"#39#attributes"...)
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:13 =#
+    var"#36#attr" = AbstractPlotting.Attributes(var"#39#attributes")
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:14 =#
+    var"#37#kw" = AbstractPlotting.extract_scene_attributes!(var"#36#attr")
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:15 =#
+    AbstractPlotting.plot!(AbstractPlotting.Scene(; var"#37#kw"...), Earth, var"#36#attr", 1)
+end
+
+#= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:19 =#
+function earth!(; var"#41#attributes"...)
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:20 =#
+    AbstractPlotting.plot!(AbstractPlotting.current_scene(), Earth, AbstractPlotting.Attributes(var"#41#attributes"), 1)
+end
+#= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:23 =#
+function earth!(var"#42#scene"::AbstractPlotting.SceneLike; var"#44#attributes"...)
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:24 =#
+    AbstractPlotting.plot!(var"#42#scene", Earth, AbstractPlotting.Attributes(var"#44#attributes"), 1)
+end
+#= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:27 =#
+function earth(var"#47#attributes"::AbstractPlotting.Attributes, var"#48#args"...; var"#49#kw_attributes"...)
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:28 =#
+    var"#45#merged" = AbstractPlotting.merge!(AbstractPlotting.Attributes(var"#49#kw_attributes"), var"#47#attributes")
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:29 =#
+    var"#46#kw" = AbstractPlotting.extract_scene_attributes!(var"#45#merged")
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:30 =#
+    AbstractPlotting.plot!(AbstractPlotting.Scene(; var"#46#kw"...), Earth, var"#45#merged", 1)
+end
+#= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:33 =#
+function earth!(var"#50#attributes"::AbstractPlotting.Attributes, var"#51#args"...; var"#52#kw_attributes"...)
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:34 =#
+    AbstractPlotting.plot!(AbstractPlotting.current_scene(), Earth, AbstractPlotting.merge!(AbstractPlotting.Attributes(var"#52#kw_attributes"), var"#50#attributes"), 1)
+end
+#= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:37 =#
+function earth!(var"#53999#scene"::AbstractPlotting.SceneLike, var"#54999#attributes"::AbstractPlotting.Attributes, var"#55999#args"...; var"#56999#kw_attributes"...)
+    #= /Users/anshul/.julia/dev/AbstractPlotting/src/recipes.jl:38 =#
+    AbstractPlotting.plot!(var"#53999#scene", Earth, AbstractPlotting.merge!(AbstractPlotting.Attributes(var"#56999#kw_attributes"), var"#54999#attributes"), 1)
+end
+
+
+AbstractPlotting.default_theme(var"#57999#scene", ::Type{<:Earth}) = begin
+        (((scene,)->begin
+        merge(
+            default_theme(scene, Surface),
+            Theme(
+                crs = (
+                    source = LonLat(),
+                    dest = LonLat()
+                ),
+                shading = false
+            )
+        )
+            end))(var"#57999#scene")
+    end
+export Earth, earth, earth!
 
 function AbstractPlotting.plot!(p::Earth)
 
@@ -58,7 +161,3 @@ function AbstractPlotting.plot!(p::Earth)
 
     surface!(p, xs, ys, zeros(size(xs[])); color = EARTH_IMG, shading = false, show_axis = false)
 end
-
-earth(; kwargs...) = earth(1; kwargs...)
-earth!(sc = AbstractPlotting.current_scene(); attributes...) = plot!(sc, Earth, Attributes(attributes), 1)
-earth!(; attributes...) = plot!(AbstractPlotting.current_scene(), Earth, Attributes(attributes), 1)
