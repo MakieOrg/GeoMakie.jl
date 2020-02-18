@@ -5,7 +5,7 @@
 #     )
 # end
 
-coastlines() = coastlines!(Scene())
+coastlines(; kwargs...) = coastlines!(Scene(); kwargs...)
 
 const Coastlines{ArgType} = AbstractPlotting.Combined{coastlines, ArgType}
 
@@ -74,7 +74,7 @@ function AbstractPlotting.plot!(p::Coastlines)
     lines!(p, new_linevec)
 end
 
-earth() = earth!(Scene())
+earth(; kwargs...) = earth!(Scene(); kwargs...)
 
 const Earth{ArgType} = AbstractPlotting.Combined{earth, ArgType}
 
