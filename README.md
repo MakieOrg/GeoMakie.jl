@@ -34,7 +34,7 @@ scene = surface(xs, ys; color = field, shading = false, show_axis = false, scale
 
 geoaxis!(scene, -180, 180, -90, 90; crs = (src = source, dest = dest,))
 
-coastlines!(scene, 1; crs = (src = source, dest = dest,))
+coastlines!(scene; crs = (src = source, dest = dest,))
 ```
 ![simple](https://user-images.githubusercontent.com/32143268/74341805-5bcf1880-4d76-11ea-86ee-d0822ba70ab4.png)
 
