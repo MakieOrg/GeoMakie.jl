@@ -40,10 +40,10 @@ export LonLat, PlateCarree, Mercator, TransverseMercator, UTM, AlbersEqualArea, 
 
 export rec_project, rec_point, xygrid
 
-function __init__()
-    Base.delete_method(methods(coastlines!).ms[6])
-    Base.delete_method(methods(earth!).ms[6])
-end
+# function __init__()
+#     Base.delete_method(methods(coastlines!).ms[6])
+#     Base.delete_method(methods(earth!).ms[6])
+# end
 
 end # module
 
