@@ -3,9 +3,7 @@
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaPlots.github.io/GeoMakie.jl/stable)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaPlots.github.io/GeoMakie.jl/dev)
-[![Build Status](https://travis-ci.com/JuliaPlots/GeoMakie.jl.svg?branch=master)](https://travis-ci.com/JuliaPlots/GeoMakie.jl)
-[![Build Status](https://gitlab.com/JuliaPlots/GeoMakie.jl/badges/master/build.svg)](https://gitlab.com/JuliaPlots/GeoMakie.jl/pipelines)
-[![Coverage](https://gitlab.com/JuliaPlots/GeoMakie.jl/badges/master/coverage.svg)](https://gitlab.com/JuliaPlots/GeoMakie.jl/commits/master)
+[![Build Status](https://gitlab.com/JuliaGPU/GeoMakie-jl/badges/master/pipeline.svg)](https://gitlab.com/JuliaGPU/GeoMakie-jl/pipelines)
 
 ## Installation
 
