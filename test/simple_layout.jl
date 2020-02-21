@@ -17,7 +17,7 @@ ymin, ymax = extrema(ys)
 aspect_ratio = (ymax - ymin) / (xmax - xmin)
 
 scene, layout = layoutscene(
-)
+);
 
 layout[1, 1] = lsc = LScene(scene; scenekw = (show_axis = false, scale_plot = false))
 
@@ -25,7 +25,7 @@ splot = surface!(lsc, xs, ys; color = field, shading = false, show_axis = false)
 
 geoaxis!(lsc, -180, 180, -90, 90; crs = (src = source, dest = dest,))
 
-coastlines!(lsc, 1; crs = (src = source, dest = dest,))
+coastlines!(lsc; crs = (src = source, dest = dest,))
 
 layout[1, 2] = LColorbar(scene, splot; label = "Arbitrary data", width = 30)
 

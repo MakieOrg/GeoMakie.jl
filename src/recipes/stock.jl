@@ -5,6 +5,11 @@
 #     )
 # end
 
+"""
+    coastlines(; kwargs...)
+
+Plot coastlines along the world.
+"""
 coastlines(; kwargs...) = coastlines!(Scene(); kwargs...)
 
 const Coastlines{ArgType} = AbstractPlotting.Combined{coastlines, ArgType}
@@ -74,6 +79,11 @@ function AbstractPlotting.plot!(p::Coastlines)
     lines!(p, new_linevec)
 end
 
+"""
+    earth(; kwargs...)
+
+Plots an image of the Earth in the given projection.
+"""
 earth(; kwargs...) = earth!(Scene(); kwargs...)
 
 const Earth{ArgType} = AbstractPlotting.Combined{earth, ArgType}

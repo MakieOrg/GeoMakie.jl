@@ -84,7 +84,9 @@ imflip(img) = reverse(vec(transpose(reverse(img; dims=2))))
 ########################################
 
 """
-    to_nansep_vec([f::Function,] data::Vector{Vector{T}}) where T
+    to_nansep_vec([f::Function,] data::Vector{Vector{T}};
+        outtype = Point2f0, length_of_data = sum(length.(data)) + length(data)
+    )
 
 Flattens the given Vector of Vectors into a single Vector,
 while inserting NaN separations between each individual sub-
@@ -92,19 +94,18 @@ vector.
 
 If `f` is given, then `f` will be executed on each subvector
 before it is merged into the main vector.  If it is not, the data
-will remain unchanged.
+will remain unchanged (i.e., `f` is just `identity`).
 """
-function to_nansep_vec(f::Function, data::AbstractVector{T}, outtyp = Point2f0) where T
-
-    length_of_data = sum(length.(data)) + length(data)
+function to_nansep_vec(f::Function, data::AbstractVector{T}; outtyp = Point2f0, length_of_data = sum(length.(data)) + length(data)) where T
 
     lvec = Vector{outtyp}(undef, length_of_data)
 
     pos = 1
 
     for (i, datum) in enumerate(data)
-        lvec[pos:(pos+length(datum)-1)] .= f(datum)
-        pos += length(datum)
+        output = f(datum)
+        lvec[pos:(pos+length(output)-1)] .= output
+        pos += length(output)
         lvec[pos] = outtyp(NaN)
         pos += 1
     end
@@ -113,7 +114,7 @@ function to_nansep_vec(f::Function, data::AbstractVector{T}, outtyp = Point2f0) 
 
 end
 
-to_nansep_vec(data::Vector{Vector{T}}, outtyp = Point2f0) where T = to_nansep_vec(identity, data, outtyp)
+to_nansep_vec(data::Vector{Vector{T}}; outtyp = Point2f0) where T = to_nansep_vec(identity, data; outtyp = outtyp)
 
 ########################################
 #     Matrix-based grid generation     #
