@@ -3,6 +3,10 @@ using Documenter, GeoMakie
 # use the README as the home page
 cp(joinpath(dirname(@__DIR__), "README.md"), joinpath(@__DIR__, "src", "index.md"); force = true)
 
+indexstr = read(joinpath(@__DIR__, "src", "index.md"), String)
+
+replace(indexstr, """<a href = "https://www.github.com/JuliaPlots/Makie.jl"><img src="https://raw.githubusercontent.com/JuliaPlots/Makie.jl/master/assets/logo.png" alt="Makie.jl" height="30" align = "top"></a>""" => "Makie.jl")
+
 makedocs(;
     modules=[GeoMakie, AbstractPlotting],
     format=Documenter.HTML(),
