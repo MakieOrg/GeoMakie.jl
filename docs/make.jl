@@ -7,6 +7,8 @@ indexstr = read(joinpath(@__DIR__, "src", "index.md"), String)
 
 replace(indexstr, """<a href = "https://www.github.com/JuliaPlots/Makie.jl"><img src="https://raw.githubusercontent.com/JuliaPlots/Makie.jl/master/assets/logo.png" alt="Makie.jl" height="30" align = "top"></a>""" => "Makie.jl")
 
+write(joinpath(@__DIR__, "src", "index.md"), indexstr)
+
 makedocs(;
     modules=[GeoMakie, AbstractPlotting],
     format=Documenter.HTML(),
