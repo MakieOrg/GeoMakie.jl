@@ -28,7 +28,7 @@ yaxisattrs = (
             padding   = 5f0,
             rotation  = 0f0,
             align     = (:center, :top),
-            position  = Left()::MakieLayout.Side
+            position  = Left()::Side
 
         ),
     ),
