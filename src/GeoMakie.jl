@@ -5,6 +5,9 @@ using GeometryTypes, EarCut, Colors, MakieLayout, AbstractPlotting, ImageMagick,
 
 using MakieLayout: Formatting
 
+using MakieLayout.GridLayoutBase
+using GridLayoutBase: Side
+
 @reexport using Colors, AbstractPlotting
 @reexport using GeoInterface, Proj4, NASAEarthObservations
 
