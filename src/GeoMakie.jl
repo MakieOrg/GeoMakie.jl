@@ -1,7 +1,7 @@
 module GeoMakie
 
 using Reexport
-using GeometryTypes, EarCut, Colors, MakieLayout, AbstractPlotting, ImageMagick, GeoJSON, Glob
+using GeometryBasics, EarCut, Colors, MakieLayout, AbstractPlotting, ImageMagick, GeoJSON, Glob
 
 using MakieLayout: Formatting
 
@@ -15,7 +15,7 @@ import AbstractPlotting: convert_arguments, convert_attribute
 using AbstractPlotting.DocStringExtensions
 
 # fix conflicts
-const AbstractGeometry = GeometryTypes.AbstractGeometry
+const AbstractGeometry = GeometryBasics.AbstractGeometry
 const Point = AbstractPlotting.Point
 const attributes = AbstractPlotting.attributes
 const transform! = Proj4.transform!
