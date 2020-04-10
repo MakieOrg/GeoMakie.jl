@@ -1,7 +1,7 @@
 module GeoMakie
 
 using Reexport
-using GeometryTypes, EarCut, Colors, MakieLayout, AbstractPlotting, ImageMagick, GeoJSON, Glob
+using GeometryBasics, EarCut, Colors, MakieLayout, AbstractPlotting, ImageMagick, GeoJSON, Glob
 
 using MakieLayout: Formatting
 
