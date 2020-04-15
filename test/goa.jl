@@ -1,4 +1,4 @@
-using GeoJSON, GeoMakie, Makie, GeometryTypes, EarCut
+using GeoJSON, GeoMakie, Makie, GeometryBasics, EarCut
 
 goa = download("https://raw.githubusercontent.com/datameet/indian_village_boundaries/master/ga/ga.geojson")
 

@@ -82,7 +82,7 @@ for feature in statesgj.features
     end
 end
 
-zerodiff(pt::GeometryTypes.Point{2, T}) where {T} = pt[1] != zero(T) && pt[2] != zero(T)
+zerodiff(pt::Point{2, T}) where {T} = pt[1] != zero(T) && pt[2] != zero(T)
 
 function imprecise(arr)
     dif = Point2{Float32}.(arr) |> diff

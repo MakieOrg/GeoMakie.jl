@@ -29,11 +29,11 @@ end
 
 
 """
-    nonzero(pt::GeometryTypes.Point{2, T}) where T
+    nonzero(pt::Point{2, T}) where T
 
 Returns `true` if both of the elements are nonzero, and `false` otherwise.
 """
-nonzero(pt::GeometryTypes.Point{2, T}) where {T} = pt[1] != zero(T) && pt[2] != zero(T)
+nonzero(pt::Point{2, T}) where {T} = pt[1] != zero(T) && pt[2] != zero(T)
 
 """
     imprecise(arr)
