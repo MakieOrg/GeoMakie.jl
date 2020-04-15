@@ -20,6 +20,8 @@ const Point = AbstractPlotting.Point
 const attributes = AbstractPlotting.attributes
 const transform! = Proj4.transform!
 const volume = AbstractPlotting.volume
+const Mesh = GeometryBasics.Mesh
+const coordinates = GeoInterface.coordinates
 
 include("conversions.jl")
 include("projections.jl")

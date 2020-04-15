@@ -94,18 +94,18 @@ xaxisattrs = (
     )
 end
 
-convert_arguments(::Type{<: GeoAxis}, xmin::Real, xmax::Real, ymin::Real, ymax::Real) = (Rect2{Float32}(xmin, xmax, ymin, ymax),)
+convert_arguments(::Type{<: GeoAxis}, xmin::Real, xmax::Real, ymin::Real, ymax::Real) = (Rect2D{Float32}(xmin, xmax, ymin, ymax),)
 
 function convert_arguments(::Type{<: GeoAxis}, xs::Tuple, ys::Tuple)
     xmin, xmax = xs
     ymin, ymax = ys
-    return (Rect2{Float32}(xmin, xmax, ymin, ymax),)
+    return (Rect2D{Float32}(xmin, xmax, ymin, ymax),)
 end
 
 function convert_arguments(::Type{<: GeoAxis}, xs::AbstractVector{<: Number}, ys::AbstractVector{<: Number})
     xmin, xmax = extrema(xs)
     ymin, ymax = extrema(ys)
-    return (Rect2{Float32}(xmin, xmax, ymin, ymax),)
+    return (Rect2D{Float32}(xmin, xmax, ymin, ymax),)
 end
 
 # function AbstractPlotting.calculated_attributes!(plot::GeoAxis)
