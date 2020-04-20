@@ -28,7 +28,7 @@ yaxisattrs = (
             padding   = 5f0,
             rotation  = 0f0,
             align     = (:center, :top),
-            position  = Left()::Side
+            position  = MakieLayout.Left()::MakieLayout.GridLayoutBase.Side
 
         ),
     ),
@@ -57,7 +57,7 @@ xaxisattrs = (
             padding   = 5f0,
             rotation  = 0f0,
             align     = (:center, :top),
-            position  = Bottom()
+            position  = MakieLayout.Bottom()::MakieLayout.GridLayoutBase.Side
 
         ),
     ),
@@ -94,18 +94,18 @@ xaxisattrs = (
     )
 end
 
-convert_arguments(::Type{<: GeoAxis}, xmin::Real, xmax::Real, ymin::Real, ymax::Real) = (Rect2D{Float32}(xmin, xmax, ymin, ymax),)
+convert_arguments(::Type{<: GeoAxis}, xmin::Real, xmax::Real, ymin::Real, ymax::Real) = (Rect2D{Float32}(xmin, ymin, xmax - xmin, ymax - ymin),)
 
 function convert_arguments(::Type{<: GeoAxis}, xs::Tuple, ys::Tuple)
     xmin, xmax = xs
     ymin, ymax = ys
-    return (Rect2D{Float32}(xmin, xmax, ymin, ymax),)
+    return (Rect2D{Float32}(xmin, ymin, xmax - xmin, ymax - ymin),)
 end
 
 function convert_arguments(::Type{<: GeoAxis}, xs::AbstractVector{<: Number}, ys::AbstractVector{<: Number})
     xmin, xmax = extrema(xs)
     ymin, ymax = extrema(ys)
-    return (Rect2D{Float32}(xmin, xmax, ymin, ymax),)
+    return (Rect2D{Float32}(xmin, ymin, xmax - xmin, ymax - ymin),)
 end
 
 # function AbstractPlotting.calculated_attributes!(plot::GeoAxis)
@@ -149,18 +149,22 @@ function draw_frames!(plot::GeoAxis{T}) where T
     # initialize the line vectors
     lift(plot.limits, source, dest, samples) do lims, source, dest, samples
 
-        lonrange = LinRange(left(lims), right(lims), samples)
-        latrange = LinRange(bottom(lims), top(lims), samples)
+        lonrange = LinRange(MakieLayout.left(lims), MakieLayout.right(lims), samples)
+        latrange = LinRange(MakieLayout.bottom(lims), MakieLayout.top(lims), samples)
 
-        topline[] = Point2f0.(transform.(source, dest, [Point2f0(lon, top(lims)) for lon in lonrange]))
-        leftline[] = Point2f0.(transform.(source, dest, [Point2f0(left(lims), lat) for lat in latrange]))
-        rightline[] = Point2f0.(transform.(source, dest, [Point2f0(right(lims), lat) for lat in latrange]))
-        bottomline[] = Point2f0.(transform.(source, dest, [Point2f0(lon, bottom(lims)) for lon in lonrange]))
+        topline[] = Point2f0.(transform.(source, dest, [Point2f0(lon, MakieLayout.top(lims)) for lon in lonrange]))
+        leftline[] = Point2f0.(transform.(source, dest, [Point2f0(MakieLayout.left(lims), lat) for lat in latrange]))
+        rightline[] = Point2f0.(transform.(source, dest, [Point2f0(MakieLayout.right(lims), lat) for lat in latrange]))
+        bottomline[] = Point2f0.(transform.(source, dest, [Point2f0(lon, MakieLayout.bottom(lims)) for lon in lonrange]))
 
     end
 
     # plot the frames
-    lines!.(plot, (top, bottom, left, right), (topline, bottomline, leftline, rightline))
+    lines!.(
+        plot,
+        (top, bottom, left, right),                # forward the frame attributes
+        (topline, bottomline, leftline, rightline) # pass the lines
+    )
 
 end
 
@@ -179,8 +183,8 @@ function draw_ticks!(plot::GeoAxis)
 
     lift(x.tick.ticks, y.tick.ticks, x.tick.label.position, y.tick.label.position, plot.limits, plot.samples, plot.crs.source, plot.crs.dest, x.tick.label.size, y.tick.label.size) do xticks_struct, yticks_struct, xtickp, ytickp, limits, samples, source, dest, xticklabelsize, yticklabelsize
 
-        xtickvalues[] = MakieLayout.compute_tick_values(xticks_struct, left(limits), right(limits), 100f0)
-        ytickvalues[] = MakieLayout.compute_tick_values(yticks_struct, bottom(limits), top(limits), 100f0)
+        xtickvalues[] = MakieLayout.compute_tick_values(xticks_struct, MakieLayout.left(limits), MakieLayout.right(limits), 100f0)
+        ytickvalues[] = MakieLayout.compute_tick_values(yticks_struct, MakieLayout.bottom(limits), MakieLayout.top(limits), 100f0)
 
         xticklabels = MakieLayout.get_tick_labels(xticks_struct, xtickvalues[])
         yticklabels = MakieLayout.get_tick_labels(yticks_struct, ytickvalues[])
@@ -191,11 +195,11 @@ function draw_ticks!(plot::GeoAxis)
         ylinevec.val = Vector{Point2f0}()
 
         for xtick in xtickvalues[]
-            append!(xlinevec.val, transform.(source, dest, Point2f0.(xtick, LinRange(bottom(limits), top(limits), samples))))
+            append!(xlinevec.val, transform.(source, dest, Point2f0.(xtick, LinRange(MakieLayout.bottom(limits), MakieLayout.top(limits), samples))))
             push!(xlinevec.val, Point2f0(NaN))
         end
         for ytick in ytickvalues[]
-            append!(ylinevec.val, transform.(source, dest, Point2f0.(LinRange(left(limits), right(limits), samples), ytick)))
+            append!(ylinevec.val, transform.(source, dest, Point2f0.(LinRange(MakieLayout.left(limits), MakieLayout.right(limits), samples), ytick)))
             push!(ylinevec.val, Point2f0(NaN))
         end
 
@@ -208,18 +212,30 @@ function draw_ticks!(plot::GeoAxis)
         # first, we do the y ticks (latitude)
         ytickpositions, ytickstrings = (nothing, nothing)
 
-        if typeof(ytickp) <: MakieLayout.Side
+        if typeof(ytickp) <: MakieLayout.GridLayoutBase.Side
 
-            xpos = limits[ytickp]
+            xpos = if ytickp == Left()
+                left(limits)
+            else
+                right(limits)
+            end
 
             ytickpositions = Point2f0.(xpos, ytickvalues[])
 
             ytickstrings = yticklabels
 
-        elseif ytickp isa NTuple{2, <: MakieLayout.Side}
+        elseif ytickp isa NTuple{2, <: MakieLayout.GridLayoutBase.Side}
 
-            xpos1 = limits[ytickp[1]]
-            xpos2 = limits[ytickp[2]]
+            xpos1 = if ytickp[1] == Left()
+                left(limits)
+            else
+                right(limits)
+            end
+            xpos2 = if ytickp[2] == Left()
+                left(limits)
+            else
+                right(limits)
+            end
 
             ytickpositions = Point2f0.([(x, y) for x in (xpos1, xpos2), y in ytickvalues[]])
 
@@ -233,18 +249,30 @@ function draw_ticks!(plot::GeoAxis)
 
         xtickpositions, xtickstrings = (nothing, nothing)
 
-        if typeof(xtickp) <: MakieLayout.Side
+        if typeof(xtickp) <: MakieLayout.GridLayoutBase.Side
 
-            ypos = limits[xtickp]
+            ypos = if ytickp == Top()
+                top(limits)
+            else
+                bottom(limits)
+            end
 
             xtickpositions = Point2f0.(xtickvalues[], ypos)
 
             xtickstrings = xticklabels
 
-        elseif xtickp isa NTuple{2, <: MakieLayout.Side}
+        elseif xtickp isa NTuple{2, <: MakieLayout.GridLayoutBase.Side}
 
-            ypos1 = limits[ytickp[1]]
-            ypos2 = limits[ytickp[2]]
+            ypos1 = if ytickp[1] == Top()
+                top(limits)
+            else
+                bottom(limits)
+            end
+            ypos2 = if ytickp[2] == Top()
+                top(limits)
+            else
+                bottom(limits)
+            end
 
             xtickpositions = Point2f0.([(x, y) for y in (ypos1, ypos2), x in xtickvalues[]])
 
