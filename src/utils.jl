@@ -152,7 +152,7 @@ wrap_lon(x) = -180 .+ (360 .+ ((x.+180) .% 360)) .% 360
 
 Converts a matrix to a vector with the correct form for mesh coloring.
 """
-imflip(img) = reverse(vec(transpose(reverse(img; dims=2))))
+img2colorvec(img) = reverse(vec(transpose(reverse(img; dims=2))))
 
 # function Base.:(==)(a::Projection, b::Projection)
 #     return Bool(
