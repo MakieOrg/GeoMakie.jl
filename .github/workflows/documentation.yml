@@ -1,12 +1,12 @@
 name: Documentation
 
-on: 
+on:
   push:
     branches: master
     tags:
       - v*
 
-  pull_request: 
+  pull_request:
     branches: master
 
 jobs:
@@ -23,9 +23,22 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
       - name: Install dependencies
-        run: julia --project=docs/ -e 'using Pkg; pkg"add Makie#master AbstractPlotting#master MakieLayout#master"; Pkg.instantiate()'
+        run: julia --project=docs/ -e 'using Pkg; pkg"add Makie#master AbstractPlotting#master MakieLayout#master CairoMakie#master"; Pkg.instantiate()'
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: julia --project=docs/ docs/make.jl deploy
+
+      - name: Cache artifacts
+        uses: actions/cache@v1
+        env:
+          cache-name: cache-artifacts
+        with:
+          path: ~/.julia/artifacts
+          key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-test-${{ env.cache-name }}-
+            ${{ runner.os }}-test-
+            ${{ runner.os }}-
+        if: always()
