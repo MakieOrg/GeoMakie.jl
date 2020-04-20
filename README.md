@@ -30,7 +30,7 @@ Proj4.transform!(source, dest, vec(xs), vec(ys))
 
 scene = surface(xs, ys; color = field, shading = false, show_axis = false, scale_plot = false)
 
-geoaxis!(scene, -180, 180, -90, 90; crs = (src = source, dest = dest,))
+geoaxis!(scene, extrema(lons), extrema(lats); crs = (src = source, dest = dest,))
 
 coastlines!(scene; crs = (src = source, dest = dest,))
 ```
