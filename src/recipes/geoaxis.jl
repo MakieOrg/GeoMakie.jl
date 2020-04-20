@@ -149,13 +149,13 @@ function draw_frames!(plot::GeoAxis{T}) where T
     # initialize the line vectors
     lift(plot.limits, source, dest, samples) do lims, source, dest, samples
 
-        lonrange = LinRange(lims[LEFT], lims[RIGHT], samples)
-        latrange = LinRange(lims[BOTTOM], lims[TOP], samples)
+        lonrange = LinRange(left(lims), right(lims), samples)
+        latrange = LinRange(bottom(lims), top(lims), samples)
 
-        topline[] = Point2f0.(transform.(source, dest, [Point2f0(lon, lims[TOP]) for lon in lonrange]))
-        leftline[] = Point2f0.(transform.(source, dest, [Point2f0(lims[LEFT], lat) for lat in latrange]))
-        rightline[] = Point2f0.(transform.(source, dest, [Point2f0(lims[RIGHT], lat) for lat in latrange]))
-        bottomline[] = Point2f0.(transform.(source, dest, [Point2f0(lon, lims[BOTTOM]) for lon in lonrange]))
+        topline[] = Point2f0.(transform.(source, dest, [Point2f0(lon, top(lims)) for lon in lonrange]))
+        leftline[] = Point2f0.(transform.(source, dest, [Point2f0(left(lims), lat) for lat in latrange]))
+        rightline[] = Point2f0.(transform.(source, dest, [Point2f0(right(lims), lat) for lat in latrange]))
+        bottomline[] = Point2f0.(transform.(source, dest, [Point2f0(lon, bottom(lims)) for lon in lonrange]))
 
     end
 
@@ -179,8 +179,8 @@ function draw_ticks!(plot::GeoAxis)
 
     lift(x.tick.ticks, y.tick.ticks, x.tick.label.position, y.tick.label.position, plot.limits, plot.samples, plot.crs.source, plot.crs.dest, x.tick.label.size, y.tick.label.size) do xticks_struct, yticks_struct, xtickp, ytickp, limits, samples, source, dest, xticklabelsize, yticklabelsize
 
-        xtickvalues[] = MakieLayout.compute_tick_values(xticks_struct, limits[LEFT], limits[RIGHT], 100f0)
-        ytickvalues[] = MakieLayout.compute_tick_values(yticks_struct, limits[BOTTOM], limits[TOP], 100f0)
+        xtickvalues[] = MakieLayout.compute_tick_values(xticks_struct, left(limits), right(limits), 100f0)
+        ytickvalues[] = MakieLayout.compute_tick_values(yticks_struct, bottom(limits), top(limits), 100f0)
 
         xticklabels = MakieLayout.get_tick_labels(xticks_struct, xtickvalues[])
         yticklabels = MakieLayout.get_tick_labels(yticks_struct, ytickvalues[])
@@ -191,11 +191,11 @@ function draw_ticks!(plot::GeoAxis)
         ylinevec.val = Vector{Point2f0}()
 
         for xtick in xtickvalues[]
-            append!(xlinevec.val, transform.(source, dest, Point2f0.(xtick, LinRange(limits[BOTTOM], limits[TOP], samples))))
+            append!(xlinevec.val, transform.(source, dest, Point2f0.(xtick, LinRange(bottom(limits), top(limits), samples))))
             push!(xlinevec.val, Point2f0(NaN))
         end
         for ytick in ytickvalues[]
-            append!(ylinevec.val, transform.(source, dest, Point2f0.(LinRange(limits[LEFT], limits[RIGHT], samples), ytick)))
+            append!(ylinevec.val, transform.(source, dest, Point2f0.(LinRange(left(limits), right(limits), samples), ytick)))
             push!(ylinevec.val, Point2f0(NaN))
         end
 
