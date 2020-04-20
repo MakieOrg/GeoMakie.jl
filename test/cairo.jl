@@ -23,6 +23,7 @@ scene = mesh(
 
 geoaxis!(scene, extrema(lons), extrema(lats); crs = (src = source, dest = dest,))
 
+coastlines!(scene; crs = (src = source, dest = dest))
 
 save("geomakie-readme.png", scene) # works
 save("geomakie-readme.svg", scene) # works

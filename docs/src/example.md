@@ -80,7 +80,11 @@ save("rawmesh.png", scene); nothing # hide
 ![](rawmesh.png)
 
 Now, we can add the geoaxis and coastlines:
-```@example 1
+```julia
+geoaxis!(scene, extrema(lons), extrema(lats); crs = (src = source, dest = dest,))
+coastlines!(scene; crs = (src = source, dest = dest,))
+```
+```@setup 1
 geoaxis!(scene, extrema(lons), extrema(lats); crs = (src = source, dest = dest,))
 save("axismesh.png", scene); nothing # hide
 coastlines!(scene; crs = (src = source, dest = dest,))
