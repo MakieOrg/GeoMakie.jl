@@ -147,6 +147,13 @@ into the domain `(-180, 180)`.
 """
 wrap_lon(x) = -180 .+ (360 .+ ((x.+180) .% 360)) .% 360
 
+"""
+    img2colorvec(img)
+
+Converts a matrix to a vector with the correct form for mesh coloring.
+"""
+imflip(img) = reverse(vec(transpose(reverse(img; dims=2))))
+
 # function Base.:(==)(a::Projection, b::Projection)
 #     return Bool(
 #         Proj4.proj_is_equivalent_to(
