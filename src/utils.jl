@@ -1,13 +1,3 @@
-########################################
-#            Side constants            #
-########################################
-
-const TOP = Top()
-const LEFT = Left()
-const RIGHT = Right()
-const BOTTOM = Bottom()
-
-
 ################################################################################
 #                              Utility functions                               #
 ################################################################################
@@ -156,6 +146,13 @@ Wraps the input longitude (or Vector of longitudes)
 into the domain `(-180, 180)`.
 """
 wrap_lon(x) = -180 .+ (360 .+ ((x.+180) .% 360)) .% 360
+
+"""
+    img2colorvec(img)
+
+Converts a matrix to a vector with the correct form for mesh coloring.
+"""
+img2colorvec(img) = reverse(vec(transpose(reverse(img; dims=2))))
 
 # function Base.:(==)(a::Projection, b::Projection)
 #     return Bool(
