@@ -14,6 +14,7 @@ makedocs(;
     format=Documenter.HTML(),
     pages=[
         "Home" => "index.md",
+        "Example" => "example.md"
         "Recipes" => [
             "geoaxis.md",
             "stock.md"
