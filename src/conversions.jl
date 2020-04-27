@@ -8,7 +8,7 @@ Point2{T}(a::Vector{T}) where T = Point2(a[1], a[2])
 Creates a vector of [`Point`](@ref)s from the given polygon.
 Returns a `Vector{Vector{Point}}`, with one element.
 """
-toPointVecs(poly::T) where T <: GeoInterface.AbstractPolygon = [Point2.(cs) for cs in coordinates(poly)]
+toPointVecs(poly::T) where T <: GeoInterface.AbstractPolygon = [Point2.(cs) for cs in GeoInterface.coordinates(poly)]
 
 """
     toPointVecs(mp::MultiPolygon)
@@ -22,7 +22,9 @@ Returns a `Vector{Vector{Point}}`.
 """
 function toPointVecs(mp::T) where T <: GeoInterface.AbstractMultiPolygon
 
-    polys = []
+    polys = GeoInterface.coordinates(mp)
+
+    return to_nansep_vec(identity, toPointVecs.(polys))
 
 end
 
@@ -65,7 +67,7 @@ function toMeshes(mp::Vector{Vector{Vector{Point2{T}}}}) where T
 
         v = map(x-> Point3f0(x[1], x[2], 0), vcat(pol...))
 
-        push!(meshes, GLNormalMesh(vertices=v, faces=triangle_faces))
+        push!(meshes, GeometryBasics.Mesh(v, triangle_faces))
     end
 
     return meshes
@@ -77,15 +79,39 @@ function toMeshes(mp::Vector{Vector{Point2{T}}}) where T
 
     v = map(x-> Point3{T}(x[1], x[2], 0), vcat(mp...))
 
-    return [GLNormalMesh(vertices=v, faces=triangle_faces)]
+    return [GeometryBasics.Mesh(v, triangle_faces)]
+end
+
+
+function toMeshes(poly::T) where T <: GeoInterface.AbstractPolygon
+
+    mp = rec_point(GeoInterface.coordinates(poly))
+
+    triangle_faces = EarCut.triangulate(mp)
+
+    v = vcat(mp...)
+
+    return [Mesh(v, triangle_faces)]
 end
 
 function toMeshes(mps::Vector{<: GeoInterface.AbstractMultiPolygon})
-    meshes = GLNormalUVMesh[]
+    meshes = GeometryBasics.Mesh[]
     sizehint!(meshes, length(mps))
     for mp in mps
-        polys = coordinates(mp) |> rec_point
+        polys = GeoInterface.coordinates(mp) |> rec_point
         push!(meshes, merge(vcat(toMeshes.(polys)...)))
+    end
+
+    return meshes
+end
+
+
+function toMeshes(mp::T where T <: GeoInterface.AbstractMultiPolygon)
+    meshes = GeometryBasics.Mesh[]
+
+    for p in GeoInterface.coordinates(mp)
+        poly = rec_point.(p)
+        append!(meshes, toMeshes(poly))
     end
 
     return meshes
@@ -99,8 +125,8 @@ convert_arguments(::Type{<: Poly}, poly::T) where T <: GeoInterface.AbstractPoly
 convert_arguments(::Type{<: Poly}, mp::T) where T <: GeoInterface.AbstractMultiPolygon = (toPointVecs(mp),)
 
 # Only converts polygons and multipolygons
-function convert_arguments(::Type{<: Poly}, fc::GeoInterface.FeatureCollection{GeoInterface.Feature})
-    features = fc.features
+function convert_arguments(::Type{<: AbstractPlotting.Poly}, fc::GeoInterface.AbstractFeatureCollection)
+    features = GeoInterface.features(fc)
 
     cs = Vector{Point2f0}[]
 
@@ -108,7 +134,7 @@ function convert_arguments(::Type{<: Poly}, fc::GeoInterface.FeatureCollection{G
 
     for feature in features
         for coord in toPointVecs(feature.geometry)
-            if imprecise(coord) || length(coord) <= 4
+            if imprecise(coord) || length(coord) < 4
                 @warn(
                     """
                     Imprecise coordinates!  You may want to consider reprojecting to a different coordinate system.
@@ -133,8 +159,8 @@ function convert_arguments(::Type{<: Poly}, fc::GeoInterface.FeatureCollection{G
 
 end
 
-function AbstractPlotting.convert_arguments(::Type{<: Mesh}, fc::GeoInterface.FeatureCollection{GeoInterface.Feature})
-    return (fc.features .|> GeoInterface.geometry .|> toPointVecs .|> toMeshes,) # return a Vector of meshes
+function AbstractPlotting.convert_arguments(::Type{<: Mesh}, fc::GeoInterface.FeatureCollection)
+    return (geo |> GeoInterface.features .|> GeoInterface.geometry .|> toMeshes,) # return a Vector of meshes
 end
 
 convert_arguments(::Type{<: Mesh}, polys::Vector{<:GeoInterface.AbstractMultiPolygon}) = (toMeshes(polys),)
