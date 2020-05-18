@@ -8,7 +8,7 @@ frameattrs = (
 yaxisattrs = (
     tick = (
     # tick marks
-        ticks   = WilkinsonTicks(; k_min = 5, k_ideal = 7, k_max = 15),
+        ticks   = WilkinsonTicks(7; k_min = 5, k_max = 15),
         autolimitmargin = 0.05f0,
         size    = 10f0,
         visible = true,
@@ -37,7 +37,7 @@ yaxisattrs = (
 xaxisattrs = (
     tick = (
     # tick marks
-        ticks   = WilkinsonTicks(; k_min = 5, k_ideal = 7, k_max = 12),
+        ticks   = WilkinsonTicks(7; k_min = 5, k_max = 12),
         autolimitmargin = 0.05f0,
         size    = 10f0,
         visible = true,
@@ -183,11 +183,11 @@ function draw_ticks!(plot::GeoAxis)
 
     lift(x.tick.ticks, y.tick.ticks, x.tick.label.position, y.tick.label.position, plot.limits, plot.samples, plot.crs.source, plot.crs.dest, x.tick.label.size, y.tick.label.size) do xticks_struct, yticks_struct, xtickp, ytickp, limits, samples, source, dest, xticklabelsize, yticklabelsize
 
-        xtickvalues[] = MakieLayout.compute_tick_values(xticks_struct, MakieLayout.left(limits), MakieLayout.right(limits), 100f0)
-        ytickvalues[] = MakieLayout.compute_tick_values(yticks_struct, MakieLayout.bottom(limits), MakieLayout.top(limits), 100f0)
+        xtickvalues[] = MakieLayout.get_tickvalues(xticks_struct, MakieLayout.left(limits), MakieLayout.right(limits))
+        ytickvalues[] = MakieLayout.get_tickvalues(yticks_struct, MakieLayout.bottom(limits), MakieLayout.top(limits))
 
-        xticklabels = MakieLayout.get_tick_labels(xticks_struct, xtickvalues[])
-        yticklabels = MakieLayout.get_tick_labels(yticks_struct, ytickvalues[])
+        xticklabels = MakieLayout.get_ticklabels(AbstractPlotting.automatic, xtickvalues[])
+        yticklabels = MakieLayout.get_ticklabels(AbstractPlotting.automatic, ytickvalues[])
 
         # silently update the backend value without calling
         # these Observables' listener functions.

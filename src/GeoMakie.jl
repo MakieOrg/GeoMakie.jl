@@ -26,7 +26,6 @@ const coordinates = GeoInterface.coordinates
 include("conversions.jl")
 include("projections.jl")
 include("utils.jl")
-include("tick_compat.jl")
 include("data.jl")
 
 include("recipes/geoaxis.jl")
