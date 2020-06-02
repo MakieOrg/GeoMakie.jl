@@ -26,7 +26,7 @@ scene = poly(points, faces; color = imflip(img), show_axis = false);
 
 geoaxis!(scene, -180, 180, -90, 90; crs = (dest = dest,));
 
-titletext = Node("07/2016")
+titletext = Observable("07/2016")
 
 fullsc = title(sc, titletext; fontsize = 40);
 

@@ -70,7 +70,7 @@ function AbstractPlotting.plot!(p::Coastlines)
 
     @extract p (crs,)
 
-    new_linevec = Node(COASTLINES_LINEVEC)
+    new_linevec = Observable(COASTLINES_LINEVEC)
 
     lift(crs.source, crs.dest) do source, dest
         new_linevec[] = Proj4.transform.(source, dest, COASTLINES_LINEVEC)
@@ -156,8 +156,8 @@ function AbstractPlotting.plot!(p::Earth)
     lons = LinRange(-180, 179, size(EARTH_IMG)[2])
     lats = LinRange(89.5, -89.5, size(EARTH_IMG)[1])
 
-    xs = Node([lon for lat in lats, lon in lons])
-    ys = Node([lat for lat in lats, lon in lons])
+    xs = Observable([lon for lat in lats, lon in lons])
+    ys = Observable([lat for lat in lats, lon in lons])
 
     lift(crs.source, crs.dest) do source, dest
 

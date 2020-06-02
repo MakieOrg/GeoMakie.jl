@@ -11,18 +11,18 @@ t = 1 # time
 f.vars["toa_net_all_mon"][:, :, t][:, :, 1] # this hack seems necessary for NetCDF, but I'm not sure why
 
 
-field = Node{Matrix{Float64}}(f.vars["toa_net_all_mon"][:, :, t][:, :, 1])
+field = Observable{Matrix{Float64}}(f.vars["toa_net_all_mon"][:, :, t][:, :, 1])
 
-cf = Node(copy(field[]))
+cf = Observable(copy(field[]))
 
 source = Projection("+proj=lonlat +lon_0=180 +pm=180")
 dest   = Projection("+proj=moll +lon_0=0")
-projtup = Node([source, dest])
+projtup = Observable([source, dest])
 
-pm = Node(0)
+pm = Observable(0)
 oxs, oys = xygrid(lon, lat)
 
-xs, ys = Node(copy(oxs)), Node(copy(oys))
+xs, ys = Observable(copy(oxs)), Observable(copy(oys))
 
 on(projtup) do projtup
     # restore the arrays to their original values

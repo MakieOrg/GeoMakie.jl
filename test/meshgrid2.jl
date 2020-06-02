@@ -11,7 +11,7 @@ imgpaths = sort(Glob.glob(joinpath(relpath(imgdir), "*.PNG"))) # change this to 
 img = ImageMagick.load(imgpaths[1])
 
 re = GeoMakie.date_regex("MYDAL2_M_AER_RA", "PNG")
-titletext = Node(join(match(re, basename(imgpaths[1])).captures, '-'))
+titletext = Observable(join(match(re, basename(imgpaths[1])).captures, '-'))
 
 lons = LinRange(-179.5, 179.5, size(img)[2])
 lats = LinRange(89.5, -89.5, size(img)[1])
@@ -40,7 +40,7 @@ rect = popup[end]
 
 translate!(rect, Vec3f0(0, 0, 100))
 
-textnode = Node(" ")
+textnode = Observable(" ")
 
 text!(popup, textnode, textsize = 30, position = textpos, color = :darkred, align = (:center, :center), raw = true, visible = visible)
 

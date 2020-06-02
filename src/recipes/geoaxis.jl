@@ -141,10 +141,10 @@ function draw_frames!(plot::GeoAxis{T}) where T
     @extract crs (source, dest)
 
     # initialize frames
-    topline = Node(Vector{Point2f0}())
-    bottomline = Node(Vector{Point2f0}())
-    leftline = Node(Vector{Point2f0}())
-    rightline = Node(Vector{Point2f0}())
+    topline = Observable(Vector{Point2f0}())
+    bottomline = Observable(Vector{Point2f0}())
+    leftline = Observable(Vector{Point2f0}())
+    rightline = Observable(Vector{Point2f0}())
 
     # initialize the line vectors
     lift(plot.limits, source, dest, samples) do lims, source, dest, samples
@@ -172,14 +172,14 @@ function draw_ticks!(plot::GeoAxis)
 
     @extract plot (x, y)
 
-    xtickvalues = Node{Vector{<: AbstractFloat}}(Vector{Float64}())
-    ytickvalues = Node{Vector{<: AbstractFloat}}(Vector{Float64}())
+    xtickvalues = Observable{Vector{<: AbstractFloat}}(Vector{Float64}())
+    ytickvalues = Observable{Vector{<: AbstractFloat}}(Vector{Float64}())
 
-    xlinevec = Node(Vector{Point2f0}())
-    ylinevec = Node(Vector{Point2f0}())
+    xlinevec = Observable(Vector{Point2f0}())
+    ylinevec = Observable(Vector{Point2f0}())
 
-    xtickannotations = Node(Vector{Tuple{String, Point2f0}}())
-    ytickannotations = Node(Vector{Tuple{String, Point2f0}}())
+    xtickannotations = Observable(Vector{Tuple{String, Point2f0}}())
+    ytickannotations = Observable(Vector{Tuple{String, Point2f0}}())
 
     lift(x.tick.ticks, y.tick.ticks, x.tick.label.position, y.tick.label.position, plot.limits, plot.samples, plot.crs.source, plot.crs.dest, x.tick.label.size, y.tick.label.size) do xticks_struct, yticks_struct, xtickp, ytickp, limits, samples, source, dest, xticklabelsize, yticklabelsize
 
