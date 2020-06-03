@@ -282,3 +282,10 @@ function WinkelTripel(;
 
     return Projection(proj4_params)
 end
+
+
+
+# overload for transform_func to work with CRS2CRS
+if isdefined(Proj4, :CRS2CRS)
+    AbstractPlotting.apply_transform(cs::Proj4.CRS2CRS, vt::AbstractPlotting.VecTypes) = cs(vt)
+end
