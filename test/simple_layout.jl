@@ -6,10 +6,10 @@ lats = LinRange(-89.5, 89.5, 180)
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
 source = LonLat()
-dest = WinkelTripel()
+dest   = WinkelTripel()
+cs     = Proj4.CRS2CRS(source, dest)
 
 xs, ys = xygrid(lons, lats)
-Proj4.transform!(source, dest, vec(xs), vec(ys))
 
 xmin, xmax = extrema(xs)
 ymin, ymax = extrema(ys)
@@ -19,13 +19,13 @@ aspect_ratio = (ymax - ymin) / (xmax - xmin)
 scene, layout = layoutscene(
 );
 
-layout[1, 1] = lsc = LScene(scene; scenekw = (show_axis = false, scale_plot = false))
+layout[1, 1] = lsc = LScene(scene; scenekw = (show_axis = false, scale_plot = false, transform_func = cs))
 
 splot = surface!(lsc, xs, ys; color = field, shading = false, show_axis = false)
 
-geoaxis!(lsc, -180, 180, -90, 90; crs = (src = source, dest = dest,))
+geoaxis!(lsc, Rect2D(-180, -90, 360, 180))
 
-coastlines!(lsc; crs = (src = source, dest = dest,))
+coastlines!(lsc)
 
 layout[1, 2] = LColorbar(scene, splot; label = "Arbitrary data", width = 30)
 
@@ -34,4 +34,5 @@ rowsize!(layout, 1, Aspect(1, aspect_ratio))
 
 layout[0, :] = LText(scene, "MakieLayout is cool!"; textsize = 40)
 
-scene
+scene |> save("geo.png")
+scene |> save("geo.pdf")
