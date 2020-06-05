@@ -104,9 +104,9 @@ function convert_arguments(::Type{<: GeoAxis}, xs::AbstractVector{<: Number}, ys
 end
 
 # function AbstractPlotting.calculated_attributes!(plot::GeoAxis)
-#     @extract plot (x, y, crs, limits)
+#     @extract plot (x, y, limits)
 #
-#     lift(limits, crs.source, crs.dest, x.tick.label.size, y.tick.label.size) do limits, source, dest, xticklabelsize, yticklabelsize
+#     lift(limits, x.tick.label.size, y.tick.label.size) do limits, xticklabelsize, yticklabelsize
 #         newrect = [limits[LEFT] limits[TOP]; limits[RIGHT] limits[BOTTOM]]
 #         textscale = maximum(diff.(eachcol(newrect)))
 #
