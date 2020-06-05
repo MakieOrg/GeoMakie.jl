@@ -7,9 +7,10 @@ using MakieLayout: Formatting
 
 using MakieLayout.GridLayoutBase
 using MakieLayout.GridLayoutBase: Side
+using GeoInterface: GeoInterface, coordinates, AbstractPolygon, AbstractMultiPolygon, features, geometry
 
 @reexport using Colors, AbstractPlotting
-@reexport using GeoInterface, Proj4, NASAEarthObservations
+@reexport using Proj4, NASAEarthObservations
 
 import AbstractPlotting: convert_arguments, convert_attribute
 using AbstractPlotting.DocStringExtensions
@@ -21,7 +22,7 @@ const attributes = AbstractPlotting.attributes
 const transform! = Proj4.transform!
 const volume = AbstractPlotting.volume
 const Mesh = GeometryBasics.Mesh
-const coordinates = GeoInterface.coordinates
+const Text = AbstractPlotting.Text
 
 include("conversions.jl")
 include("projections.jl")
