@@ -227,9 +227,9 @@ function draw_ticks!(plot::GeoAxis)
         if typeof(ytickp) <: MakieLayout.GridLayoutBase.Side
 
             xpos = if ytickp == Left()
-                left(limits)
+                MakieLayout.GridLayoutBase.left(limits)
             else
-                right(limits)
+                MakieLayout.GridLayoutBase.right(limits)
             end
 
             ytickpositions = Point2f0.(xpos, ytickvalues[])
@@ -239,14 +239,14 @@ function draw_ticks!(plot::GeoAxis)
         elseif ytickp isa NTuple{2, <: MakieLayout.GridLayoutBase.Side}
 
             xpos1 = if ytickp[1] == Left()
-                left(limits)
+                MakieLayout.GridLayoutBase.left(limits)
             else
-                right(limits)
+                MakieLayout.GridLayoutBase.right(limits)
             end
             xpos2 = if ytickp[2] == Left()
-                left(limits)
+                MakieLayout.GridLayoutBase.left(limits)
             else
-                right(limits)
+                MakieLayout.GridLayoutBase.right(limits)
             end
 
             ytickpositions = Point2f0.([(x, y) for x in (xpos1, xpos2), y in ytickvalues[]])
@@ -264,9 +264,9 @@ function draw_ticks!(plot::GeoAxis)
         if typeof(xtickp) <: MakieLayout.GridLayoutBase.Side
 
             ypos = if ytickp == Top()
-                top(limits)
+                MakieLayout.GridLayoutBase.top(limits)
             else
-                bottom(limits)
+                MakieLayout.GridLayoutBase.bottom(limits)
             end
 
             xtickpositions = Point2f0.(xtickvalues[], ypos)
@@ -276,14 +276,14 @@ function draw_ticks!(plot::GeoAxis)
         elseif xtickp isa NTuple{2, <: MakieLayout.GridLayoutBase.Side}
 
             ypos1 = if ytickp[1] == Top()
-                top(limits)
+                MakieLayout.GridLayoutBase.top(limits)
             else
-                bottom(limits)
+                MakieLayout.GridLayoutBase.bottom(limits)
             end
             ypos2 = if ytickp[2] == Top()
-                top(limits)
+                MakieLayout.GridLayoutBase.top(limits)
             else
-                bottom(limits)
+                MakieLayout.GridLayoutBase.bottom(limits)
             end
 
             xtickpositions = Point2f0.([(x, y) for y in (ypos1, ypos2), x in xtickvalues[]])
