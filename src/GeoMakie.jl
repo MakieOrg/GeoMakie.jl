@@ -1,12 +1,12 @@
 module GeoMakie
 
 using Reexport
-using GeometryBasics, EarCut, Colors, MakieLayout, AbstractPlotting, ImageMagick, GeoJSON, Glob
+using GeometryBasics, EarCut, Colors, AbstractPlotting.MakieLayout, AbstractPlotting, ImageMagick, GeoJSON, Glob
 
-using MakieLayout: Formatting
+using AbstractPlotting.MakieLayout: Formatting
 
-using MakieLayout.GridLayoutBase
-using MakieLayout.GridLayoutBase: Side
+using AbstractPlotting.MakieLayout.GridLayoutBase
+using AbstractPlotting.MakieLayout.GridLayoutBase: Side
 using GeoInterface: GeoInterface, coordinates, AbstractPolygon, AbstractMultiPolygon, features, geometry
 
 @reexport using Colors, AbstractPlotting

@@ -1,4 +1,4 @@
-using GeoMakie, MakieGallery, MakieLayout, GLMakie, Test
+using GeoMakie, MakieGallery, AbstractPlotting.MakieLayout, GLMakie, Test
 
 const OPENGL = GLMakie.WORKING_OPENGL
 
