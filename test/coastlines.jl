@@ -20,7 +20,7 @@ function get_coastline_shapefile()
     return dir
 end
 
-using Proj4, Shapefile, GeoInterface, Makie, MakieLayout, PlotUtils
+using Proj4, Shapefile, GeoInterface, Makie, AbstractPlotting.MakieLayout, PlotUtils
 
 # path to shapefile of coastline
 path = "ne_110m_coastline/ne_110m_coastline.shp"

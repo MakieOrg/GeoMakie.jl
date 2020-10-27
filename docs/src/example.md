@@ -1,7 +1,7 @@
 # Example usage
 
 ```@setup 1
-using GeoMakie, AbstractPlotting, MakieLayout, CairoMakie
+using GeoMakie, AbstractPlotting, AbstractPlotting.MakieLayout, CairoMakie
 ```
 
 This is a small example which demonstrates how to use GeoMakie.  We go through the basic setup of a plot, and explore the different options which are available for plotting.

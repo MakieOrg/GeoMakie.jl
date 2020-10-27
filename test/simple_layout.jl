@@ -1,4 +1,4 @@
-using GeoMakie, MakieLayout, Makie
+using GeoMakie, AbstractPlotting.MakieLayout, Makie
 
 lons = LinRange(-179.5, 179.5, 360)
 lats = LinRange(-89.5, 89.5, 180)
