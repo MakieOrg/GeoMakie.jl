@@ -7,9 +7,9 @@
 
 ## Installation
 
-This package is **in development** and will **break often**.  As it is currently unregistered, you can install it from the REPL like so:
+This package is **in development** and will **break often**.  You can install it from the REPL like so:
 ```julia
-]add https://github.com/JuliaPlots/GeoMakie.jl
+]add GeoMakie
 ```
 
 ## Examples
