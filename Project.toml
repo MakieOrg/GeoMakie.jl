@@ -28,7 +28,7 @@ Glob = "1"
 ImageMagick = "1"
 NASAEarthObservations = "0.1"
 Proj4 = "0.7"
-Reexport = "0.2"
+Reexport = "0.2, 1.0"
 StructArrays = "0.4"
 julia = "1"
 
