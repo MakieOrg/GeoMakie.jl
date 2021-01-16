@@ -15,7 +15,8 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
 
 [compat]
-AbstractPlotting = "0.13, 0.15"
+AbstractPlotting = "0.15.8"
+GLMakie = "0.1.24"
 Colors = "0.12"
 GeoInterface = "0.5"
 GeometryBasics = "0.2, 0.3"
