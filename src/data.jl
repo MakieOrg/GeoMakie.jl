@@ -1,7 +1,16 @@
-const EARTH_IMG = ImageMagick.load(joinpath(dirname(@__DIR__), "assets", "raster", "50-natural-earth-1-downsampled.png"))
+assetpath(files...) =  joinpath(dirname(@__DIR__), "assets", files...)
 
-const COASTLINES_LINEVEC = begin
-    to_nansep_vec(coordinates.(geometry.(GeoJSON.read(Base.read(joinpath(dirname(@__DIR__), "assets", "vector", "110m_coastline.geojson"), String)).features))) do feature
-        Point2f0.(feature)
+const LOAD_CACHE = Dict{String, Any}()
+
+function earth()
+    return get!(LOAD_CACHE, "earth") do
+        FileIO.load(assetpath("raster", "50-natural-earth-1-downsampled.png"))
+    end
+end
+
+function coastlines()
+    return get!(LOAD_CACHE, "coastlines") do
+        geometry = GeoJSON.read(read(assetpath("vector", "110m_coastline.geojson"), String))
+        return geo2basic(geometry)
     end
 end

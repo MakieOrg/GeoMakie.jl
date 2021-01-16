@@ -1,17 +1,17 @@
 module GeoMakie
 
 using Reexport
-using GeometryBasics, EarCut, Colors, AbstractPlotting.MakieLayout, AbstractPlotting, ImageMagick, GeoJSON, Glob
+using GeometryBasics, Colors, AbstractPlotting.MakieLayout, AbstractPlotting, ImageMagick
+using GeoJSON
 
+using AbstractPlotting.FileIO
 using AbstractPlotting.MakieLayout: Formatting
-
 using AbstractPlotting.MakieLayout.GridLayoutBase
 using AbstractPlotting.MakieLayout.GridLayoutBase: Side
 using GeoInterface: GeoInterface, coordinates, AbstractPolygon, AbstractMultiPolygon, features, geometry
 
-@reexport using Colors, AbstractPlotting
-@reexport using Proj4, NASAEarthObservations
-
+using Proj4
+import Proj4: Projection
 import AbstractPlotting: convert_arguments, convert_attribute
 using AbstractPlotting.DocStringExtensions
 
@@ -26,31 +26,11 @@ const Text = AbstractPlotting.Text
 
 include("conversions.jl")
 include("projections.jl")
-include("utils.jl")
 include("data.jl")
-
-include("recipes/geoaxis.jl")
-include("recipes/stock.jl")
-
-
-# export recipes
-
-export geoaxis, geoaxis!
-
-# export projections
 
 export LonLat, PlateCarree, Mercator, TransverseMercator, UTM, AlbersEqualArea, Robinson, WinkelTripel
 
-# export utilities
-
-export rec_project, rec_point, xygrid
-
-# function __init__()
-#     Base.delete_method(methods(coastlines!).ms[6])
-#     Base.delete_method(methods(earth!).ms[6])
-# end
+@reexport using Colors, AbstractPlotting
+@reexport using Proj4
 
 end # module
-
-## TODOS
-# TODO note you need to return a tuple rom conv-arg

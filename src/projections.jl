@@ -283,9 +283,16 @@ function WinkelTripel(;
     return Projection(proj4_params)
 end
 
+struct PROJ{ST, DT}
+    source::ST
+    dest::DT
+end
 
+function (proj::PROJ)(x::Point2)
+    matr = transform(proj.source, proj.dest, [x[1] x[2] 0])
+    return Point2f0(matr[1], matr[2])
+end
 
-# overload for transform_func to work with CRS2CRS
-if isdefined(Proj4, :CRS2CRS)
-    AbstractPlotting.apply_transform(cs::Proj4.CRS2CRS, vt::AbstractPlotting.VecTypes) = cs(vt)
+function proj(source, dest)
+    return AbstractPlotting.PointTrans{2}(PROJ(source, dest))
 end

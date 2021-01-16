@@ -1,10 +1,9 @@
-using GeoMakie
 using GLMakie
+using GeoMakie
 using GeoMakie.GeoInterface
-using GeoJSON
-using Test
+using GeoMakie.GeoJSON
 
-@testset "GeoMakie" begin
+begin
     source = LonLat()
     dest = WinkelTripel()
     states = download("https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json")
@@ -20,5 +19,4 @@ using Test
     lines!(ax, GeoMakie.coastlines())
     poly!(ax, states_geo, color= 1:n, strokecolor = :blue, strokewidth = 1)
     display(fig)
-    @test true # :)
 end
