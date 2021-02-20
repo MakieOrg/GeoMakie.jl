@@ -3,11 +3,11 @@ using Documenter, GeoMakie
 # use the README as the home page
 cp(joinpath(dirname(@__DIR__), "README.md"), joinpath(@__DIR__, "src", "index.md"); force = true)
 
-indexstr = read(joinpath(@__DIR__, "src", "index.md"), String)
+index_obj = readlines(joinpath(@__DIR__, "src", "index.md"))
 
-replace(indexstr, """<a href = "https://www.github.com/JuliaPlots/Makie.jl"><img src="https://raw.githubusercontent.com/JuliaPlots/Makie.jl/master/assets/logo.png" alt="Makie.jl" height="30" align = "top"></a>""" => "Makie.jl")
+index_obj[2] = "## Geographic plotting utilities for [Makie.jl](https://www.github.com/JuliaPlots/Makie.jl)"
 
-write(joinpath(@__DIR__, "src", "index.md"), indexstr)
+write(joinpath(@__DIR__, "src", "index.md"), join(index_obj, "\n"))
 
 makedocs(;
     modules=[GeoMakie, AbstractPlotting],
