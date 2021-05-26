@@ -15,8 +15,8 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
 
 [compat]
+CairoMakie = "0.5"
 Colors = "0.12"
-GLMakie = "0.1.24"
 GeoInterface = "0.5"
 GeoJSON = "0.5"
 GeometryBasics = "0.2, 0.3"
@@ -28,8 +28,9 @@ StructArrays = "0.4, 0.5"
 julia = "1"
 
 [extras]
-GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "GLMakie"]
+test = ["Test", "Downloads", "CairoMakie"]
