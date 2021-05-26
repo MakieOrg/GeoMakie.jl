@@ -13,7 +13,7 @@ geo = GeoJSON.dict2geo(JSON.parse(states_str))
 
 mesh(geo, strokecolor = :blue, strokewidth = 1, color = (blue, 0.5), shading = false)
 
-polys = AbstractPlotting.convert_arguments(AbstractPlotting.Mesh, geo)
+polys = Makie.convert_arguments(Makie.Mesh, geo)
 
 geoms = geo |> GeoInterface.features .|> GeoInterface.geometry
 
@@ -21,4 +21,4 @@ sc = Scene(; scale_plot = false)
 meshes = GeoMakie.toMeshes.(geoms)
 poly!.(meshes; shading = :false, color = (:blue, 0.5), strokecolor = :blue, strokewidth = 2)
 
-AbstractPlotting.current_scene()
+Makie.current_scene()

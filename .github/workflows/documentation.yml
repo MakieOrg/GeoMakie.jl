@@ -23,7 +23,7 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
       - name: Install dependencies
-        run: julia --project=docs/ -e 'using Pkg; pkg"add Makie#master AbstractPlotting#use-vertical-dims-from-font MakieLayout#master CairoMakie#jk/scale_text"; Pkg.instantiate()'
+        run: julia --project=docs/ -e 'using Pkg; pkg"add Makie#master Makie#use-vertical-dims-from-font MakieLayout#master CairoMakie#jk/scale_text"; Pkg.instantiate()'
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

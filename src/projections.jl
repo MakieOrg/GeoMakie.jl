@@ -294,5 +294,5 @@ function (proj::PROJ)(x::Point2)
 end
 
 function proj(source, dest)
-    return AbstractPlotting.PointTrans{2}(PROJ(source, dest))
+    return Makie.PointTrans{2}(PROJ(source, dest))
 end
