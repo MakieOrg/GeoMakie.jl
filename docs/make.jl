@@ -10,7 +10,7 @@ replace(indexstr, """<a href = "https://www.github.com/JuliaPlots/Makie.jl"><img
 write(joinpath(@__DIR__, "src", "index.md"), indexstr)
 
 makedocs(;
-    modules=[GeoMakie, AbstractPlotting],
+    modules=[GeoMakie, Makie],
     format=Documenter.HTML(),
     pages=[
         "Home" => "index.md",
