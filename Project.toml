@@ -1,6 +1,6 @@
-authors = ["Anshul Singhvi"]
 name = "GeoMakie"
 uuid = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
+authors = ["Anshul Singhvi"]
 version = "0.1.16"
 
 [deps]
@@ -21,7 +21,7 @@ GeoInterface = "0.5"
 GeoJSON = "0.5"
 GeometryBasics = "0.2, 0.3"
 ImageMagick = "1"
-Makie = "0.13"
+Makie = "0.13, 0.14"
 Proj4 = "0.7"
 Reexport = "0.2, 1.0"
 StructArrays = "0.4, 0.5"
