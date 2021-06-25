@@ -16,7 +16,11 @@ function geo2basic(poly::Vector{Vector{Vector{Float64}}})
 end
 
 function geo2basic(linestring::Vector{Vector{Float64}})
-    return  to_point2.(linestring)
+    return to_point2.(linestring)
+end
+
+function geo2basic(point::GeoInterface.AbstractPoint)
+    return to_point2(GeoInterface.coordinates(point))
 end
 
 function geo2basic(multi_poly::GeoInterface.AbstractMultiPolygon)
