@@ -62,7 +62,7 @@ begin
     display(fig)
 end
 ```
-![image](https://user-images.githubusercontent.com/1010467/104816235-04ed8100-581a-11eb-9c40-abbc752524f7.png)
+![image](https://user-images.githubusercontent.com/4471859/123479757-ad8de100-d601-11eb-9745-82e0685e8163.png)
 
 These plots can be arbitrarily colored using the `color` keyword, and the full Makie interface is also exposed.
 
