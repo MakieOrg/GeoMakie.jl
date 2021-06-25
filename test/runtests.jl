@@ -11,12 +11,13 @@ using Downloads
     source = "+proj=longlat +datum=WGS84"
     dest = "+proj=natearth2"
     trans = Proj4.Transformation(source, dest, always_xy=true)
+    ptrans = Makie.PointTrans{2}(trans)
 
     fig = Figure()
     ax = Axis(fig[1,1], aspect = DataAspect())
 
     # all input data coordinates are projected using this function
-    ax.scene.transformation.transform_func[] = Makie.PointTrans{2}(trans)
+    ax.scene.transformation.transform_func[] = ptrans
 
     # draw projected grid lines and set limits accordingly
     lons = -180:10:180
