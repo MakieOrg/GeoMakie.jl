@@ -10,8 +10,7 @@ using Makie.MakieLayout.GridLayoutBase
 using Makie.MakieLayout.GridLayoutBase: Side
 using GeoInterface: GeoInterface, coordinates, AbstractPolygon, AbstractMultiPolygon, features, geometry
 
-using Proj4
-import Proj4: Projection
+using Proj4: Proj4
 import Makie: convert_arguments, convert_attribute
 using Makie.DocStringExtensions
 
@@ -25,12 +24,9 @@ const Mesh = GeometryBasics.Mesh
 const Text = Makie.Text
 
 include("conversions.jl")
-include("projections.jl")
 include("data.jl")
 
-export LonLat, PlateCarree, Mercator, TransverseMercator, UTM, AlbersEqualArea, Robinson, WinkelTripel
-
 @reexport using Colors, Makie
-@reexport using Proj4
+export Proj4
 
 end # module
