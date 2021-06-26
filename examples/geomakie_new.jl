@@ -20,8 +20,10 @@ begin
     ax.scene.transformation.transform_func[] = ptrans
 
     # draw projected grid lines and set limits accordingly
-    lons = -180:10:180
-    lats = -90:10:90
+    lats = -90:10.0:90
+    lons = -180:10.0:180
+    lons = collect(lons)
+    lons[end] = prevfloat(lons[end])  # avoid PROJ wrapping 180 to -180
     field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
     points = map(CartesianIndices(size(field))) do xy
         x, y = Tuple(xy)
