@@ -4,6 +4,7 @@ using GeoMakie.GeoInterface
 using GeoJSON
 using Test
 using Downloads
+using Proj4
 
 @testset "GeoMakie" begin
     # select a coordinate projection, using a string that PROJ accepts
