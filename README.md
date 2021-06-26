@@ -37,8 +37,10 @@ begin
     ax.scene.transformation.transform_func[] = ptrans
 
     # draw projected grid lines and set limits accordingly
-    lons = -180:10:180
-    lats = -90:10:90
+    lats = -90:10.0:90
+    lons = -180:10.0:180
+    lons = collect(lons)
+    lons[end] = prevfloat(lons[end])  # avoid PROJ wrapping 180 to -180
     field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
     points = map(CartesianIndices(size(field))) do xy
         x, y = Tuple(xy)
@@ -64,7 +66,7 @@ begin
     display(fig)
 end
 ```
-![image](https://user-images.githubusercontent.com/4471859/123479757-ad8de100-d601-11eb-9745-82e0685e8163.png)
+![image](https://user-images.githubusercontent.com/4471859/123510397-8116ab00-d67b-11eb-8414-cffd18d60f05.png)
 
 These plots can be arbitrarily colored using the `color` keyword, and the full Makie interface is also exposed.
 
