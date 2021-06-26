@@ -3,6 +3,7 @@ using GeoMakie
 using GeoMakie.GeoInterface
 using GeoMakie.GeoJSON
 using Downloads
+using Proj4
 
 begin
     # select a coordinate projection, using a string that PROJ accepts

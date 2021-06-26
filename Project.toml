@@ -27,7 +27,8 @@ julia = "1"
 [extras]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
+Proj4 = "9a7e659c-8ee8-5706-894e-f68f43bc57ea"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Downloads", "CairoMakie"]
+test = ["Test", "Downloads", "CairoMakie", "Proj4"]
