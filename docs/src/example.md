@@ -1,31 +1,35 @@
 # Example usage
 
 ```@setup 1
-using GeoMakie, AbstractPlotting, AbstractPlotting.MakieLayout, CairoMakie
+using GeoMakie, CairoMakie, Proj4
 ```
 
 This is a small example which demonstrates how to use GeoMakie.  We go through the basic setup of a plot, and explore the different options which are available for plotting.
 
 It helps to think of GeoMakie not as a fully featured, all-in-one solution like Cartopy is; instead, it is simply a collection of utilities which make creating geographical plots easier.
 
-We'll begin by simulating a field across the Earth:
+We'll begin by simulating a field across the Earth. We can plot this field using the
+standard `heatmap` from Makie.
 
 ```@example 1
-using GeoMakie
-
 lons = LinRange(-179.5, 179.5, 360)
 lats = LinRange(-89.5, 89.5, 180)
 
-field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
+field = [exp(cosd(x)) + 3(y/90) for x in lons, y in lats]
+
+heatmap(lons, lats, field)
 ```
 
-Presumably, you won't want to use the boring old Plate-Carrée projection.  Fortunately, GeoMakie provides several convenience constructors, and you can use [Proj4.jl](https://github.com/JuliaGeo/Proj4.jl) to construct arbitrary projections.
+Presumably, you won't want to use the boring old Plate-Carrée projection.  Fortunately, we can hook up any [`Proj4.Transformation`](https://github.com/JuliaGeo/Proj4.jl) to [`Makie.Transformation`](http://makie.juliaplots.org/stable/makie_api.html#Makie.Transformation).
 
 ```@example 1
-source, dest = LonLat(), WinkelTripel()
+source = "+proj=longlat +datum=WGS84"
+dest = "+proj=wintri"
+trans = Proj4.Transformation(source, dest, always_xy=true)
+ptrans = Makie.PointTrans{2}(trans)
 ```
 
-There are two main entry points to plot a field.  If you're using the GLMakie backend (which is the default, but does require a GPU), then you have the option of using `surface` or `mesh`; however, if you're using the CairoMakie backend (which does not require a GPU), then you can only use `mesh`.
+There are two main entry points to plot a field.  If you're using the GLMakie backend (which requires a GPU), then you have the option of using `surface` or `mesh`; however, if you're using the CairoMakie backend (which does not require a GPU), then you can only use `mesh`.
 
 We'll cover the `surface` method first.
 
