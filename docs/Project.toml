@@ -2,6 +2,7 @@
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
+Proj4 = "9a7e659c-8ee8-5706-894e-f68f43bc57ea"
 
 [compat]
-CairoMakie = "0.3"
+Documenter = "0.27"
