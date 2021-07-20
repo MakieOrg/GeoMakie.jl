@@ -27,9 +27,9 @@ begin
     field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
     points = map(CartesianIndices(size(field))) do xy
         x, y = Tuple(xy)
-        Point2f0(lons[x], lats[y])
+        Point2f(lons[x], lats[y])
     end
-    limits = FRect2D(Makie.apply_transform(ptrans, points))
+    limits = Rect2f(Makie.apply_transform(ptrans, points))
     limits!(ax, limits)
     wireframe!(ax, lons, lats, field, color=(:gray, 0.2), transparency=true)
 
