@@ -26,4 +26,8 @@ include("data.jl")
 
 @reexport using Colors, Makie
 
+include("api.jl")
+
+export geosurface!, geoscatter!
+
 end # module
