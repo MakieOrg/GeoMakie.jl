@@ -22,11 +22,15 @@ configure the map projection to be used for the given field.
   `source, dest` you can directly use the Proj4.jl package to define the projection.
 * `coastlines = true`: Whether to plot coastlines.
 * `coastkwargs = NamedTuple()` Keywords propagated to the coastline plot (which is a line plot).
+* `lonticks = -180:60:180, latticks = -90:30:90` ticks for the longitude and latitude
+  dimensions (in degrees).
 """
 function GeoAxis(args...; 
         source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth",
         transformation = Proj4.Transformation(source, dest, always_xy=true),
         coastlines = true, coastkwargs = NamedTuple(),
+        lonticks = -180:60:180,
+        latticks = -90:30:90,  
         kw... # TODO: Where is `kw` propagated into?
     )
 
@@ -59,8 +63,6 @@ function GeoAxis(args...;
     # lonticks = range(lons[1], lons[end]; length = 4)
     # latticks = range(lats[1], lats[end]; length = 4)
 
-    lonticks = -180:60:180
-    latticks = -90:30:90
     xticks = first.(transformation.(Point2f0.(lonticks, latticks[1]))) 
     yticks = last.(transformation.(Point2f0.(lonticks[1], latticks)))
     ax.xticks = (xticks, string.(lonticks, 'ᵒ'))
@@ -68,7 +70,7 @@ function GeoAxis(args...;
 
     # Draw tick lines
     ax.xgridvisible=false; ax.ygridvisible=false
-    # TODO: How to get "default grid lines
+    # TODO: How to get "default" grid line style from the theme?
     for lon in lonticks
         coords = [Point2f0(lon, l) for l in range(latticks[1], latticks[end]; length = 100)]
         lines!(coords; color = :gray20, linewidth = 0.5)
