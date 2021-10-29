@@ -24,6 +24,31 @@ configure the map projection to be used for the given field.
 * `coastkwargs = NamedTuple()` Keywords propagated to the coastline plot (which is a line plot).
 * `lonticks = -180:60:180, latticks = -90:30:90` ticks for the longitude and latitude
   dimensions (in degrees).
+
+## Example
+```julia
+using GeoMakie, GLMakie
+
+lons = -180:180
+lats = -90:90
+field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
+
+# Surface example
+fig = Figure()
+ax = GeoAxis(fig[1,1])
+el = surface!(ax, lons, lats, field)
+display(fig)
+
+# %% Scatter example
+slons = rand(lons, 2000)
+slats = rand(lats, 2000)
+sfield = [exp(cosd(l)) + 3(y/90) for (l,y) in zip(slons, slats)]
+
+fig = Figure()
+ax = GeoAxis(fig[1,1])
+el = scatter!(slons, slats; color = sfield)
+display(fig)
+```
 """
 function GeoAxis(args...; 
         source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth",
