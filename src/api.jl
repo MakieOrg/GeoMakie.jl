@@ -42,12 +42,12 @@ function GeoAxis(args...;
     ax.scene.transformation.transform_func[] = ptrans
 
     # set axis limits
-    # TODO: I don't know how to set correct limits
-    # points = [Point2f0(-171, -89), Point2f0(180, 90)]
-    # rectLimits = FRect2D(transformation.(points)...) # This errors with Infinity
-    # limits!(ax, rectLimits)
-    lonslim = (-180, 180); latslim = (-90, 90)
-    points = [Point2f0(lon, lat) for lon in lonslim, lat in latslim]
+    # TODO: I don't know how to set correct limits. but this seems tremendously
+    # inefficient. Like, why do we have to create millions of points?
+    # Shouldn't we only need to create 4 points to set the limits of a 2D axis???
+    lons = -180:180
+    lats = -90:90
+    points = [Point2f0(lon, lat) for lon in lons, lat in lats]
     rectLimits = FRect2D(Makie.apply_transform(ptrans, points))
     limits!(ax, rectLimits)
 
