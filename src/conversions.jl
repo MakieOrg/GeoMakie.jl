@@ -1,5 +1,5 @@
 # # Helper functions
-to_point2(a::Vector{<: Number}) = Point2f0(a[1], a[2])
+to_point2(a::Vector{<: Number}) = Point2f(a[1], a[2])
 
 """
 GeoInterface -> GeometryBasics
