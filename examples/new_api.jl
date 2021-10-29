@@ -5,13 +5,17 @@ lats = -90:90
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
 # Surface example
-fig, ax, el = geosurface(field, lons, lats)
+fig = Figure()
+ax = GeoAxis(fig[1,1])
+el = surface!(ax, lons, lats, field)
 display(fig)
 
-# Scatter example
+# %% Scatter example
 slons = rand(lons, 2000)
 slats = rand(lats, 2000)
 sfield = [exp(cosd(l)) + 3(y/90) for (l,y) in zip(slons, slats)]
 
-fig, ax, el = geoscatter(sfield, slons, slats)
+fig = Figure()
+ax = GeoAxis(fig[1,1])
+el = scatter!(slons, slats; color = sfield)
 display(fig)

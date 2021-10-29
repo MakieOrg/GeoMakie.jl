@@ -30,7 +30,6 @@ export Proj4
 
 include("api.jl")
 
-export geosurface!, geoscatter!, geolines!
-export geosurface, geoscatter, geolines
+export GeoAxis
 
 end # module
