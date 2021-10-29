@@ -1,4 +1,4 @@
-function geosurface!(ax, A, lon, lat; 
+function geosurface!(ax, A, lons, lats; 
         coastlines = true, coastkwargs = NamedTuple(), 
         transformation = Proj4.Transformation("+proj=longlat +datum=WGS84", "+proj=wintri", always_xy=true)
         surfkwargs = NamedTuple(),
@@ -10,7 +10,7 @@ function geosurface!(ax, A, lon, lat;
     return hm
 end
 
-function geoscatter!(ax, A, lon, lat;
+function geoscatter!(ax, A, lons, lats;
         coastlines = true, coastkwargs = NamedTuple(), 
         transformation = Proj4.Transformation("+proj=longlat +datum=WGS84", "+proj=wintri", always_xy=true)
         scatterkwargs = NamedTuple(),
@@ -36,5 +36,21 @@ function prepare_geoaxis!(ax, lons, lats, transformation, type = :regular)
     end
     rectLimits = FRect2D(Makie.apply_transform(ptrans, points))
     limits!(ax, rectLimits)
+
+    # This is necessary because at the moment we do not have a GeoAxis
+    # and as such the grid and the ticks are all in orthogonal
+    # coordinate system and in units of meters instead of degrees
+    # hidedecorations!(ax)
+    # hidespines!(ax)
+
+    # change ticks into lon/lat coordinates
+    lonrange = range(lons[1], lons[end]; length = 4)
+    latrange = range(lats[1], lats[end]; length = 4)
+    latrange = -90:30:90
+    xticks = first.(trans.(Point2f0.(lonrange, lats[1]))) 
+    yticks = last.(trans.(Point2f0.(lons[1], latrange)))
+    ax.xticks = (xticks, string.(lonrange, 'ᵒ'))
+    ax.yticks = (yticks, string.(latrange, 'ᵒ'))
+
     return nothing
 end
