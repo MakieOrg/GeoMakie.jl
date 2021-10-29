@@ -44,11 +44,13 @@ function geoplot end
 funs = (:geosurface, :geoscatter, :geolines)
 for f in funs
     inplacef = Symbol(string(f), "!")
-    @eval function ($f)(args...; kwargs...)
-        fig = Figure()
-        ax = Axis(fig[1,1])
-        el = $(inplacef)(ax, args...; kwargs...)
-        return fig, ax, el
+    @eval begin
+        function ($f)(args...; kwargs...)
+            fig = Figure()
+            ax = Axis(fig[1,1])
+            el = $(inplacef)(ax, args...; kwargs...)
+            return fig, ax, el
+        end
     end
 end
 
@@ -60,7 +62,7 @@ function geoplot!(ax, A, lons, lats;
         _plottype! = A isa AbstractMatrix ? surface : scatter!,
     )
 
-    gridtype = _plotype! == surface! ? :lonlat : :unstructured
+    gridtype = _plottype! == surface! ? :lonlat : :unstructured
     prepare_geoaxis!(ax, lons, lats, transformation, gridtype)
     coastlines && lines!(ax, GeoMakie.coastlines(), color = :black, overdraw = true, coastkwargs...)
    
@@ -68,6 +70,7 @@ function geoplot!(ax, A, lons, lats;
         el = _plottype!(ax, lons, lats, A; plotkwargs...)
     else
         el = _plottype!(ax, lons, lats; color = A, plotkwargs...)
+    end
     return el
 end
 geolines!(args...; kwargs...) = geoplot!(args...; kwargs..., _plottype! = lines!)
@@ -90,10 +93,13 @@ function prepare_geoaxis!(ax, lons, lats, transformation, gridtype = :lonlat)
     limits!(ax, rectLimits)
 
     # change ticks into lon/lat coordinates
-    lonticks = range(lons[1], lons[end]; length = 4)
-    latticks = range(lats[1], lats[end]; length = 4)
-    xticks = first.(transformation.(Point2f0.(lonticks, lats[1]))) 
-    yticks = last.(transformation.(Point2f0.(lons[1], latticks)))
+    # lonticks = range(lons[1], lons[end]; length = 4)
+    # latticks = range(lats[1], lats[end]; length = 4)
+
+    lonticks = -180:60:180
+    latticks = -90:30:90
+    xticks = first.(transformation.(Point2f0.(lonticks, latticks[1]))) 
+    yticks = last.(transformation.(Point2f0.(lonticks[1], latticks)))
     ax.xticks = (xticks, string.(lonticks, 'ᵒ'))
     ax.yticks = (yticks, string.(latticks, 'ᵒ'))
 
