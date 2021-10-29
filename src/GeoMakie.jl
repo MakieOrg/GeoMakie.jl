@@ -24,10 +24,10 @@ const Text = Makie.Text
 include("conversions.jl")
 include("data.jl")
 
-@reexport using Colors, Makie
+@reexport using Colors, Makie, Proj4
 
 include("api.jl")
 
-export geosurface!, geoscatter!
+export geosurface!, geoscatter!, Proj4
 
 end # module
