@@ -1,15 +1,21 @@
-using Documenter, GeoMakie
+cd(@__DIR__)
+using Pkg
+CI = get(ENV, "CI", nothing) == "true" || get(ENV, "GITHUB_TOKEN", nothing) !== nothing
+CI && Pkg.activate(@__DIR__)
+CI && Pkg.instantiate()
 
-# use the README as the home page
-readme = read(joinpath(dirname(@__DIR__), "README.md"), String)
-# HTML not supported in the Markdown parser used by Documenter
-href = """<a href = "https://www.github.com/JuliaPlots/Makie.jl"><img src="https://raw.githubusercontent.com/JuliaPlots/Makie.jl/master/assets/logo.png" alt="Makie.jl" height="30" align = "top"></a>"""
-homepage = replace(readme, href => "Makie.jl")
-write(joinpath(@__DIR__, "src", "index.md"), homepage)
+using Documenter, GeoMakie
 
 makedocs(;
     modules=[GeoMakie],
-    format=Documenter.HTML(),
+    doctest = false,
+    format = Documenter.HTML(
+        prettyurls = CI,
+        assets = [
+            "assets/logo.ico",
+            asset("https://fonts.googleapis.com/css?family=Quicksand|Montserrat|Source+Code+Pro|Lora&display=swap", class=:css),
+            ],
+        ),
     pages=[
         "Home" => "index.md",
         "Example" => "example.md",

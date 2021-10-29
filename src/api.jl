@@ -1,26 +1,41 @@
+funs = (:geosurface, :geoscatter, :geolines)
+for f in funs
+    inplacef = Symbol(string(f), "!")
+    @eval function ($f)(args...; kwargs...)
+        fig = Figure()
+        ax = Axis(fig[1,1])
+        el = $(inplacef)(ax, args...; kwargs...)
+        return fig, ax, el
+    end
+end
+
 function geosurface!(ax, A, lons, lats; 
         coastlines = true, coastkwargs = NamedTuple(), 
-        transformation = Proj4.Transformation("+proj=longlat +datum=WGS84", "+proj=wintri", always_xy=true)
-        surfkwargs = NamedTuple(),
+        source = "+proj=longlat +datum=WGS84", dest = "+proj=wintri",
+        transformation = Proj4.Transformation(source, dest, always_xy=true),
+        plotkwargs = NamedTuple(),
     )
 
     prepare_geoaxis!(ax, lons, lats, transformation, :regular)
     coastlines && lines!(ax, GeoMakie.coastlines(), color = :black, overdraw = true, coastkwargs...)
-    hm = surface!(ax, lons, lats, A; shading = false, surfkwargs...)
+    hm = surface!(ax, lons, lats, A; shading = false, plotkwargs...)
     return hm
 end
 
 function geoscatter!(ax, A, lons, lats;
         coastlines = true, coastkwargs = NamedTuple(), 
-        transformation = Proj4.Transformation("+proj=longlat +datum=WGS84", "+proj=wintri", always_xy=true)
-        scatterkwargs = NamedTuple(),
+        source = "+proj=longlat +datum=WGS84", dest = "+proj=wintri",
+        transformation = Proj4.Transformation(source, dest, always_xy=true),
+        plotkwargs = NamedTuple(),
+        _plottype = scatter!,
     )
 
     prepare_geoaxis!(ax, lons, lats, transformation, :unstructured)
     coastlines && lines!(ax, GeoMakie.coastlines(), color = :black, overdraw = true, coastkwargs...)
-    sc = scatter!(ax, lons, lats; color = A, scatterkwargs...)
+    sc = scatter!(ax, lons, lats; color = A, plotkwargs...)
     return sc
 end
+geolines!(args...; kwargs...) = geoscatter!(args...; kwargs..., _plottype = lines!)
 
 function prepare_geoaxis!(ax, lons, lats, transformation, type = :regular)
     ax.aspect = DataAspect()
@@ -44,13 +59,12 @@ function prepare_geoaxis!(ax, lons, lats, transformation, type = :regular)
     # hidespines!(ax)
 
     # change ticks into lon/lat coordinates
-    lonrange = range(lons[1], lons[end]; length = 4)
-    latrange = range(lats[1], lats[end]; length = 4)
-    latrange = -90:30:90
-    xticks = first.(trans.(Point2f0.(lonrange, lats[1]))) 
-    yticks = last.(trans.(Point2f0.(lons[1], latrange)))
-    ax.xticks = (xticks, string.(lonrange, 'ᵒ'))
-    ax.yticks = (yticks, string.(latrange, 'ᵒ'))
+    lonticks = range(lons[1], lons[end]; length = 4)
+    latticks = range(lats[1], lats[end]; length = 4)
+    xticks = first.(transformation.(Point2f0.(lonticks, lats[1]))) 
+    yticks = last.(transformation.(Point2f0.(lons[1], latticks)))
+    ax.xticks = (xticks, string.(lonticks, 'ᵒ'))
+    ax.yticks = (yticks, string.(latticks, 'ᵒ'))
 
     return nothing
 end
