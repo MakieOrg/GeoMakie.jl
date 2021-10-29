@@ -10,12 +10,13 @@
 # GeoAxis implementation
 ##########################################################################################
 """
-    GeoAxis(lons, lats, figloc; kwargs...)
+    GeoAxis(args...; kwargs...)
 Create a new axis instance that is based on `Axis`, but is appropriate for geospatial
-plotting. `args...` is a standard figure location, e.g., `fig[1,1]` as given in
+plotting by incorporating a user-defined map projection when plotting data.
+`args...` is a standard figure location, e.g., `fig[1,1]` as given in
 `Axis`. The keyword arguments decide the geospatial projection:
 
-* `source = "+proj=longlat +datum=WGS84", dest = "+proj=wintri"`: These two keywords
+* `source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth"`: These two keywords
 configure the map projection to be used for the given field.
 * `transformation = Proj4.Transformation(source, dest, always_xy=true)`: Instead of
   `source, dest` you can directly use the Proj4.jl package to define the projection.
@@ -23,14 +24,14 @@ configure the map projection to be used for the given field.
 * `coastkwargs = NamedTuple()` Keywords propagated to the coastline plot (which is a line plot).
 """
 function GeoAxis(args...; 
-        source = "+proj=longlat +datum=WGS84", dest = "+proj=wintri",
+        source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth",
         transformation = Proj4.Transformation(source, dest, always_xy=true),
         coastlines = true, coastkwargs = NamedTuple(),
-        kw... # Where is `kw` propagated into?
+        kw... # TODO: Where is `kw` propagated into?
     )
 
     # Generate Axis instance
-    ax = Axis(args...; aspect = DataAspect())
+    ax = Axis(args...; aspect = DataAspect(), interpolate_grid = true)
     # TODO:
     # ax = Axis(args...; interpolate_grid=true)
     # interpolate_grid would need to be implemented in the axis code, but that should be fairly straightforward 
@@ -65,7 +66,17 @@ function GeoAxis(args...;
     ax.xticks = (xticks, string.(lonticks, 'ᵒ'))
     ax.yticks = (yticks, string.(latticks, 'ᵒ'))
 
-    # TODO: Draw grid lines
+    # Draw tick lines
+    ax.xgridvisible=false; ax.ygridvisible=false
+    # TODO: How to get "default grid lines
+    for lon in lonticks
+        coords = [Point2f0(lon, l) for l in range(latticks[1], latticks[end]; length = 100)]
+        lines!(coords; color = :gray20, linewidth = 0.5)
+    end
+    for lat in latticks
+        coords = [Point2f0(l, lat) for l in range(lonticks[1], lonticks[end]; length = 100)]
+        lines!(coords; color = :gray20, linewidth = 0.5)
+    end
 
     return ax
 end
