@@ -10,10 +10,15 @@
 # GeoAxis implementation
 ##########################################################################################
 """
-    GeoAxis(args...; kwargs...)
-Create a new axis instance that is based on `Axis`, but is appropriate for geospatial
-plotting by incorporating a user-defined map projection when plotting data.
-`args...` is a standard figure location, e.g., `fig[1,1]` as given in
+    GeoAxis(args...; kwargs...) → ax
+Create a new axis instance `ax` that is a modified `Axis` of the Makie.jl ecosystem.
+All Makie.jl plotting functions work directly on `GeoAxis`, e.g., `scatter!(ax, x, y)`.
+
+`GeoAxis` is appropriate for geospatial plotting because it automatically transforms all
+plotted data given a user-defined map projection. See keyword arguments below and examples
+in the online documentation.
+
+In the call signature, `args...` is a standard figure location, e.g., `fig[1,1]` as given in
 `Axis`. The keyword arguments decide the geospatial projection:
 
 * `source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth"`: These two keywords
@@ -39,7 +44,7 @@ ax = GeoAxis(fig[1,1])
 el = surface!(ax, lons, lats, field)
 display(fig)
 
-# %% Scatter example
+# Scatter example
 slons = rand(lons, 2000)
 slats = rand(lats, 2000)
 sfield = [exp(cosd(l)) + 3(y/90) for (l,y) in zip(slons, slats)]
