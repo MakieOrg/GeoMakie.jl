@@ -61,7 +61,10 @@ function GeoAxis(args...;
 
     # Generate Axis instance
     ax = Axis(args...; aspect = DataAspect(), interpolate_grid = true)
-    # TODO:
+    
+    # TODO: I don't know what the following comment means, but it was here
+    # before @Datseris did the `GeoAxis` PR.
+
     # ax = Axis(args...; interpolate_grid=true)
     # interpolate_grid would need to be implemented in the axis code, but that should be fairly straightforward 
     # needed to make the grid warp correctly
@@ -70,10 +73,9 @@ function GeoAxis(args...;
     ptrans = Makie.PointTrans{2}(transformation)
     ax.scene.transformation.transform_func[] = ptrans
 
-    # set axis limits
-    # TODO: I don't know how to set correct limits. but this seems tremendously
-    # inefficient. Like, why do we have to create millions of points?
-    # Shouldn't we only need to create 4 points to set the limits of a 2D axis???
+    # Set axis limits
+    # This seems a bit inefficient, but it is the only way to ensure 
+    # correct limits independently of the projection.
     lons = -180:180
     lats = -90:90
     points = [Point2f0(lon, lat) for lon in lons, lat in lats]
@@ -81,13 +83,13 @@ function GeoAxis(args...;
     limits!(ax, rectLimits)
 
     # Plot coastlines
-    coastlines && lines!(ax, GeoMakie.coastlines(), color = :black, overdraw = true, coastkwargs...)
+    if coastlines
+        coastplot = lines!(ax, GeoMakie.coastlines(), color = :black, overdraw = true, coastkwargs...)
+        translate!(coastplot, 0, 0, 99) # ensure they are on top of other plotted elements
+    end
 
     # Set ticks
-    # TODO: Use latitude longitude that makes sense with given data
-    # lonticks = range(lons[1], lons[end]; length = 4)
-    # latticks = range(lats[1], lats[end]; length = 4)
-
+    # TODO: automatically estimate better ticks for local, @visr
     xticks = first.(transformation.(Point2f0.(lonticks, latticks[1]))) 
     yticks = last.(transformation.(Point2f0.(lonticks[1], latticks)))
     ax.xticks = (xticks, string.(lonticks, 'ᵒ'))
@@ -98,11 +100,13 @@ function GeoAxis(args...;
     # TODO: How to get "default" grid line style from the theme?
     for lon in lonticks
         coords = [Point2f0(lon, l) for l in range(latticks[1], latticks[end]; length = 100)]
-        lines!(coords; color = :gray20, linewidth = 0.5)
+        gridplot = lines!(coords; color = :gray20, linewidth = 0.5)
+        translate!(gridplot, 0, 0, 100) # ensure they are on top of other plotted elements
     end
     for lat in latticks
         coords = [Point2f0(l, lat) for l in range(lonticks[1], lonticks[end]; length = 100)]
-        lines!(coords; color = :gray20, linewidth = 0.5)
+        gridplot = lines!(coords; color = :gray20, linewidth = 0.5)
+        translate!(gridplot, 0, 0, 100) # ensure they are on top of other plotted elements
     end
 
     return ax
