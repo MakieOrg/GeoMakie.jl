@@ -9,6 +9,7 @@ using Makie.MakieLayout: Formatting
 using Makie.MakieLayout.GridLayoutBase
 using Makie.MakieLayout.GridLayoutBase: Side
 using GeoInterface: GeoInterface, coordinates, AbstractPolygon, AbstractMultiPolygon, features, geometry
+export GeoInterface
 
 import Makie: convert_arguments, convert_attribute
 using Makie.DocStringExtensions

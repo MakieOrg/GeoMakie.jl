@@ -28,7 +28,7 @@ configure the map projection to be used for the given field.
 * `coastlines = true`: Whether to plot coastlines.
 * `coastkwargs = NamedTuple()` Keywords propagated to the coastline plot (which is a line plot).
 * `lonticks = -180:60:180, latticks = -90:30:90` ticks for the longitude and latitude
-  dimensions (in degrees).
+  dimensions (in degrees). The grid lines of the axis are also spanning these tick values.
 
 ## Example
 ```julia
