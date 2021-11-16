@@ -29,6 +29,7 @@ configure the map projection to be used for the given field.
 * `coastkwargs = NamedTuple()` Keywords propagated to the coastline plot (which is a line plot).
 * `lonticks = -180:60:180, latticks = -90:30:90` ticks for the longitude and latitude
   dimensions (in degrees). The grid lines of the axis are also spanning these tick values.
+* `hidespines = true` Hide the axis spines (rectangle surrounding the axis).
 
 ## Example
 ```julia
@@ -61,6 +62,7 @@ function GeoAxis(args...;
         coastlines = true, coastkwargs = NamedTuple(),
         lonticks = -180:60:180,
         latticks = -90:30:90,  
+        hidespines = true,
         kw... # TODO: Where is `kw` propagated into?
     )
 
@@ -114,5 +116,6 @@ function GeoAxis(args...;
         translate!(gridplot, 0, 0, 100) # ensure they are on top of other plotted elements
     end
 
+    hidespines && hidespines!(ax)
     return ax
 end

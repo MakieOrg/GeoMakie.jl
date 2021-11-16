@@ -31,6 +31,6 @@ export Proj4
 
 include("api.jl")
 
-export GeoAxis
+export GeoAxis, geo2basic
 
 end # module

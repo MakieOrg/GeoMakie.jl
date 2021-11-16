@@ -27,8 +27,8 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
 fig = Figure()
 ax = GeoAxis(fig[1,1])
-el = surface!(ax, lons, lats, field)
-display(fig)
+el = surface!(ax, lons, lats, field; shading = false)
+fig
 ```
 
 ### Scatter example
@@ -44,7 +44,7 @@ sfield = [exp(cosd(l)) + 3(y/90) for (l,y) in zip(slons, slats)]
 fig = Figure()
 ax = GeoAxis(fig[1,1])
 el = scatter!(slons, slats; color = sfield)
-display(fig)
+fig
 ```
 
 ### Different map projection
@@ -56,9 +56,9 @@ lats = -90:90
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
 fig = Figure()
-ax = GeoAxis(fig[1,1]; dest = "+proj=winktri)
+ax = GeoAxis(fig[1,1]; dest = "+proj=wintri")
 el = surface!(ax, lons, lats, field; shading = false)
-display(fig)
+fig
 ```
 
 ### Changing central longitude
@@ -79,7 +79,7 @@ To fix this, there are two approaches: (1) to change the central longitude of th
 fig = Figure()
 ax = GeoAxis(fig[1,1]; dest = "+proj=eqearth +lon_0=180")
 el = surface!(ax, lons, lats, field; shading = false)
-display(fig)
+fig
 ```
 
 _or_ (2), circshift your data appropriately so that the central longitude you want coincides with the center of the longitude dimension of the data.
@@ -99,10 +99,8 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 fig = Figure()
 ax = GeoAxis(fig[1,1])
 el = surface!(ax, lons, lats, field)
-display(fig)
 
 # TODO: Finish this (I need help from @visr or @lazarusA)
 
-download("https://datahub.io/core/geo-countries/datapackage.json", "countries.geojson")
-countries = GeoJSON.read(read("countries.geojson"))
+fig
 ```
