@@ -56,8 +56,8 @@ lats = -90:90
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
 fig = Figure()
-ax = GeoAxis(fig[1,1])
-el = surface!(ax, lons, lats, field)
+ax = GeoAxis(fig[1,1]; dest = "+proj=winktri)
+el = surface!(ax, lons, lats, field; shading = false)
 display(fig)
 ```
 
@@ -77,8 +77,8 @@ To fix this, there are two approaches: (1) to change the central longitude of th
 
 ```@example MAIN
 fig = Figure()
-ax = GeoAxis(fig[1,1]; dest = "eqearth +lon_0=180")
-el = surface!(ax, lons, lats, field)
+ax = GeoAxis(fig[1,1]; dest = "+proj=eqearth +lon_0=180")
+el = surface!(ax, lons, lats, field; shading = false)
 display(fig)
 ```
 
@@ -101,31 +101,8 @@ ax = GeoAxis(fig[1,1])
 el = surface!(ax, lons, lats, field)
 display(fig)
 
-# TODO: Finish this.
+# TODO: Finish this (I need help from @visr or @lazarusA)
 
 download("https://datahub.io/core/geo-countries/datapackage.json", "countries.geojson")
 countries = GeoJSON.read(read("countries.geojson"))
-```
-
-
-### Submarine cables
-```@example MAIN
-using GeoMakie, CairoMakie
-using Downloads # for downloading the cable data
-using GeoJSON   # for reading cable data
-# notice that `GeoInterface` is a module name also exported by GeoMakie
-
-# data from https://github.com/telegeography/www.submarinecablemap.com
-urlPoints = "https://raw.githubusercontent.com/telegeography/www.submarinecablemap.com/master/web/public/api/v3/landing-point/landing-point-geo.json"
-urlCables = "https://raw.githubusercontent.com/telegeography/www.submarinecablemap.com/master/web/public/api/v3/cable/cable-geo.json"
-
-landPoints = Downloads.download(urlPoints, IOBuffer())
-landCables = Downloads.download(urlCables, IOBuffer())
-land_geoPoints = GeoJSON.read(seekstart(landPoints))
-land_geoCables = GeoJSON.read(seekstart(landCables))
-
-# TODO: This example is so complicated I give up. I don't understand anything.
-# please either @lazarusA or @vsir or @SimonDanisch write this example in 
-# a way that a beginner user can follow what's going on.
-# the full example is here: https://lazarusa.github.io/BeautifulMakie/GeoPlots/submarineCables/
 ```
