@@ -11,7 +11,9 @@ In the call signature, `args...` is a standard figure location, e.g., `fig[1,1]`
 `Axis`. The keyword arguments decide the geospatial projection:
 
 * `source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth"`: These two keywords
-configure the map projection to be used for the given field.
+  configure the map projection to be used for the given field using Proj4.jl.
+  See also online the section [Changing central longitude](@ref) for data that may not 
+  span the (expected by default) longitude range from -180 to 180.
 * `transformation = Proj4.Transformation(source, dest, always_xy=true)`: Instead of
   `source, dest` you can directly use the Proj4.jl package to define the projection.
 * `coastlines = true`: Whether to plot coastlines.
