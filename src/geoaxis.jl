@@ -5,7 +5,8 @@ All Makie.jl plotting functions work directly on `GeoAxis`, e.g., `scatter!(ax, 
 
 `GeoAxis` is appropriate for geospatial plotting because it automatically transforms all
 plotted data given a user-defined map projection. See keyword arguments below and examples
-in the online documentation.
+in the online documentation. Longitude and latitude values in GeoMakie.jl are always
+assumed to be **in degrees**.
 
 In the call signature, `args...` is a standard figure location, e.g., `fig[1,1]` as given in
 `Axis`. The keyword arguments decide the geospatial projection:
@@ -19,7 +20,7 @@ In the call signature, `args...` is a standard figure location, e.g., `fig[1,1]`
 * `coastlines = true`: Whether to plot coastlines.
 * `coastkwargs = NamedTuple()` Keywords propagated to the coastline plot (which is a line plot).
 * `lonticks = -180:60:180, latticks = -90:30:90` ticks for the longitude and latitude
-  dimensions (in degrees). The grid lines of the axis are also spanning these tick values.
+  dimensions. The grid lines of the axis are also spanning these tick values.
 * `hidespines = true` Hide the axis spines (rectangle surrounding the axis).
 
 ## Example
