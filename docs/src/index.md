@@ -3,6 +3,14 @@ GeoMakie.jl is a Julia package for plotting geospatial data on a given map proje
 
 The package [ClimateBase.jl](https://juliaclimate.github.io/ClimateBase.jl/dev/) builds upon GeoMakie.jl to create a seamless workflow between analyzing/manipulating climate data, and plotting them.
 
+## Installation
+
+This package is **in development** and may **break**, although we are currently working on a long-term stable interface. 
+
+You can install it from the REPL like so:
+```julia
+]add GeoMakie
+```
 
 ## API
 Using GeoMakie.jl is straightforward, although it does assume basic knowledge of the Makie.jl ecosystem. 
@@ -90,8 +98,6 @@ using GeoMakie, CairoMakie
 using Downloads
 
 # First, make a surface plot
-using GeoMakie, CairoMakie
-
 lons = -180:180
 lats = -90:90
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
@@ -100,7 +106,14 @@ fig = Figure()
 ax = GeoAxis(fig[1,1])
 el = surface!(ax, lons, lats, field)
 
-# TODO: Finish this (I need help from @visr or @lazarusA)
+Downloads.download("https://datahub.io/core/geo-countries/r/countries.geojson", "countries.geojson")
+countries = GeoJSON.read(read("countries.geojson"))
+
+hm = poly!(ax, countries; color= 1:n, colormap = Reverse(:dense), 
+    strokecolor = :black, strokewidth = 0.25, overdraw = true, 
+)
+
+Colorbar(fig[1,2], hm; label = "countries index", height = Relative(0.65))
 
 fig
 ```
