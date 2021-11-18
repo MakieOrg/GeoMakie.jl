@@ -17,7 +17,10 @@ In the call signature, `args...` is a standard figure location, e.g., `fig[1,1]`
   span the (expected by default) longitude range from -180 to 180.
 * `transformation = Proj4.Transformation(source, dest, always_xy=true)`: Instead of
   `source, dest` you can directly use the Proj4.jl package to define the projection.
-* `coastlines = true`: Whether to plot coastlines.
+* `coastlines = true`: Whether to plot coastlines. Coastlines are plotted using
+  ```
+  lines!(ax, GeoMakie.coastlines(); coastkwargs...)
+  ```
 * `coastkwargs = NamedTuple()` Keywords propagated to the coastline plot (which is a line plot).
 * `lonticks = -180:60:180, latticks = -90:30:90` ticks for the longitude and latitude
   dimensions. The grid lines of the axis are also spanning these tick values.
@@ -83,7 +86,7 @@ function GeoAxis(args...;
 
     # Plot coastlines
     if coastlines
-        coastplot = lines!(ax, GeoMakie.coastlines(), color = :black, overdraw = true, coastkwargs...)
+        coastplot = lines!(ax, GeoMakie.coastlines(); color = :black, overdraw = true, coastkwargs...)
         translate!(coastplot, 0, 0, 99) # ensure they are on top of other plotted elements
     end
 
