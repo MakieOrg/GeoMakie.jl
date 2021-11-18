@@ -10,7 +10,7 @@ makedocs(;
     modules=[GeoMakie],
     doctest = false,
     format = Documenter.HTML(
-        prettyurls = CI,
+        prettyurls = CI, collapselevel = 3,
     ),
     pages=[
         "GeoMakie.jl" => "index.md",
