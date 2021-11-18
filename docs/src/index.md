@@ -83,11 +83,8 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats];
 a `surface!` plot with the default arguments will lead to artifacts if the data along longitude 179 and 180 have significantly different values.
 To fix this, there are two approaches: (1) to change the central longitude of the map transformation, by changing the projection destination used like so:
 
-```@example MAIN
-fig = Figure()
+```julia
 ax = GeoAxis(fig[1,1]; dest = "+proj=eqearth +lon_0=180")
-el = surface!(ax, lons, lats, field; shading = false)
-fig
 ```
 
 _or_ (2), circshift your data appropriately so that the central longitude you want coincides with the center of the longitude dimension of the data.
@@ -103,17 +100,19 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
 fig = Figure()
 ax = GeoAxis(fig[1,1])
-el = surface!(ax, lons, lats, field)
+sf = surface!(ax, lons, lats, field; shading = false)
+cb1 = Colorbar(fig[1,2], sf; label = "field", height = Relative(0.65))
 
-using Downloads
+using Downloads, GeoJSON
 Downloads.download("https://datahub.io/core/geo-countries/r/countries.geojson", "countries.geojson")
 countries = GeoJSON.read(read("countries.geojson"))
 
-hm = poly!(ax, countries; color= 1:n, colormap = Reverse(:dense), 
-    strokecolor = :black, strokewidth = 0.25, overdraw = true, 
+n = length(GeoInterface.features(countries))
+hm = poly!(ax, countries; color= 1:n, colormap = :dense, 
+    strokecolor = :black, strokewidth = 0.5, overdraw = true, 
 )
 
-Colorbar(fig[1,2], hm; label = "countries index", height = Relative(0.65))
+# cb2 = Colorbar(fig[1,3], hm; label = "countries index", height = Relative(0.65))
 
 fig
 ```
