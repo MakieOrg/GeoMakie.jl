@@ -1,14 +1,3 @@
-##########################################################################################
-# TODOs
-##########################################################################################
-# TODO: restore the infastructure of the previous GeoAxis where the axis grid is 
-# curved and follows the projection used.
-# TODO: create a function that can do surface plots for unstructured points
-# (George has some script that does it lying around)
-
-##########################################################################################
-# GeoAxis implementation
-##########################################################################################
 """
     GeoAxis(args...; kwargs...) → ax
 Create a new axis instance `ax` that is a modified `Axis` of the Makie.jl ecosystem.

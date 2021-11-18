@@ -95,7 +95,6 @@ _or_ (2), circshift your data appropriately so that the central longitude you wa
 ### Countries loaded with GeoJSON
 ```@example MAIN
 using GeoMakie, CairoMakie
-using Downloads
 
 # First, make a surface plot
 lons = -180:180
@@ -106,6 +105,7 @@ fig = Figure()
 ax = GeoAxis(fig[1,1])
 el = surface!(ax, lons, lats, field)
 
+using Downloads
 Downloads.download("https://datahub.io/core/geo-countries/r/countries.geojson", "countries.geojson")
 countries = GeoJSON.read(read("countries.geojson"))
 

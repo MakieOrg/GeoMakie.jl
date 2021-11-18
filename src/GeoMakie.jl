@@ -29,7 +29,7 @@ include("data.jl")
 using Proj4
 export Proj4
 
-include("api.jl")
+include("geoaxis.jl")
 
 export GeoAxis, geo2basic
 
