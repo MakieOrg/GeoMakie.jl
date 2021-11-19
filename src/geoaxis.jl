@@ -58,11 +58,11 @@ function GeoAxis(args...;
         lonticks = -180:60:180,
         latticks = -90:30:90,  
         hidespines = true,
-        kw... # TODO: Where is `kw` propagated into?
+        kw...
     )
 
     # Generate Axis instance
-    ax = Axis(args...; aspect = DataAspect(), interpolate_grid = true)
+    ax = Axis(args...; aspect = DataAspect(), interpolate_grid = true, kw...)
     
     # TODO: I don't know what the following comment means, but it was here
     # before @Datseris did the `GeoAxis` PR.
