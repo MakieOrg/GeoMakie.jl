@@ -30,6 +30,10 @@ lons = -180:180
 lats = -90:90
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
+# Plot coastlines
+coastplot = lines!(ax, GeoMakie.coastlines(); color = :black, overdraw = true, coastkwargs...)
+translate!(coastplot, 0, 0, 99) # ensure they are on top of other plotted elements
+
 # Surface example
 fig = Figure()
 ax = GeoAxis(fig[1,1])
