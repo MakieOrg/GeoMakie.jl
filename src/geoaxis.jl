@@ -17,11 +17,7 @@ In the call signature, `args...` is a standard figure location, e.g., `fig[1,1]`
   span the (expected by default) longitude range from -180 to 180.
 * `transformation = Proj4.Transformation(source, dest, always_xy=true)`: Instead of
   `source, dest` you can directly use the Proj4.jl package to define the projection.
-* `coastlines = true`: Whether to plot coastlines. Coastlines are plotted using
-  ```
   lines!(ax, GeoMakie.coastlines(); coastkwargs...)
-  ```
-* `coastkwargs = NamedTuple()` Keywords propagated to the coastline plot (which is a line plot).
 * `lonticks = -180:60:180, latticks = -90:30:90` ticks for the longitude and latitude
   dimensions. The grid lines of the axis are also spanning these tick values.
 * `hidespines = true` Hide the axis spines (rectangle surrounding the axis).
@@ -37,7 +33,7 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 # Surface example
 fig = Figure()
 ax = GeoAxis(fig[1,1])
-el = surface!(ax, lons, lats, field)
+surface!(ax, lons, lats, field)
 display(fig)
 
 # Scatter example
@@ -54,7 +50,6 @@ display(fig)
 function GeoAxis(args...; 
         source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth",
         transformation = Proj4.Transformation(source, dest, always_xy=true),
-        coastlines = true, coastkwargs = NamedTuple(),
         lonticks = -180:60:180,
         latticks = -90:30:90,  
         hidespines = true,

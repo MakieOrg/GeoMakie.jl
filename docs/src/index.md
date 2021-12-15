@@ -12,7 +12,7 @@ You can install it from the REPL like so:
 ]add GeoMakie
 ```
 
-## API
+## GeoAxis
 Using GeoMakie.jl is straightforward, although it does assume basic knowledge of the Makie.jl ecosystem. 
 
 GeoMakie.jl provides an axis for plotting geospatial data, [`GeoAxis`](@ref), and also the function [`geo2basic`](@ref) that converts an output of GeoJSON to a polygon appropriate for plotting. Both are showcased in the examples below.
@@ -35,7 +35,7 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
 fig = Figure()
 ax = GeoAxis(fig[1,1])
-el = surface!(ax, lons, lats, field; shading = false)
+surface!(ax, lons, lats, field; shading = false)
 fig
 ```
 
@@ -51,11 +51,12 @@ sfield = [exp(cosd(l)) + 3(y/90) for (l,y) in zip(slons, slats)]
 
 fig = Figure()
 ax = GeoAxis(fig[1,1])
-el = scatter!(slons, slats; color = sfield)
+scatter!(slons, slats; color = sfield)
 fig
 ```
 
-### Different map projection
+### Map projections
+The default projection is given by the arguments `source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth"`, so that if a different one is needed, for example a `wintri` projection one can do it as follows:
 ```@example MAIN
 using GeoMakie, CairoMakie
 
@@ -65,7 +66,7 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
 fig = Figure()
 ax = GeoAxis(fig[1,1]; dest = "+proj=wintri")
-el = surface!(ax, lons, lats, field; shading = false)
+surface!(ax, lons, lats, field; shading = false)
 fig
 ```
 

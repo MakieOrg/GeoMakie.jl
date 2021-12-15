@@ -7,7 +7,7 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 # Surface example
 fig = Figure()
 ax = GeoAxis(fig[1,1])
-el = surface!(ax, lons, lats, field)
+surface!(ax, lons, lats, field)
 display(fig)
 
 # %% Scatter example
@@ -17,5 +17,5 @@ sfield = [exp(cosd(l)) + 3(y/90) for (l,y) in zip(slons, slats)]
 
 fig = Figure()
 ax = GeoAxis(fig[1,1])
-el = scatter!(slons, slats; color = sfield)
+scatter!(slons, slats; color = sfield)
 display(fig)
