@@ -13,7 +13,7 @@ In the call signature, `args...` is a standard figure location, e.g., `fig[1,1]`
 
 * `source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth"`: These two keywords
   configure the map projection to be used for the given field using Proj4.jl.
-  See also online the section [Changing central longitude](@ref) for data that may not 
+  See also online the section [Changing central longitude](@ref) for data that may not
   span the (expected by default) longitude range from -180 to 180.
 * `transformation = Proj4.Transformation(source, dest, always_xy=true)`: Instead of
   `source, dest` you can directly use the Proj4.jl package to define the projection.
@@ -51,37 +51,32 @@ el = scatter!(slons, slats; color = sfield)
 display(fig)
 ```
 """
-function GeoAxis(args...; 
+function GeoAxis(args...;
         source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth",
         transformation = Proj4.Transformation(source, dest, always_xy=true),
         lonticks = -180:60:180,
-        latticks = -90:30:90,  
+        latticks = -90:30:90,
         hidespines = true,
+        coastlines = false,
+
         kw...
     )
 
     # Generate Axis instance
-    ax = Axis(args...; aspect = DataAspect(), interpolate_grid = true, kw...)
-    
+    ax = Axis(args...; aspect = DataAspect(),
+              yautolimits = false,
+              xautolimits = false, kw...)
+
     # TODO: I don't know what the following comment means, but it was here
     # before @Datseris did the `GeoAxis` PR.
 
     # ax = Axis(args...; interpolate_grid=true)
-    # interpolate_grid would need to be implemented in the axis code, but that should be fairly straightforward 
+    # interpolate_grid would need to be implemented in the axis code, but that should be fairly straightforward
     # needed to make the grid warp correctly
 
     # Set axis transformation
     ptrans = Makie.PointTrans{2}(transformation)
     ax.scene.transformation.transform_func[] = ptrans
-
-    # Set axis limits
-    # This seems a bit inefficient, but it is the only way to ensure 
-    # correct limits independently of the projection.
-    lons = -180:180
-    lats = -90:90
-    points = [Point2f0(lon, lat) for lon in lons, lat in lats]
-    rectLimits = FRect2D(Makie.apply_transform(ptrans, points))
-    limits!(ax, rectLimits)
 
     # Plot coastlines
     if coastlines
@@ -91,7 +86,7 @@ function GeoAxis(args...;
 
     # Set ticks
     # TODO: automatically estimate better ticks for local, @visr
-    xticks = first.(transformation.(Point2f0.(lonticks, latticks[1]))) 
+    xticks = first.(transformation.(Point2f0.(lonticks, latticks[1])))
     yticks = last.(transformation.(Point2f0.(lonticks[1], latticks)))
     ax.xticks = (xticks, string.(lonticks, 'ᵒ'))
     ax.yticks = (yticks, string.(latticks, 'ᵒ'))
