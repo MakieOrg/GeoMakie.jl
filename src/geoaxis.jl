@@ -86,8 +86,8 @@ function GeoAxis(args...;
 
     # Set ticks
     # TODO: automatically estimate better ticks for local, @visr
-    xticks = first.(transformation.(Point2f0.(lonticks, latticks[1])))
-    yticks = last.(transformation.(Point2f0.(lonticks[1], latticks)))
+    xticks = first.(transformation.(Point2f.(lonticks, latticks[1])))
+    yticks = last.(transformation.(Point2f.(lonticks[1], latticks)))
     ax.xticks = (xticks, string.(lonticks, 'ᵒ'))
     ax.yticks = (yticks, string.(latticks, 'ᵒ'))
 
@@ -95,12 +95,12 @@ function GeoAxis(args...;
     ax.xgridvisible=false; ax.ygridvisible=false
     # TODO: How to get "default" grid line style from the theme?
     for lon in lonticks
-        coords = [Point2f0(lon, l) for l in range(latticks[1], latticks[end]; length = 100)]
+        coords = [Point2f(lon, l) for l in range(latticks[1], latticks[end]; length = 100)]
         gridplot = lines!(coords; color = :gray20, linewidth = 0.5)
         translate!(gridplot, 0, 0, 100) # ensure they are on top of other plotted elements
     end
     for lat in latticks
-        coords = [Point2f0(l, lat) for l in range(lonticks[1], lonticks[end]; length = 100)]
+        coords = [Point2f(l, lat) for l in range(lonticks[1], lonticks[end]; length = 100)]
         gridplot = lines!(coords; color = :gray20, linewidth = 0.5)
         translate!(gridplot, 0, 0, 100) # ensure they are on top of other plotted elements
     end

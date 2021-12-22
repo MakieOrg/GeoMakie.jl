@@ -1,4 +1,4 @@
-using GeoMakie
+using GeoMakie, Test
 
 @testset "GeoMakie" begin
     lons = -180:180
