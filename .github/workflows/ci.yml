@@ -15,8 +15,8 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1' # Replace this with the minimum Julia version that your package supports. E.g. if your package requires Julia 1.5 or higher, change this to '1.5'.
-        os:  [ubuntu-latest, windows-latest, macos-latest] # adjust according to need, e.g. os: [ubuntu-latest] if testing only on linux
+          - '1.6'
+        os: ubuntu-latest # adjust according to need, e.g. os: [ubuntu-latest] if testing only on linux
         arch:
           - x64
     steps:
@@ -45,33 +45,3 @@ jobs:
             ${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
-
-
-  docs:
-    name: Documentation
-    runs-on: ubuntu-latest
-    steps:
-      # Cancel ongoing documentation build if pushing to branch again before the previous
-      # build is finished.
-      - name: Cancel ongoing documentation builds for previous commits
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ github.token }}
-
-      # Build docs
-      - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
-        with:
-          version: '1'
-      - name: Instantiate and install dependencies
-        run: |
-          julia --project=docs -e '
-            using Pkg
-            Pkg.develop(PackageSpec(path=pwd()))
-            Pkg.instantiate()'
-      - name: Generate documentation and deploy
-        env: # needed for pushing to gh-pages branch
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-        run:
-          julia --project=docs docs/make.jl
