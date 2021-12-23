@@ -58,14 +58,11 @@ function GeoAxis(args...;
         latticks = -90:30:90,
         hidespines = true,
         coastlines = false,
-
         kw...
     )
 
     # Generate Axis instance
-    ax = Axis(args...; aspect = DataAspect(),
-              yautolimits = false,
-              xautolimits = false, kw...)
+    ax = Axis(args...; aspect = DataAspect(), kw...)
 
     # TODO: I don't know what the following comment means, but it was here
     # before @Datseris did the `GeoAxis` PR.
