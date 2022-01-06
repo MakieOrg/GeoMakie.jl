@@ -21,6 +21,8 @@ In the call signature, `args...` is a standard figure location, e.g., `fig[1,1]`
 * `lonticks = -180:60:180, latticks = -90:30:90` ticks for the longitude and latitude
   dimensions. The grid lines of the axis are also spanning these tick values.
 * `hidespines = true` Hide the axis spines (rectangle surrounding the axis).
+* `coastlines = false` draw coastlines
+* `coastline_attributes = (;)` named tuple that gets passed to the `lines` call drawing the coastline
 
 ## Example
 ```julia
@@ -58,6 +60,7 @@ function GeoAxis(args...;
         latticks = -90:30:90,
         hidespines = true,
         coastlines = false,
+        coastline_attributes = (;),
         aspect = DataAspect(),
         kw...
     )
@@ -78,6 +81,11 @@ function GeoAxis(args...;
     # Set axis transformation
     ax.scene.transformation.transform_func[] = ptrans
 
+    # Plot coastlines
+    if coastlines
+        coastplot = lines!(ax, GeoMakie.coastlines(); color = :black, coastline_attributes...)
+        translate!(coastplot, 0, 0, 99) # ensure they are on top of other plotted elements
+    end
     # Draw tick lines
     ax.xgridvisible=false; ax.ygridvisible=false
     # TODO: How to get "default" grid line style from the theme?
