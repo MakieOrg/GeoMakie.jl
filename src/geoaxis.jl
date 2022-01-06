@@ -58,47 +58,38 @@ function GeoAxis(args...;
         latticks = -90:30:90,
         hidespines = true,
         coastlines = false,
+        aspect = DataAspect(),
         kw...
     )
-
-    # Generate Axis instance
-    ax = Axis(args...; aspect = DataAspect(), kw...)
-
-    # TODO: I don't know what the following comment means, but it was here
-    # before @Datseris did the `GeoAxis` PR.
-
-    # ax = Axis(args...; interpolate_grid=true)
-    # interpolate_grid would need to be implemented in the axis code, but that should be fairly straightforward
-    # needed to make the grid warp correctly
-
-    # Set axis transformation
-    ptrans = Makie.PointTrans{2}(transformation)
-    ax.scene.transformation.transform_func[] = ptrans
-
-    # Plot coastlines
-    if coastlines
-        coastplot = lines!(ax, GeoMakie.coastlines(); color = :black, overdraw = true, coastkwargs...)
-        translate!(coastplot, 0, 0, 99) # ensure they are on top of other plotted elements
+    ptrans = Makie.PointTrans{2}() do p
+        transformation(p) ./ 10_0000f0
     end
 
-    # Set ticks
-    # TODO: automatically estimate better ticks for local, @visr
-    xticks = first.(transformation.(Point2f.(lonticks, latticks[1])))
-    yticks = last.(transformation.(Point2f.(lonticks[1], latticks)))
-    ax.xticks = (xticks, string.(lonticks, 'ᵒ'))
-    ax.yticks = (yticks, string.(latticks, 'ᵒ'))
+    xticks = first.(Makie.apply_transform(ptrans, Point2f0.(lonticks, latticks[1])))
+    yticks = last.(Makie.apply_transform(ptrans, Point2f0.(lonticks[1], latticks)))
+    # Generate Axis instance
+    ax = Axis(args...;
+        aspect = aspect,
+        xticks = (xticks, string.(lonticks, 'ᵒ')),
+        yticks = (yticks, string.(latticks, 'ᵒ')),
+        limits = (extrema(lonticks), extrema(latticks)),
+        kw...)
+
+    # Set axis transformation
+    ax.scene.transformation.transform_func[] = ptrans
 
     # Draw tick lines
     ax.xgridvisible=false; ax.ygridvisible=false
     # TODO: How to get "default" grid line style from the theme?
     for lon in lonticks
         coords = [Point2f(lon, l) for l in range(latticks[1], latticks[end]; length = 100)]
-        gridplot = lines!(coords; color = :gray20, linewidth = 0.5)
+        gridplot = lines!(ax, coords; color = :gray20, linewidth = 0.5)
         translate!(gridplot, 0, 0, 100) # ensure they are on top of other plotted elements
     end
+
     for lat in latticks
         coords = [Point2f(l, lat) for l in range(lonticks[1], lonticks[end]; length = 100)]
-        gridplot = lines!(coords; color = :gray20, linewidth = 0.5)
+        gridplot = lines!(ax, coords; color = :gray20, linewidth = 0.5)
         translate!(gridplot, 0, 0, 100) # ensure they are on top of other plotted elements
     end
 
