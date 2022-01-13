@@ -2,7 +2,9 @@
 to_point2(a::Vector{<: Number}) = Point2f(a[1], a[2])
 
 """
-GeoInterface -> GeometryBasics
+    geo2basic(obj::GeoInterface)
+
+Converts any GeoInterface object to the equivalent GeometryBasics, which can be plotted by Makie.
 """
 function geo2basic(poly::GeoInterface.AbstractPolygon)
     polygon_coordinates = GeoInterface.coordinates(poly)

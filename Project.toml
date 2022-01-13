@@ -1,7 +1,7 @@
 name = "GeoMakie"
 uuid = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
-authors = ["Anshul Singhvi"]
-version = "0.2.2"
+authors = ["Makie.jl Contributors"]
+version = "0.3.0"
 
 [deps]
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
@@ -10,6 +10,7 @@ GeoJSON = "61d90e0f-e114-555e-ac52-39dfb47a3ef9"
 GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
 ImageMagick = "6218d12a-5da1-5696-b52f-db25d2ecc6d1"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+Proj4 = "9a7e659c-8ee8-5706-894e-f68f43bc57ea"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
 
@@ -19,16 +20,13 @@ GeoInterface = "0.5"
 GeoJSON = "0.5"
 GeometryBasics = "0.4.1"
 ImageMagick = "1"
-Makie = "0.15.2"
-Reexport = "0.2, 1.0"
+Makie = "0.16.1"
+Reexport = "1"
 StructArrays = "0.4, 0.5, 0.6"
 julia = "1"
 
 [extras]
-CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
-Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
-Proj4 = "9a7e659c-8ee8-5706-894e-f68f43bc57ea"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Downloads", "CairoMakie", "Proj4"]
+test = ["Test"]

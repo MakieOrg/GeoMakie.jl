@@ -9,6 +9,7 @@ using Makie.MakieLayout: Formatting
 using Makie.MakieLayout.GridLayoutBase
 using Makie.MakieLayout.GridLayoutBase: Side
 using GeoInterface: GeoInterface, coordinates, AbstractPolygon, AbstractMultiPolygon, features, geometry
+export GeoInterface
 
 import Makie: convert_arguments, convert_attribute
 using Makie.DocStringExtensions
@@ -25,5 +26,11 @@ include("conversions.jl")
 include("data.jl")
 
 @reexport using Colors, Makie
+using Proj4
+export Proj4
+
+include("geoaxis.jl")
+
+export GeoAxis, geo2basic
 
 end # module
