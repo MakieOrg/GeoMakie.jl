@@ -97,6 +97,23 @@ function GeoAxis(args...;
         translate!(gridplot, 0, 0, 100) # ensure they are on top of other plotted elements
     end
 
+    geoaxis_setlimits!(ax, ptrans; lonrange = lonticks, latrange = latticks)
+
     hidespines && hidespines!(ax)
     return ax
+end
+
+
+function geoaxis_setlimits!(ax, ptrans; lonrange = -180:10.0:180, latrange = -90:10.0:90)
+    lats = Float32.(lonrange)
+    lons = Float32.(latrange)
+    # avoid PROJ wrapping 180 to -180
+    lons[end] = prevfloat(lons[end])
+    lats[end] = prevfloat(lats[end])
+    points = [Point2f(lon, lat) for lon in lons, lat in lats]
+    xytrans = Makie.apply_transform(ptrans, points)
+    check_infs(xy) = !any(x -> isnan(x) || isinf(x), xy)
+    xytrans_clean = [1.2xy for xy in xytrans if check_infs(xy)]
+    rect_limits = FRect2D(xytrans_clean)
+    limits!(ax, rect_limits)
 end
