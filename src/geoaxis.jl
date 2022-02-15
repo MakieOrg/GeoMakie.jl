@@ -17,12 +17,11 @@ In the call signature, `args...` is a standard figure location, e.g., `fig[1,1]`
   span the (expected by default) longitude range from -180 to 180.
 * `transformation = Proj4.Transformation(source, dest, always_xy=true)`: Instead of
   `source, dest` you can directly use the Proj4.jl package to define the projection.
-  lines!(ax, GeoMakie.coastlines(); coastkwargs...)
 * `lonticks = -180:60:180, latticks = -90:30:90` ticks for the longitude and latitude
   dimensions. The grid lines of the axis are also spanning these tick values.
 * `hidespines = true` Hide the axis spines (rectangle surrounding the axis).
-* `coastlines = false` draw coastlines
-* `coastline_attributes = (;)` named tuple that gets passed to the `lines` call drawing the coastline
+* `coastlines = false` Draw coastlines.
+* `coastline_attributes = (;)` Passed to the `lines` call when drawing the coastlines.
 
 ## Example
 ```julia
