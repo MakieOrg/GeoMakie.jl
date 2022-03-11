@@ -64,9 +64,7 @@ function GeoAxis(args...;
         aspect = DataAspect(),
         kw...
     )
-    ptrans = Makie.PointTrans{2}() do p
-        transformation(p) ./ 10_0000f0
-    end
+    ptrans = transformation
 
     xticks = first.(Makie.apply_transform(ptrans, Point2f0.(lonticks, latticks[1])))
     yticks = last.(Makie.apply_transform(ptrans, Point2f0.(lonticks[1], latticks)))
@@ -103,4 +101,28 @@ function GeoAxis(args...;
 
     hidespines && hidespines!(ax)
     return ax
+end
+
+
+function Makie.apply_transform(f::Proj4.Transformation, pt::Point{N,T}) where {N,T}
+    Point(f(Vec(pt)) ./ 100_000)
+end
+function Makie.apply_transform(f::Proj4.Transformation, r::Rect2{T}) where {T}
+    # TODO: once Proj4.jl is updated to PROJ 8.2, we can use
+    # proj_trans_bounds (https://proj.org/development/reference/functions.html#c.proj_trans_bounds)
+    N = 21
+    umin = vmin = T(Inf)
+    umax = vmax = T(-Inf)
+    xmin, ymin = minimum(r)
+    xmax, ymax = maximum(r)
+    for x in range(xmin, xmax; length = N)
+        for y in range(ymin, ymax; length = N)
+            u, v = Makie.apply_transform(f, Point(x, y))
+            umin = min(umin, u)
+            umax = max(umax, u)
+            vmin = min(vmin, v)
+            vmax = max(vmax, v)
+        end
+    end
+    Rect(Vec2(umin, vmin), Vec2(umax-umin, vmax-vmin))
 end
