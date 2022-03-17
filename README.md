@@ -35,7 +35,7 @@ The GeoAxis default's projection is [Equal Earth](https://proj.org/operations/pr
 
 <img src="./assets/coastlines.png">
 
-### A more colorful map with a different projection could be with:
+### A more colorful map with a different projection can be done with:
 
 ```julia
 lons = -180:180
