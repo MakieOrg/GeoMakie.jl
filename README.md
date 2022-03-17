@@ -19,6 +19,12 @@ You may check the installed versions with:
 ] st GLMakie GeoMakie
 ```
 
+Start using the package:
+
+```julia
+using GLMakie, GeoMakie
+```
+
 # Quick start
 
 The following examples are supposed to be self-explanatory. For further information [check out the documentation here!](https://juliaplots.org/GeoMakie.jl/stable/)
