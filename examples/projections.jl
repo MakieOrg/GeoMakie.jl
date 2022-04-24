@@ -18,18 +18,18 @@ fig
 
 
 # Limited-domain projections (like orthographic) must have
-# their limits explicitly set for now.
-# If the limits are too large, you may get a blank figure!
+# their limits correctly set!
+# If the limits are too large, you may get a blank figure.
 fig = Figure()
 ga = GeoAxis(
     fig[1, 1],
     dest="+proj=ortho",
-    limits = (-90,90,-90,90), # IMPORTANT - you MUST have proper limits!
+    lonlims = Makie.automatic,
     coastlines = true,
     title = "Orthographic projection with proper limits"
 )
 hidedecorations!(ga)
-sp = surface!(ga, lons, lats, field; shading = false, colormap = (:plasma, 0.45))
+sp = surface!(ga, lons, lats, field; shading = false, colormap = :rainbow_bgyrm_35_85_c69_n256)
 cb = Colorbar(fig[1, 2], sp)
 save("orthographic_with_limits.png", fig, px_per_unit=2)
 fig
