@@ -18,9 +18,11 @@ jobs:
       - name: Install binary dependencies
         run: sudo apt-get update && sudo apt-get install -y xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev
       - uses: actions/checkout@v2
+
       - uses: julia-actions/setup-julia@latest
         with:
           version: '1.6'
+      - run: "git clone https://github.com/JuliaGeo/Proj4.jl Proj; julia --project=@. -e "using Pkg;Pkg.add(\"./Proj\")"
       - name: Install dependencies
         run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
       - name: Build and deploy
