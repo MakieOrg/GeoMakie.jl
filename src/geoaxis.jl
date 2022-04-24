@@ -63,7 +63,7 @@ function GeoAxis(args...;
         latlims = (-90, 90),
         hide_original_spines = true,
         coastlines = false,
-        coastline_attributes = (;),
+        coastline_attributes = (;label = "Coastlines",),
         line_density = 1_000,
         # these are the axis keywords which we will merge in
         xtickformat = geoformat_ticklabels,
