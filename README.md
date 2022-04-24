@@ -32,7 +32,10 @@ The following examples are supposed to be self-explanatory. For further informat
 ### A simple map
 
 ```julia
-fig = lines(GeoMakie.coastlines(); color = :black, axis = (; type = GeoAxis))
+fig = Figure()
+ga = GeoAxis(f[1, 1])
+lines!(ga, GeoMakie.coastlines(); color = :black)
+fig
 save("coastlines.png", fig; resolution = (600,400))
 fig
 ```
