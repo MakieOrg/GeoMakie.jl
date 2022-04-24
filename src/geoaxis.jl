@@ -59,8 +59,8 @@ display(fig)
 function GeoAxis(args...;
         source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth",
         transformation = Proj.Transformation(source, dest, always_xy=true),
-        lonlims = Makie.automatic,
-        latlims = Makie.automatic,
+        lonlims = (-180, 180),
+        latlims = (-90, 90),
         hide_original_spines = true,
         coastlines = false,
         coastline_attributes = (;),
@@ -70,6 +70,8 @@ function GeoAxis(args...;
         ytickformat = geoformat_ticklabels,
         xticks = LinearTicks(7),
         yticks = LinearTicks(7),
+        xticklabelpad = 5.0,
+        yticklabelpad = 5.0,
         kw...
     )
     ptrans = transformation
@@ -191,7 +193,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
                     Point2f.(_xtickvalues, ylimits[][1])
                 )
             )
-        ) .+ Ref(Point2f(pxarea.origin))
+        ) .+ Ref(Point2f(pxarea.origin) + Point2f(-ax.xticklabelpad[], 0))
 
         ytickpoints.val = Point2f.(
             Makie.project.(
@@ -202,13 +204,13 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
                     Point2f.(xlimits[][1], _ytickvalues)
                 )
             )
-        ) .+ Ref(Point2f(pxarea.origin))
+        ) .+ Ref(Point2f(pxarea.origin) + Point2f(0, -ax.yticklabelpad[]))
 
         # notify this
         xticklabels[] = _xticklabels
         yticklabels[] = _yticklabels
 
-        notify!(xtickpoints); notify!(ytickpoints)
+        Makie.Observables.notify!(xtickpoints); Makie.Observables.notify!(ytickpoints)
 
         xrange = LinRange(xlimits[]..., line_density)
         yrange = LinRange(ylimits[]..., line_density)
@@ -230,7 +232,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
             current_ind += line_density + 1
         end
         # now y
-        _ygridpoints = fill(Point2f(NaN), (line_density+1) * length(_xtickvalues))
+        _ygridpoints = fill(Point2f(NaN), (line_density+1) * length(_ytickvalues))
 
         current_ind = 1
         for y in _ytickvalues
@@ -340,8 +342,9 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         inspectable = false
     )
 
-    scatter!(textscene, xtickpoints; visible = hijacked_observables[:xticklabelsvisible], color = :red, bordercolor=:black)
-    scatter!(textscene, ytickpoints; visible = hijacked_observables[:yticklabelsvisible], color = :red, bordercolor=:black)
+    # For diagnostics only!
+    # scatter!(textscene, xtickpoints; visible = hijacked_observables[:xticklabelsvisible], color = :red, bordercolor=:black)
+    # scatter!(textscene, ytickpoints; visible = hijacked_observables[:yticklabelsvisible], color = :red, bordercolor=:black)
 
     # Finally, we translate these plots such that they are above the content.
     Makie.update_cam!(scene)
