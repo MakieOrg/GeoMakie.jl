@@ -237,6 +237,8 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         xticklabels[] = _xticklabels
         yticklabels[] = _yticklabels
 
+        notify!(xtickpoints); notify!(ytickpoints)
+
         xrange = LinRange(xlimits[]..., line_density)
         yrange = LinRange(ylimits[]..., line_density)
 

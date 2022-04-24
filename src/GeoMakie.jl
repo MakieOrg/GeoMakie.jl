@@ -21,13 +21,14 @@ const attributes = Makie.attributes
 const volume = Makie.volume
 const Mesh = GeometryBasics.Mesh
 const Text = Makie.Text
+using Proj
+
 
 include("conversions.jl")
 include("data.jl")
 include("utils.jl")
 
 @reexport using Colors, Makie
-using Proj
 export Proj
 
 include("geoaxis.jl")
