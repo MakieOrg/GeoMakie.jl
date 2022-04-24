@@ -63,6 +63,8 @@ function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 
     # avoid PROJ wrapping 180 to -180
     lons[1]   = nextfloat(lons[1])
     lons[end] = prevfloat(lons[end])
+    lats[1]   = nextfloat(lats[1])
+    lats[end] = prevfloat(lats[end])
 
     points = Point2f.(lons, lats')
     tpoints = ptrans.(points)
@@ -70,7 +72,7 @@ function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 
 
     finite_inds = findall(isfinite, itpoints)
 
-    min, max = getindex.(Ref(itpoints), extrema(finite_inds))
+    min, max = getindex.(Ref(itpoints), finite_inds[[1, end]])
 
     return (min[1], max[1], min[2], max[2])
 end

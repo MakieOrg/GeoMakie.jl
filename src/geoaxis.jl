@@ -79,42 +79,13 @@ function GeoAxis(args...;
     # or not?
     axmin, axmax, aymin, aymax = find_transform_limits(transformation)
 
-    verified_lonlims = if lonlims == Makie.automatic
-        (axmin, axmax)
-    else
-        retmin = 0
-        retmax = 0
-        if lonlims[1] > axmin
-            retmin = lonlims[1]
-        else
-            @warn("$(lonlims[1]) not within computed domain $((axmin, axmax)))!")
-        end
-        if lonlims[2] < axmax
-            retmax = lonlims[2]
-        else
-            @warn("$(lonlims[2]) not within computed domain $((axmin, axmax)))!")
-        end
-
-        (retmin, retmax)
+    verified_lonlims = lonlims
+    if lonlims == Makie.automatic
+        verified_lonlims = axmin < axmax ? (axmin, axmax) : (axmax, axmin)
     end
-
-    verified_latlims = if latlims == Makie.automatic
-        (aymin, aymax)
-    else
-        retmin = 0
-        retmax = 0
-        if latlims[1] > aymin
-            retmin = latlims[1]
-        else
-            @warn("$(latlims[1]) not within computed domain $((aymin, aymax)))!")
-        end
-        if latlims[2] < aymax
-            retmax = latlims[2]
-        else
-            @warn("$(latlims[2]) not within computed domain $((aymin, aymax)))!")
-        end
-
-        (retmin, retmax)
+    verified_latlims = latlims
+    if latlims == Makie.automatic
+        verified_latlims = aymin < aymax ? (aymin, aymax) : (aymax, aymin)
     end
     # Apply defaults
     # Generate Axis instance
