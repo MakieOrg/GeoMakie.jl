@@ -3,14 +3,14 @@ using GeoMakie
 using GeoMakie.GeoInterface
 using GeoMakie.GeoJSON
 using Downloads
-using Proj4
+using Proj
 
 begin
     # select a coordinate projection, using a string that PROJ accepts
     # see e.g. https://proj.org/operations/projections/index.html
     source = "+proj=longlat +datum=WGS84"
     dest = "+proj=natearth2"
-    trans = Proj4.Transformation(source, dest, always_xy=true)
+    trans = Proj.Transformation(source, dest, always_xy=true)
     ptrans = Makie.PointTrans{2}(trans)
 
     fig = Figure()

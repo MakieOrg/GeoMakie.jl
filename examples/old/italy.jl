@@ -1,5 +1,5 @@
 using Makie, GeoMakie
-using GeoMakie.GeoJSON
+using JSON, GeoJSON
 
 # Acquire data
 states = download("https://github.com/openpolis/geojson-italy/raw/master/geojson/limits_IT_provinces.geojson")
@@ -7,7 +7,6 @@ states_bytes = read(states)
 geo = GeoJSONTables.read(states_bytes)
 
 states_str = read(states, String)
-using JSON
 
 geo = GeoJSON.dict2geo(JSON.parse(states_str))
 

@@ -24,21 +24,12 @@ oxs, oys = xygrid(lon, lat)
 
 xs, ys = Observable(copy(oxs)), Observable(copy(oys))
 
-on(projtup) do projtup
-    # restore the arrays to their original values
-    xs.val .= oxs
-    ys.val .= oys
-    source, dest = projtup
-    # Transform the underlying array
-    Proj4.transform!(source, dest, vec(xs.val), vec(ys.val))
-    # Notify the arrays that they've been updated
-    xs[] = xs[]
-    ys[] = ys[]
-end
 
 projtup[] = [source, dest]
 
-scene = surface(xs, ys; color = cf, shading = false, show_axis = false)
+figure = Figure()
+ga = GeoAxis(figure[1, 1]; dest = "+proj=moll")
+surfplot = surface!(ga, xs, ys; color = field, shading = false)
 
 ph = on(pm) do pm
     projtup[] = [Projection("+proj=lonlat +lon_0=180 +pm=$pm"), Projection("+proj=moll +lon_0=-pm +pm=$pm")]
