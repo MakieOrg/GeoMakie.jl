@@ -131,6 +131,40 @@ function geoformat_ticklabels(nums)
 end
 
 
+# Project any point to coordinates in pixel space
+function project_to_pixelspace(scene, point::Point{N, T}) where {N, T}
+    @assert N ≤ 3
+    return Point{N, T}(
+        Makie.project(
+            # obtain the camera of the Scene which will project to its screenspace
+            camera(scene),
+            # go from dataspace (transformation applied to inputspace) to pixelspace
+            :data, :pixel,
+            # apply the transform to go from inputspace to dataspace
+            Makie.apply_transform(
+                scene.transformation.transform_func[],
+                point
+            )
+        )
+    )
+end
+
+function project_to_pixelspace(scene, points::AbstractVector{Point{N, T}}) where {N, T}
+    Point{N, T}.(
+        Makie.project.(
+            # obtain the camera of the Scene which will project to its screenspace
+            Ref(Makie.camera(scene)),
+            # go from dataspace (transformation applied to inputspace) to pixelspace
+            Ref(:data), Ref(:pixel),
+            # apply the transform to go from inputspace to dataspace
+            Makie.apply_transform(
+                scene.transformation.transform_func[],
+                points
+            )
+        )
+    )
+end
+
 # Direction finder - find how to displace the tick so that it is out of the axis
 
 function tick_direction(scene, tick_max_extent, tickcoord; ds = 0.01)
@@ -150,7 +184,7 @@ function tick_direction(scene, tick_max_extent, tickcoord; ds = 0.01)
 
     padding_vec = normal_vec * tick_max_extent # tick_max_extent should be in px
 
-    return padding_vec 
+    return padding_vec
 end
 
 

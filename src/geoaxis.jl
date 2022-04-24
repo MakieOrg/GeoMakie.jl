@@ -181,29 +181,12 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         # then project to scene pixelspace.
         # TODO this is still not working right - the text positions almost look stretched
         # or multiplied out from where they should be.
-        xtickpoints.val = Point2f.(
-            Makie.project.(
-                # obtain the camera of the Scene which will project to its screenspace
-                Ref(camera(scene)),
-                # go from dataspace (transformation applied to inputspace) to pixelspace
-                Ref(:data), Ref(:pixel),
-                # apply the transform to go from inputspace to dataspace
-                Makie.apply_transform(
-                    scene.transformation.transform_func[],
+        xtickpoints.val = project_to_pixelspace(scene,
                     Point2f.(_xtickvalues, ylimits[][1])
-                )
-            )
         ) .+ Ref(Point2f(pxarea.origin) + Point2f(-ax.xticklabelpad[], 0))
 
-        ytickpoints.val = Point2f.(
-            Makie.project.(
-                Ref(camera(scene)),
-                Ref(:data), Ref(:pixel),
-                Makie.apply_transform(
-                    scene.transformation.transform_func[],
+        ytickpoints.val = project_to_pixelspace(scene,
                     Point2f.(xlimits[][1], _ytickvalues)
-                )
-            )
         ) .+ Ref(Point2f(pxarea.origin) + Point2f(0, -ax.yticklabelpad[]))
 
         # notify this
