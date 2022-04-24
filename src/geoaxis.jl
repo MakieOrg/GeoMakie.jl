@@ -59,8 +59,8 @@ display(fig)
 function GeoAxis(args...;
         source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth",
         transformation = Proj.Transformation(source, dest, always_xy=true),
-        lonlims = (-180, 180),
-        latlims = (-90, 90),
+        lonlims = Makie.automatic,
+        latlims = Makie.automatic,
         hide_original_spines = true,
         coastlines = false,
         coastline_attributes = (;),
@@ -74,9 +74,48 @@ function GeoAxis(args...;
     )
     ptrans = transformation
 
-    # TODO: Ensure that the limits are valid
-    # validate_limits(transformation, lonlims, latlims)
+    # Automatically determine limits!
+    # TODO: should we automatically verify limits
+    # or not?
+    axmin, axmax, aymin, aymax = find_transform_limits(transformation)
 
+    verified_lonlims = if lonlims == Makie.automatic
+        (axmin, axmax)
+    else
+        retmin = 0
+        retmax = 0
+        if lonlims[1] > axmin
+            retmin = lonlims[1]
+        else
+            @warn("$(lonlims[1]) not within computed domain $((axmin, axmax)))!")
+        end
+        if lonlims[2] < axmax
+            retmax = lonlims[2]
+        else
+            @warn("$(lonlims[2]) not within computed domain $((axmin, axmax)))!")
+        end
+
+        (retmin, retmax)
+    end
+
+    verified_latlims = if latlims == Makie.automatic
+        (aymin, aymax)
+    else
+        retmin = 0
+        retmax = 0
+        if latlims[1] > aymin
+            retmin = latlims[1]
+        else
+            @warn("$(latlims[1]) not within computed domain $((aymin, aymax)))!")
+        end
+        if latlims[2] < aymax
+            retmax = latlims[2]
+        else
+            @warn("$(latlims[2]) not within computed domain $((aymin, aymax)))!")
+        end
+
+        (retmin, retmax)
+    end
     # Apply defaults
     # Generate Axis instance
     ax = Axis(args...;
@@ -85,7 +124,7 @@ function GeoAxis(args...;
         ytickformat = ytickformat,
         xticks = xticks,
         yticks = yticks,
-        limits = (lonlims, latlims),
+        limits = (verified_lonlims, verified_latlims),
         kw...)
 
 

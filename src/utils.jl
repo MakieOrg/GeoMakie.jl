@@ -54,6 +54,27 @@ end
 
 Makie.inverse_transform(p::Proj.Transformation) = Base.inv(p)
 
+Base.isfinite(p::Point2f) = isfinite(p[1]) && isfinite(p[2])
+
+function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 90))
+    # Search for a good bound with decent accuracy
+    lons = Float32.(LinRange(lonrange..., 360 * 2))
+    lats = Float32.(LinRange(latrange..., 180 * 2))
+    # avoid PROJ wrapping 180 to -180
+    lons[1]   = nextfloat(lons[1])
+    lons[end] = prevfloat(lons[end])
+
+    points = Point2f.(lons, lats')
+    tpoints = ptrans.(points)
+    itpoints = inv(ptrans).(tpoints)
+
+    finite_inds = findall(isfinite, itpoints)
+
+    min, max = getindex.(Ref(itpoints), extrema(finite_inds))
+
+    return (min[1], max[1], min[2], max[2])
+end
+
 # This is the code for the function body of `apply_transform(f::Proj4.Transformation, r::Rect2)` once Proj4.jl is renamed to Proj.jl
 # out_xmin = Ref{Float64}(0.0)
 # out_ymin = Ref{Float64}(0.0)
