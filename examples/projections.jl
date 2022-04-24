@@ -13,7 +13,7 @@ ax2 = GeoAxis(fig[1, 2], dest = "+proj=wintri",
 surface!(ax1, lons, lats, field; shading = false, colormap = (:plasma, 0.45))
 surface!(ax2, lons, lats, field; shading = false)
 hidedecorations!(ax1)
-save("projections.png", fig; resolution = (900, 400), px_per_unit=3)
+save("projections.png", fig; resolution = (900, 400), px_per_unit=2)
 fig
 
 
@@ -31,5 +31,5 @@ ga = GeoAxis(
 hidedecorations!(ga)
 sp = surface!(ga, lons, lats, field; shading = false, colormap = (:plasma, 0.45))
 cb = Colorbar(fig[1, 2], sp)
-save("orthographic_with_limits.png", fig, px_per_unit=3)
+save("orthographic_with_limits.png", fig, px_per_unit=2)
 fig

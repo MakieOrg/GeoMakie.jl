@@ -14,4 +14,4 @@ hidedecorations!(ga) # hide ticks and ticklabels
 
 imgplot = image!(lons, lats, img; interpolate = false)
 # save at high resolution
-save("blackmarble.png", fig; px_per_unit = 4)
+save("blackmarble.png", fig; px_per_unit = 2)
