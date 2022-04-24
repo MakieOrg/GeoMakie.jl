@@ -9,3 +9,7 @@
 /docs/Manifest.toml
 stuff.jl
 .vscode
+*.swp
+
+src/oldsrc
+src/experimental
