@@ -1,7 +1,7 @@
 module GeoMakie
 
 using Reexport
-using GeometryBasics, Colors, Makie.MakieLayout, Makie, ImageMagick
+using GeometryBasics, Colors, Makie.MakieLayout, Makie, ImageIO
 using GeoJSON
 
 using Makie.FileIO
@@ -24,10 +24,11 @@ const Text = Makie.Text
 
 include("conversions.jl")
 include("data.jl")
+include("utils.jl")
 
 @reexport using Colors, Makie
-using Proj4
-export Proj4
+using Proj
+export Proj
 
 include("geoaxis.jl")
 
