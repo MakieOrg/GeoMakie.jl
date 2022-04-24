@@ -131,6 +131,29 @@ function geoformat_ticklabels(nums)
 end
 
 
+# Direction finder - find how to displace the tick so that it is out of the axis
+
+function tick_direction(scene, tick_max_extent, tickcoord; ds = 0.01)
+    tfunc = scene.transform.transform_func[]
+    px, py = tfunc(tickcoord)
+    Δx = tfunc(tickcoord + Point2f(ds, 0))
+    Δy = tfunc(tickcoord + Point2f(0, ds))
+
+    pixel_Δx, pixel_Δy = project_to_pixelspace(scene, [Δx, Δy])
+
+    dx = tickcoord - pixel_Δx
+    dy = tickcoord - pixel_Δy
+
+    # The vector which is normal to the plot in pixel-space.
+    normal_vec = Vec2(-(dx + dy)/2)
+    normal_vec = normal_vec / sqrt(sum(normal_vec .^2))
+
+    padding_vec = normal_vec * tick_max_extent # tick_max_extent should be in px
+
+    return padding_vec 
+end
+
+
 ############################################################
 #                                                          #
 #                      Useful macros                       #
