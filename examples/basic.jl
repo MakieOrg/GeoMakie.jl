@@ -11,6 +11,7 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 fig = Figure()
 ax = GeoAxis(fig[1,1])
 surface!(ax, lons, lats, field; shading = false)
+save("surf_example.png", fig; px_per_unit=3)
 display(fig)
 
 # Scatter example
@@ -21,4 +22,5 @@ sfield = [exp(cosd(l)) + 3(y/90) for (l,y) in zip(slons, slats)]
 fig = Figure()
 ax = GeoAxis(fig[1,1])
 scatter!(slons, slats; color = sfield)
+save("scatter_example.png", fig; px_per_unit=3)
 display(fig)
