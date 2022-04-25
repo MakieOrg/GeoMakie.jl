@@ -194,7 +194,7 @@ end
 
 function are_ticks_colocated(scene, positions, labels, fontsize)
     pixel_positions = positions
-    if all(≈(positions[1]), positions)
+    if all(isapprox(positions[1]; atol = 10.0), positions)
         return true
     elseif false
         return true

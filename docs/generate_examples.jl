@@ -26,13 +26,13 @@ for ext in example_title_pairs
     base64data = Base64.base64encode(read(joinpath(test_image_dir, splitext(example)[1] * ".png")))
 
     println(io, "## $title")
-
+    println()
     println(io, "```julia")
     println(io, readchomp(filepath))
     println(io, "```\n")
     println(io, "```@raw html")
     println(io, "<img src=\"data:image/png;base64,$(base64data)\" alt=\"$title\"></img>")
-    print(io, "\n\n\n")
+    println(io, "```\n")
 
 end
 
