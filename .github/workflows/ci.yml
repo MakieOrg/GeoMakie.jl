@@ -38,7 +38,7 @@ jobs:
         run: |
             git clone --branch rename --single-branch https://github.com/JuliaGeo/Proj4.jl Proj;
             git clone --depth=1 https://github.com/JuliaPlots/Makie.jl Makie;
-            julia --project=@. -e 'using Pkg;pkg"dev ./Proj ./Makie ./Makie/MakieCore ./Makie/CairoMakie"'
+            julia --project=@. -e 'using Pkg;pkg"dev ./Proj ./Makie ./Makie/MakieCore ./Makie/CairoMakie"; Pkg.add("ImageMagick")'
       - uses: actions/cache@v1
         env:
           cache-name: cache-artifacts
