@@ -28,4 +28,23 @@ for ext in example_title_pairs
 
 end
 
+
+# Special case for rotating Earth
+# since we want a slow video, but
+# the generated one would be quite fast.
+println(io, "## Rotating Earth")
+
+println(io, "```julia\n$(read(joinpath("examples", "rotating_earth.jl"), String))\n```\n")
+println(io,
+"""
+```@raw html
+<video controls autoplay loop>
+  <source src="https://user-images.githubusercontent.com/32143268/165003843-db5984f0-9ccf-49f7-847e-88fd63e80bb4.mp4" type="video/mp4">
+  Your browser does not support this video.
+</video>
+```
+"""
+)
+println()
+
 close(io)

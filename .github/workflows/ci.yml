@@ -38,7 +38,7 @@ jobs:
         run: |
             git clone --branch rename --single-branch https://github.com/JuliaGeo/Proj4.jl Proj;
             git clone --depth=1 https://github.com/JuliaPlots/Makie.jl Makie;
-            julia --project=@. -e 'using Pkg;pkg"dev ./Proj ./Makie ./Makie/CairoMakie"'
+            julia --project=@. -e 'using Pkg;pkg"dev ./Proj ./Makie ./Makie/MakieCore ./Makie/CairoMakie"'
       - uses: actions/cache@v1
         env:
           cache-name: cache-artifacts
@@ -51,3 +51,7 @@ jobs:
             ${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+      - uses: actions/upload-artifact@v3
+        with:
+          name: Test images
+          path: test_images/

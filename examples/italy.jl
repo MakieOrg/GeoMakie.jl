@@ -1,8 +1,8 @@
 using CairoMakie, GeoMakie
-using GeoJSON
-
+using GeoMakie.GeoJSON
+using Downloads
 # Acquire data
-states = download("https://github.com/openpolis/geojson-italy/raw/master/geojson/limits_IT_provinces.geojson")
+states = Downloads.download("https://github.com/openpolis/geojson-italy/raw/master/geojson/limits_IT_provinces.geojson")
 geo = GeoJSON.read(read(states, String))
 basic = GeoMakie.geo2basic(geo)
 

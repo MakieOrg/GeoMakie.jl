@@ -19,8 +19,8 @@ axes[2, 1].xgridstyle = :dashdot
 axes[2, 1].ygridcolor = (:orange, 0.5)
 axes[2, 1].ygridwidth = 2.0
 
-
 # axis 4 - customizing ticks
 axes[2, 2].xticks = LinearTicks(20)
-
+axes[2, 2].xticklabelsvisible[] = false
+hidexdecorations!(axes[2, 2])
 fig

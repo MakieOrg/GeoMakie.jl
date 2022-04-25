@@ -25,10 +25,10 @@ jobs:
         run: |
             git clone --branch rename --single-branch https://github.com/JuliaGeo/Proj4.jl Proj;
             git clone --depth=1 https://github.com/JuliaPlots/Makie.jl Makie;
-            julia --project=@. -e 'using Pkg;pkg"dev ./Proj ./Makie ./Makie/CairoMakie"'
+            julia --project=@. -e 'using Pkg;pkg"dev ./Proj ./Makie ./Makie/MakieCore ./Makie/CairoMakie"'
       - name: Install dependencies
         run: |
-            julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); pkg"dev ./Proj ./Makie ./Makie/CairoMakie"; Pkg.instantiate()'
+            julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); pkg"dev ./Proj ./Makie ./Makie/CairoMakie ./Makie/MakieCore"; Pkg.instantiate()'
             julia --project=docs/ -e 'using CairoMakie'
       - name: Build and deploy
         env:

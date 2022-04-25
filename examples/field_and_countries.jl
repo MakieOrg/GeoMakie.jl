@@ -2,10 +2,11 @@
 # BeautifulMakie.jl repository.  It has some really
 # good stuff - check it out!
 using Makie, CairoMakie, GeoMakie
+import Downloads
 using GeoMakie.GeoJSON
 
 # https://datahub.io/core/geo-countries#curl # download data from here
-worldCountries = GeoJSON.read(read(download("https://datahub.io/core/geo-countries/r/0.geojson"), String))
+worldCountries = GeoJSON.read(read(Downloads.download("https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json"), String))
 n = length(GeoMakie.GeoInterface.features(worldCountries))
 lons = -180:180
 lats = -90:90

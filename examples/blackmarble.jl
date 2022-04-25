@@ -1,9 +1,9 @@
 using GeoMakie, CairoMakie, Makie
-using NASAEarthObservations, FileIO, ImageIO
+using FileIO, ImageIO, Downloads
 
 # Get and load data
-obs = observations("blackmarble/2016/global/BlackMarble_2016_01deg_geo.tif")
-img = rotr90(load(joinpath(obs, "BlackMarble_2016_01deg_geo.tif")))
+file = Downloads.download("https://neo.sci.gsfc.nasa.gov/archive/blackmarble/2016/global/BlackMarble_2016_01deg_geo.tif")
+img = rotr90(load(file))
 
 fig = Figure(resolution = (800, 400), backgroundcolor = :black)
 ga = GeoAxis(fig[1, 1]; title = "Earth at night", titlecolor = :white, backgroundcolor = (:black, 0.0))
