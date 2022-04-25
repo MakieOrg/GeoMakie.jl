@@ -12,7 +12,7 @@ example_title_pairs = [
 
 ]
 
-io = open(joinpath("src", "examples.md"), "w")
+io = open(joinpath("docs", "src", "examples.md"), "w")
 
 for ext in example_title_pairs
 
@@ -22,7 +22,7 @@ for ext in example_title_pairs
     println(io, "## $title")
 
     println(io, "```@example MAIN")
-    println(io, readchomp(joinpath("..", "examples", example)))
+    println(io, readchomp(joinpath("examples", example)))
     println(io, "```")
     print(io, "\n\n\n")
 

@@ -5,7 +5,7 @@ The package [ClimateBase.jl](https://juliaclimate.github.io/ClimateBase.jl/dev/)
 
 ## Installation
 
-This package is **in development** and may **break**, although we are currently working on a long-term stable interface. 
+This package is **in development** and may **break**, although we are currently working on a long-term stable interface.
 
 You can install it from the REPL like so:
 ```julia
@@ -13,7 +13,7 @@ You can install it from the REPL like so:
 ```
 
 ## GeoAxis
-Using GeoMakie.jl is straightforward, although it does assume basic knowledge of the Makie.jl ecosystem. 
+Using GeoMakie.jl is straightforward, although it does assume basic knowledge of the Makie.jl ecosystem.
 
 GeoMakie.jl provides an axis for plotting geospatial data, [`GeoAxis`](@ref), and also the function [`geo2basic`](@ref) that converts an output of GeoJSON to a polygon appropriate for plotting. Both are showcased in the examples below.
 
@@ -104,13 +104,13 @@ ax = GeoAxis(fig[1,1])
 sf = surface!(ax, lons, lats, field; shading = false)
 cb1 = Colorbar(fig[1,2], sf; label = "field", height = Relative(0.65))
 
-using Downloads, GeoJSON
-Downloads.download("https://datahub.io/core/geo-countries/r/countries.geojson", "countries.geojson")
-countries = GeoJSON.read(read("countries.geojson"))
+using GeoMakie.GeoJSON
+countries_file = download("https://datahub.io/core/geo-countries/r/countries.geojson")
+countries = GeoJSON.read(read(countries_file, String))
 
 n = length(GeoInterface.features(countries))
-hm = poly!(ax, countries; color= 1:n, colormap = :dense, 
-    strokecolor = :black, strokewidth = 0.5, overdraw = true, 
+hm = poly!(ax, countries; color= 1:n, colormap = :dense,
+    strokecolor = :black, strokewidth = 0.5, overdraw = true,
 )
 
 # cb2 = Colorbar(fig[1,3], hm; label = "countries index", height = Relative(0.65))

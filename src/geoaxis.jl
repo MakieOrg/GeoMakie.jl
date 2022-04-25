@@ -338,7 +338,6 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
     # scatter!(textscene, ytickpoints; visible = hijacked_observables[:yticklabelsvisible], color = :red, bordercolor=:black)
 
     # Finally, we translate these plots such that they are above the content.
-    Makie.update_cam!(scene)
     translate!.(values(decorations), 0, 0, 100)
 
     return decorations
