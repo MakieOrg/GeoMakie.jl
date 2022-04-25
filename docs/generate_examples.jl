@@ -1,4 +1,5 @@
 # Generate examples.md, which holds a lot of the examples
+using Base64
 
 example_title_pairs = [
     "Contourf" => "contourf.jl",
@@ -13,6 +14,23 @@ example_title_pairs = [
 ]
 
 io = open(joinpath("docs", "src", "examples.md"), "w")
+
+function print_example(io, title, filepath)
+
+    filename = splitext(splitdir(filepath)[2])[1]
+
+    test_image_dir = "test_images"
+    base64data = Base64.base64encode(read(joinpath(test_image_dir, filename*".png")))
+
+    println(io, "## $title")
+
+    println(io, "```julia")
+    println(io, readchomp(joinpath("examples", example)))
+    println(io, "```")
+    println(io, "```@raw html")
+    println(io, "<img src=\"data:image/png;base64,$(base64data)\" alt=\"$title\"")
+    print(io, "\n\n\n")
+end
 
 for ext in example_title_pairs
 
