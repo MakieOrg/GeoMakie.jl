@@ -1,3 +1,4 @@
+using Statistics, LinearAlgebra
 ############################################################
 #                                                          #
 #         Proj.Transform as a Makie transformation         #
@@ -192,12 +193,17 @@ function tick_direction(scene, tick_max_extent, tickcoord; ds = 0.01)
 end
 
 function are_ticks_colocated(scene, positions, labels, fontsize)
-    pixel_positions = project_to_pixelspace(scene, positions)
-    if all(sum.((pixel_positions .- mean(pixel_positions)) .^ 2) > 3 * fontsize)
+    pixel_positions = positions
+    if all(≈(positions[1]), positions)
+        return true
+    elseif false
         return true
     else
         return false
     end
+end
+
+function overlapping_ticks(scene, positions, labels, fontsize)
 end
 
 ############################################################

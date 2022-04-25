@@ -201,7 +201,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         xticklabels[] = _xticklabels
         yticklabels[] = _yticklabels
 
-        Makie.Observables.notify!(xtickpoints); Makie.Observables.notify!(ytickpoints)
+        Makie.Observables.notify(xtickpoints); Makie.Observables.notify(ytickpoints)
 
         xrange = LinRange(xlimits[]..., line_density)
         yrange = LinRange(ylimits[]..., line_density)
@@ -233,6 +233,14 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
 
         xgridpoints[] = _xgridpoints
         ygridpoints[] = _ygridpoints
+
+        if are_ticks_colocated(ax.scene, xtickpoints[], xticklabels[], ax.xticklabelsize[])
+            ax.xticklabelsvisible[] = false
+        end
+
+        if are_ticks_colocated(ax.scene, ytickpoints[], yticklabels[], ax.yticklabelsize[])
+            ax.yticklabelsvisible[] = false
+        end
 
         return 1
         # Now, we've updated the entire axis.

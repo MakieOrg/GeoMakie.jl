@@ -1,3 +1,4 @@
+using GeoMakie, CairoMakie
 
 # Limited-domain projections (like orthographic) must have
 # their limits correctly set!
@@ -10,7 +11,7 @@ ga = GeoAxis(
     coastlines = true,
     title = "Orthographic projection with proper limits"
 )
-hidedecorations!(ga)
+# hidedecorations!(ga)
 sp = surface!(ga, lons, lats, field; shading = false, colormap = :rainbow_bgyrm_35_85_c69_n256)
 cb = Colorbar(fig[1, 2], sp)
 
