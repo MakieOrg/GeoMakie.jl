@@ -1,0 +1,38 @@
+# This example was taken from Lazar Alonso's
+# BeautifulMakie.jl repository.  It has some really
+# good stuff - check it out!
+using Makie, CairoMakie, GeoMakie
+using GeoMakie.GeoJSON
+
+# https://datahub.io/core/geo-countries#curl # download data from here
+worldCountries = GeoJSON.read(read(download("https://datahub.io/core/geo-countries/r/0.geojson"), String))
+n = length(GeoMakie.GeoInterface.features(worldCountries))
+lons = -180:180
+lats = -90:90
+field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
+
+
+fig = Figure(resolution = (1200,800), fontsize = 22)
+
+ax = GeoAxis(
+    fig[1,1];
+    dest = "+proj=wintri",
+    title = "World Countries",
+    tellheight = true,
+)
+
+hm1 = surface!(ax, lons, lats, field; shading = false)
+
+hm2 = poly!(
+    ax, worldCountries;
+    color= 1:n,
+    colormap = Reverse(:plasma),
+    strokecolor = :black,
+    strokewidth = 0.25
+)
+
+cb = Colorbar(fig[1,2], hm1, label = "variable, color code")
+
+hidedecorations!(ax)
+
+fig

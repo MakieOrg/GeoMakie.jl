@@ -1,6 +1,6 @@
 # This example was contributed by Martijn Visser (@visr)
 using Makie, CairoMakie, GeoMakie
-using GeoJSON
+using GeoMakie.GeoJSON
 
 source = "+proj=longlat +datum=WGS84"
 dest = "+proj=natearth2"

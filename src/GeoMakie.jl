@@ -35,6 +35,6 @@ export Proj
 
 include("geoaxis.jl")
 
-export GeoAxis, geo2basic
+export GeoAxis, geo2basic, datalims, datalims!
 
 end # module

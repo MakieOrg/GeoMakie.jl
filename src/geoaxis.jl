@@ -347,8 +347,9 @@ end
 function datalims(ax::Axis)
     nplots = length(plots(ax.scene))
 
-    n_axisplots = if nplots > 8 &&
+    n_axisplots = if nplots ≥ 8 &&
                     ax.scene.plots[2] isa Makie.Lines &&
+                    haskey(ax.scene.plots[2], :label) &&
                     ax.scene.plots[2].label[] == "Coastlines"
                 8
         else
