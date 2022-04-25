@@ -47,6 +47,6 @@ end
 # to cut down on artifact size when uploaded.
 if ENV["CI"] == "true"
     image_files = readdir(joinpath(dirname(dirname(pathof(GeoMakie))), "test_images"); join=true)
-    pdf_files = filter(imagefiles, endswith("pdf"))
+    pdf_files = filter(image_files, endswith("pdf"))
     rm.(pdf_files)
 end
