@@ -246,7 +246,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         # Now, we've updated the entire axis.
     end
 
-    Makie.Observables.notify!(ax.xticks)
+    Makie.Observables.notify(ax.xticks)
 
     # Time to plot!
 

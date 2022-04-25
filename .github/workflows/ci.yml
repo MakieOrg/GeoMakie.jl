@@ -54,7 +54,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: Test images
+          name: test_images
           path: test_images/
   docs:
     name: Build and deploy documentation

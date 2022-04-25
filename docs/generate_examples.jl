@@ -15,33 +15,23 @@ example_title_pairs = [
 
 io = open(joinpath("docs", "src", "examples.md"), "w")
 
-function print_example(io, title, filepath)
-
-    filename = splitext(splitdir(filepath)[2])[1]
-
-    test_image_dir = "test_images"
-    base64data = Base64.base64encode(read(joinpath(test_image_dir, filename*".png")))
-
-    println(io, "## $title")
-
-    println(io, "```julia")
-    println(io, readchomp(joinpath("examples", example)))
-    println(io, "```")
-    println(io, "```@raw html")
-    println(io, "<img src=\"data:image/png;base64,$(base64data)\" alt=\"$title\"></img>")
-    print(io, "\n\n\n")
-end
-
 for ext in example_title_pairs
 
     title   = first(ext)
     example = last(ext)
 
+    filepath = joinpath("examples", example)
+
+    test_image_dir = "test_images"
+    base64data = Base64.base64encode(read(joinpath(test_image_dir, splitext(example)[1] * ".png")))
+
     println(io, "## $title")
 
-    println(io, "```@example MAIN")
-    println(io, readchomp(joinpath("examples", example)))
-    println(io, "```")
+    println(io, "```julia")
+    println(io, readchomp(filepath))
+    println(io, "```\n")
+    println(io, "```@raw html")
+    println(io, "<img src=\"data:image/png;base64,$(base64data)\" alt=\"$title\"></img>")
     print(io, "\n\n\n")
 
 end
