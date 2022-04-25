@@ -28,7 +28,7 @@ function print_example(io, title, filepath)
     println(io, readchomp(joinpath("examples", example)))
     println(io, "```")
     println(io, "```@raw html")
-    println(io, "<img src=\"data:image/png;base64,$(base64data)\" alt=\"$title\"")
+    println(io, "<img src=\"data:image/png;base64,$(base64data)\" alt=\"$title\"></img>")
     print(io, "\n\n\n")
 end
 
