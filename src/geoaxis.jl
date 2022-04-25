@@ -257,14 +257,20 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         visible = hijacked_observables[:topspinevisible],
         color = ax.topspinecolor,
         # linestyle = ax.spinestyle,
-        linewidth = ax.spinewidth, inspectable = false
+        linewidth = ax.spinewidth,
+        inspectable = false,
+        xautolimits = false,
+        yautolimits = false,
         )
     decorations[:btmspineplot] = lines!(
         scene, btmspinepoints;
         visible = hijacked_observables[:bottomspinevisible],
         color = ax.bottomspinecolor,
         # linestyle = ax.spinestyle,
-        linewidth = ax.spinewidth, inspectable = false
+        linewidth = ax.spinewidth,
+        inspectable = false,
+        xautolimits = false,
+        yautolimits = false,
         )
     decorations[:lftspineplot] = lines!(
         scene, lftspinepoints;
@@ -272,7 +278,9 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         color = ax.leftspinecolor,
         # linestyle = ax.spinestyle,
         linewidth = ax.spinewidth,
-        inspectable = false
+        inspectable = false,
+        xautolimits = false,
+        yautolimits = false,
         )
     decorations[:rgtspineplot] = lines!(
         scene, rgtspinepoints;
@@ -280,7 +288,9 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         color = ax.rightspinecolor,
         # linestyle = ax.spinestyle,
         linewidth = ax.spinewidth,
-        inspectable = false
+        inspectable = false,
+        xautolimits = false,
+        yautolimits = false,
         )
 
 
@@ -292,7 +302,9 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         color = ax.xgridcolor,
         linestyle = ax.xgridstyle,
         width = ax.xgridwidth,
-        inspectable = false
+        inspectable = false,
+        xautolimits = false,
+        yautolimits = false,
     )
     decorations[:ygridplot] = lines!(
         scene, ygridpoints;
@@ -300,7 +312,9 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         color = ax.ygridcolor,
         linestyle = ax.ygridstyle,
         width = ax.ygridwidth,
-        inspectable = false
+        inspectable = false,
+        xautolimits = false,
+        yautolimits = false,
     )
 
 
@@ -324,7 +338,9 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         fontsize = ax.xticklabelsize,
         color = ax.xticklabelcolor,
         align = (:center, :top),
-        inspectable = false
+        inspectable = false,
+        xautolimits = false,
+        yautolimits = false,
     )
 
     decorations[:ytickplot] = text!(
@@ -338,7 +354,9 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         fontsize = ax.yticklabelsize,
         color = ax.yticklabelcolor,
         align = (:right, :center),
-        inspectable = false
+        inspectable = false,
+        xautolimits = false,
+        yautolimits = false,
     )
 
     # For diagnostics only!
@@ -351,6 +369,13 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
     return decorations
 end
 
+
+
+function _datalims_exclude(plot)
+    !(to_value(get(plot, :xautolimits, true)) || to_value(get(plot, :yautolimits, true))) ||
+    is_data_space(to_value(get(plot, :space, :data))) ||
+    to_value(get(plot, :visible, true))
+end
 # Applicable only to geoaxis
 # in the future, once PolarAxis is implemented as an example,
 # change this to `Makie.data_limits(ax::GeoAxis)`
@@ -366,7 +391,7 @@ function datalims(ax::Axis)
                 7
         end
 
-    return Makie.data_limits(ax.scene.plots[(n_axisplots+1):end])
+    return Makie.data_limits(ax.scene.plots[(n_axisplots+1):end], _datalims_exclude)
 
 end
 
