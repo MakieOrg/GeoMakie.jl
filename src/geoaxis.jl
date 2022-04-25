@@ -373,8 +373,8 @@ end
 
 function _datalims_exclude(plot)
     !(to_value(get(plot, :xautolimits, true)) || to_value(get(plot, :yautolimits, true))) ||
-    Makie.is_data_space(to_value(get(plot, :space, :data))) ||
-    to_value(get(plot, :visible, true))
+    !Makie.is_data_space(to_value(get(plot, :space, :data))) ||
+    !to_value(get(plot, :visible, true))
 end
 # Applicable only to geoaxis
 # in the future, once PolarAxis is implemented as an example,
