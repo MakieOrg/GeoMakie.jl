@@ -38,15 +38,8 @@ end
                     CairoMakie.save(savepath, Makie.current_figure());
                     isfile(savepath) && filesize(savepath) > 1000
                 end
+                haskey(ENV, "CI") && rm("$example_name.pdf")
             end
         end
     end
-end
-
-# Remove all pdfs in the test examples directory
-# to cut down on artifact size when uploaded.
-if ENV["CI"] == "true"
-    image_files = readdir(joinpath(dirname(dirname(pathof(GeoMakie))), "test_images"); join=true)
-    pdf_files = filter(image_files, endswith("pdf"))
-    rm.(pdf_files)
 end
