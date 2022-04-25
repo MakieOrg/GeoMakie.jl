@@ -343,3 +343,27 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
 
     return decorations
 end
+
+function datalims(ax::Axis)
+    nplots = length(plots(ax.scene))
+
+    n_axisplots = if nplots > 8 &&
+                    ax.scene.plots[2] isa Makie.Lines &&
+                    ax.scene.plots[2].label[] == "Coastlines"
+                8
+        else
+                7
+        end
+
+    return Makie.data_limits(ax.scene.plots[(n_axisplots+1):end])
+
+end
+
+function datalims!(ax::Axis)
+    lims = datalims(ax)
+    min = lims.origin[1:2]
+    max = lims.widths[1:2] .+ lims.origin[1:2]
+    xlims!(ax, min[1], max[1])
+    ylims!(ax, min[2], max[2])
+    return (min[1], max[1], min[2], max[2])
+end
