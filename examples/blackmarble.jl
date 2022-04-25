@@ -10,5 +10,7 @@ ga = GeoAxis(fig[1, 1]; title = "Earth at night", titlecolor = :white, backgroun
 hidedecorations!(ga) # hide ticks and ticklabels
 
 imgplot = image!(-180..180, -89.9..89.9, img; interpolate = false)
+
+fig
 # save at high resolution
-save("blackmarble.png", fig; px_per_unit = 2)
+# save("blackmarble.png", fig; px_per_unit = 2)

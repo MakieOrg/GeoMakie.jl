@@ -24,3 +24,6 @@ ax = GeoAxis(fig[1,1])
 scatter!(slons, slats; color = sfield)
 save("scatter_example.png", fig; px_per_unit=2)
 display(fig)
+
+# Poly example - not working yet!
+#

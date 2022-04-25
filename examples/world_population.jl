@@ -1,10 +1,11 @@
+# This example was contributed by Martijn Visser (@visr)
 using Makie, CairoMakie, GeoMakie
 using GeoJSON
 
 source = "+proj=longlat +datum=WGS84"
 dest = "+proj=natearth2"
 
-fig = Figure()
+fig = Figure(resolution = (1000,500))
 ga = GeoAxis(
     fig[1, 1];
     source = source,
@@ -23,4 +24,4 @@ pop = download(url * "ne_10m_populated_places_simple.geojson")
 pop_geo = GeoJSON.read(read(pop, String))
 scatter!(ga, GeoMakie.geo2basic(pop_geo), color="lightgrey", markersize=1.2)
 
-save("world_populations.png", fig; px_per_unit = 2)
+fig

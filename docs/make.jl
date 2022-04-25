@@ -6,11 +6,16 @@ if deploy && !haskey(ENV, "GITHUB_TOKEN")
     deploy = false
 end
 
+include("generate_examples.jl")
+
 makedocs(;
     modules=[GeoMakie],
     doctest=false,
     format=Documenter.HTML(; prettyurls=deploy, collapselevel=3),
-    pages=["GeoMakie.jl" => "index.md"],
+    pages=[
+        "GeoMakie.jl" => "index.md",
+        "Examples" => "examples.md"
+        ],
     sitename="GeoMakie.jl",
     authors="Makie.jl contributors")
 

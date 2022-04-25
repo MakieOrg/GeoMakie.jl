@@ -23,6 +23,8 @@ const Mesh = GeometryBasics.Mesh
 const Text = Makie.Text
 using Proj
 
+# Quick fix for Makie
+Makie.to_colormap(::Nothing) = nothing
 
 include("conversions.jl")
 include("data.jl")
