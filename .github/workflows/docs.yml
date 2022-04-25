@@ -21,7 +21,8 @@ jobs:
       - uses: julia-actions/setup-julia@latest
         with:
           version: '1.6'
-      - run: "git clone https://github.com/JuliaGeo/Proj4.jl Proj; julia --project=@. -e "using Pkg;Pkg.add(\"./Proj\")"
+      - name: Install Proj
+        run: git clone https://github.com/JuliaGeo/Proj4.jl Proj; julia --project=@. -e 'using Pkg;Pkg.develop("./Proj")'
       - name: Install dependencies
         run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
       - name: Build and deploy

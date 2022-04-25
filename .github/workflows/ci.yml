@@ -18,10 +18,8 @@ jobs:
           - '1.6'
         os:
           - ubuntu-latest
-          - macOS
         arch:
           - x64
-          - aarch64
     steps:
       # Cancel ongoing CI test runs if pushing to branch again before the previous tests
       # have finished
@@ -36,7 +34,8 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - run: "git clone https://github.com/JuliaGeo/Proj4.jl Proj; julia --project=@. -e "using Pkg;Pkg.add(\"./Proj\")"
+      - name: Install Proj
+        run: git clone https://github.com/JuliaGeo/Proj4.jl Proj; julia --project=@. -e "using Pkg;Pkg.develop(\"./Proj\")
       - uses: actions/cache@v1
         env:
           cache-name: cache-artifacts
