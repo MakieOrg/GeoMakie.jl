@@ -316,7 +316,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
     decorations[:xtickplot] = text!(
         textscene,
         xticklabels;
-        markerspace = :screen,
+        markerspace = :pixel,
         visible = hijacked_observables[:xticklabelsvisible],
         position = xtickpoints,
         rotation = ax.xticklabelrotation,
@@ -330,7 +330,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
     decorations[:ytickplot] = text!(
         textscene,
         yticklabels;
-        markerspace = :screen,
+        markerspace = :pixel,
         visible = hijacked_observables[:yticklabelsvisible],
         position = ytickpoints,
         rotation = ax.yticklabelrotation,
@@ -351,6 +351,9 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
     return decorations
 end
 
+# Applicable only to geoaxis
+# in the future, once PolarAxis is implemented as an example,
+# change this to `Makie.data_limits(ax::GeoAxis)`
 function datalims(ax::Axis)
     nplots = length(plots(ax.scene))
 
