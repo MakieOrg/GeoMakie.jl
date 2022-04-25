@@ -1,5 +1,9 @@
 using Documenter, GeoMakie
 
+# invoke some geomakie things to be sure
+GeoMakie.coastlines()
+GeoMakie.earth()
+
 deploy = length(ARGS) == 1 && ARGS[1] == "deploy"
 if deploy && !haskey(ENV, "GITHUB_TOKEN")
     @warn("Not deploying, no GITHUB_TOKEN not found in ENV")
