@@ -24,12 +24,16 @@ function Makie.apply_transform(t::Proj.Transformation, pt::Point{N,T}) where {N,
         f = Point(t(Vec(pt)) ./ 100_000)
         return f
     catch e
+        # catch this annoying edge case
+        # if pt[2] ≈ 90.0f0 || pt[2] ≈ -90.0f0
+        #     println("Caught a 90-lat")
+        #     return Point(t(Vec(pt[1], 90.0f0)) ./ 100_000)
+        # end
         println("Invalid point for transformation!")
         @show pt
         rethrow(e)
     end
 end
-
 
 function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     # TODO: once Proj4.jl is updated to PROJ 8.2, we can use
@@ -187,6 +191,14 @@ function tick_direction(scene, tick_max_extent, tickcoord; ds = 0.01)
     return padding_vec
 end
 
+function are_ticks_colocated(scene, positions, labels, fontsize)
+    pixel_positions = project_to_pixelspace(scene, positions)
+    if all(sum.((pixel_positions .- mean(pixel_positions)) .^ 2) > 3 * fontsize)
+        return true
+    else
+        return false
+    end
+end
 
 ############################################################
 #                                                          #

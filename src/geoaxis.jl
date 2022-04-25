@@ -58,7 +58,7 @@ display(fig)
 """
 function GeoAxis(args...;
         source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth",
-        transformation = Proj.Transformation(source, dest, always_xy=true),
+        transformation = Proj.Transformation(Makie.to_value(source), Makie.to_value(dest), always_xy=true),
         lonlims = (-180, 180),
         latlims = (-90, 90),
         hide_original_spines = true,
@@ -74,12 +74,20 @@ function GeoAxis(args...;
         yticklabelpad = 5.0,
         kw...
     )
-    ptrans = transformation
+
+
+    _transformation = Observable{Proj.Transformation}(Makie.to_value(transformation))
+     Makie.Observables.onany(source, dest) do src, dst
+        _transformation[] = Proj.Transformation(Makie.to_value(src), Makie.to_value(dest); always_xy = true)
+    end
+    Makie.Observables.onany(transformation) do trans
+        _transformation[] = trans
+    end
 
     # Automatically determine limits!
     # TODO: should we automatically verify limits
     # or not?
-    axmin, axmax, aymin, aymax = find_transform_limits(transformation)
+    axmin, axmax, aymin, aymax = find_transform_limits(_transformation[])
 
     verified_lonlims = lonlims
     if lonlims == Makie.automatic
@@ -102,7 +110,7 @@ function GeoAxis(args...;
 
 
     # Set axis transformation
-    ax.scene.transformation.transform_func[] = ptrans
+    Makie.Observables.connect!(ax.scene.transformation.transform_func, _transformation)
 
     # Plot coastlines
     coastplot = lines!(ax, GeoMakie.coastlines(); color = :black, coastline_attributes...)
@@ -166,7 +174,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
     ylimits = Observable((0.0f0, 0.0f0))
     # First we establish the spine points
 
-    lift(ax.finallimits, ax.xticks, ax.xtickformat, ax.yticks, ax.ytickformat, ax.scene.px_area) do limits, xticks, xtickformat, yticks, ytickformat, pxarea
+    lift(ax.finallimits, ax.xticks, ax.xtickformat, ax.yticks, ax.ytickformat, ax.scene.px_area, getproperty(ax.scene, :transformation).transform_func) do limits, xticks, xtickformat, yticks, ytickformat, pxarea, _tfunc
 
         lmin = minimum(limits)
         lmax = maximum(limits)
