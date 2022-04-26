@@ -22,6 +22,9 @@ GeoAxis
 geo2basic
 ```
 
+## Gotchas
+
+When plotting a projection which has a limited domain (in either longitude or latitude), if your limits are not inside that domain, the axis will appear blank.  To fix this, simply correct the limits - you can even do it on the fly, using the `xlims!(ax, low, high)` or `ylims!(ax, low, high)` functions.
 
 ## Examples
 
