@@ -1,0 +1,38 @@
+using LightOSM, OSMMakie
+using GeoMakie, GLMakie
+
+
+# load as OSMGraph
+osm = graph_from_file("london_drive.json";
+    graph_type = :light, # SimpleDiGraph
+    weight_type = :distance
+)
+
+fig = Figure()
+ga = GeoAxis(fig[1, 1]; dest="+proj=eqearth +lon_0=25")
+
+osmplot!(ga, osm)
+datalims!(ga)
+fig
+
+download_osm_buildings(:bbox;
+    minlat = 51.5015,
+    minlon = -0.0921,
+    maxlat = 51.5154,
+    maxlon = -0.0662,
+    metadata = true,
+    download_format = :osm,
+    save_to_file_location = "london_buildings.osm",
+);
+
+# load as Buildings Dict
+
+buildings = buildings_from_file("london_buildings.osm");
+
+# plot London map with buildings
+
+fig = Figure();
+ga = GeoAxis(fig[1, 1]; dest="+proj=ortho +lon_0=0 +lat_0=51.5", lonlims = (0, 1), latlims=(50, 51))
+plot = osmplot!(ga, osm; buildings)
+datalims!(ga)
+fig
