@@ -24,12 +24,8 @@ ga = GeoAxis(
     dest = "+proj=wintri", # the CRS in which you want to plot
     coastlines = true # plot coastlines from Natural Earth, as a reference.
 )
+scatter!(ga, -120:15:120, -60:7.5:60; color = -60:7.5:60, strokecolor = (:black, 0.2))
 fig
-```
-![geoax1](https://user-images.githubusercontent.com/32143268/165352924-32f82178-54b1-4b3a-9821-2348581c3a84.svg)
-
-```julia
-scatter!(ga, -120:15:120, -60:7.5:60; color = -60:7.5:60, strokecolor = (:black, 0.2)); fig
 ```
 ![geoax2](https://user-images.githubusercontent.com/32143268/165353013-ec6c4230-be7e-4dbc-a8c8-7e40204ebf80.svg)
 
