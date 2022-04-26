@@ -32,8 +32,6 @@ hm2 = poly!(
     strokewidth = 0.25
 )
 
-cb = Colorbar(fig[1,2], hm2, label = "variable, color code", height = Relative(0.65))
-
-hidedecorations!(ax)
+cb = Colorbar(fig[1,2]; colorrange = (1, n), colormap = Reverse(:plasma), label = "variable, color code", height = Relative(0.65))
 
 fig
