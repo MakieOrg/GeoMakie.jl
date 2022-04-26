@@ -198,18 +198,18 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
     pixel_Δx, pixel_Δy = project_to_pixelspace(scene, Σp) - project_to_pixelspace(scene, tickcoord_in_inputspace)
     # invert direction - the vectors were previously facing the inside,
     # now they will face outside .
-    dx = pixel_Δx
-    dy = pixel_Δy
+    dx = -pixel_Δx
+    dy = -pixel_Δy
 
     # Correct the angle of displacement
     θ = atan(dy/dx)
-    if tickpad[1] < tickpad[2]
-        dy = -dy
-        dx = -dx
-    elseif θ ∈ -0.5π..0.5π && tickpad[1] > tickpad[2]
-        dy = -dy
-        dx = -dx
-    end
+    # if θ ∈ 0..π && tickpad[1] < tickpad[2]
+    #     dy = -dy
+    #     dx = -dx
+    # elseif θ ∈ -0.5π..0.5π && tickpad[1] > tickpad[2]
+    #     dy = -dy
+    #     dx = -dx
+    # end
 
     # The vector which is normal to the plot in pixel-space.
     normal_vec = Vec2f((dx, dy)./sqrt(dx^2 + dy^2))
@@ -224,7 +224,7 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
 
     padding_vec = normal_vec .* (extents.widths/2) - tickpad
 
-    # println("$ticklabel $(rad2deg(θ)) ⟹ $(_sprinti(normal_vec)) ⟹ $(_sprinti(padding_vec)); $(_sprinti(extents.widths)), $(Σp)")
+    # println("$ticklabel ($(tickpad)) $(rad2deg(θ)) ⟹ $(_sprinti(normal_vec)) ⟹ $(_sprinti(padding_vec)); $(_sprinti(extents.widths)), $(Σp)")
 
 
     return padding_vec
