@@ -12,19 +12,3 @@ plot!.(ga, basic; strokecolor = :blue, strokewidth = 1, color = (:blue, 0.5), sh
 datalims!(ga)
 
 fig
-
-
-
-fig_anim = Figure()
-ga_anim = GeoAxis(fig_anim[1, 1]; dest = "+proj=ortho", lonlims=(-90,90), coastlines=true)
-
-record(fig_anim, "try_3.mp4", 0:89) do i
-    xlims!(ga_anim, -90+i, 90-i)
-    ylims!(ga_anim, -90+i/2, 90-i/2)
-end
-
-
-record(fig_anim, "try_4.mp4", 0:89) do i
-    xlims!(ga_anim, -90+i/2, 90-i)
-    ylims!(ga_anim, -90+i, 90-i)
-end

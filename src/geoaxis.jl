@@ -67,6 +67,8 @@ function GeoAxis(args...;
         yticks = LinearTicks(7),
         xticklabelpad = 5.0,
         yticklabelpad = 5.0,
+        xticklabelalign = (:center, :center),
+        yticklabelalign = (:center, :center),
         kw...
     )
 
@@ -126,8 +128,8 @@ function GeoAxis(args...;
     @hijack_observable :ygridvisible
     @hijack_observable :xticksvisible
     @hijack_observable :yticksvisible
-    @hijack_observable :xticklabelsvisible
-    @hijack_observable :yticklabelsvisible
+    # @hijack_observable :xticklabelsvisible
+    # @hijack_observable :yticklabelsvisible
     @hijack_observable :topspinevisible
     @hijack_observable :bottomspinevisible
     @hijack_observable :leftspinevisible
@@ -309,32 +311,37 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
 
     textscene = ax.blockscene
 
-    # TODO: fix text!
-    decorations[:xtickplot] = text!(
-        textscene,
-        xticklabels;
-        markerspace = :pixel,
-        visible = hijacked_observables[:xticklabelsvisible],
-        position = xtickpoints,
-        rotation = ax.xticklabelrotation,
-        font = ax.xticklabelfont,
-        textsize = ax.xticklabelsize,
-        color = ax.xticklabelcolor,
-        align = (:center, :center),
-    )
+    # decorations[:xtickplot] = text!(
+    #     textscene,
+    #     xticklabels;
+    #     markerspace = :pixel,
+    #     visible = hijacked_observables[:xticklabelsvisible],
+    #     position = xtickpoints,
+    #     rotation = ax.xticklabelrotation,
+    #     font = ax.xticklabelfont,
+    #     textsize = ax.xticklabelsize,
+    #     color = ax.xticklabelcolor,
+    #     align = (:center, :center),
+    # )
+    #
+    # decorations[:ytickplot] = text!(
+    #     textscene,
+    #     yticklabels;
+    #     markerspace = :pixel,
+    #     visible = hijacked_observables[:yticklabelsvisible],
+    #     position = ytickpoints,
+    #     rotation = ax.yticklabelrotation,
+    #     font = ax.yticklabelfont,
+    #     textsize = ax.yticklabelsize,
+    #     color = ax.yticklabelcolor,
+    #     align = (:center, :center),
+    # )
 
-    decorations[:ytickplot] = text!(
-        textscene,
-        yticklabels;
-        markerspace = :pixel,
-        visible = hijacked_observables[:yticklabelsvisible],
-        position = ytickpoints,
-        rotation = ax.yticklabelrotation,
-        font = ax.yticklabelfont,
-        textsize = ax.yticklabelsize,
-        color = ax.yticklabelcolor,
-        align = (:center, :center),
-    )
+
+    # Currently, I hijack the axis text for this.  However, I don't know what it would do
+    # to interaction times, hence why I have left the old code commented out above.
+    Makie.Observables.connect!(ax.blockscene.plots[end-3][1], Makie.@lift tuple.($yticklabels, $ytickpoints))
+    Makie.Observables.connect!(ax.blockscene.plots[end-8][1], Makie.@lift tuple.($xticklabels, $xtickpoints))
 
     # For diagnostics only!
     # scatter!(textscene, xtickpoints; visible = hijacked_observables[:xticklabelsvisible], color = :red, bordercolor=:black)

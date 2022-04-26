@@ -189,20 +189,27 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
     tickcoord_in_dataspace = tfunc(tickcoord_in_inputspace)
     # determine direction to go in order to stay inbounds.
     xdir = tickcoord_in_inputspace[1] < 0 ? +1 : -1
-    ydir = tickcoord_in_dataspace[2] < 0 ? +1 : -1
-    # Δs = limits.widths .* ds |> minimum
-    Δs = Vec2f(xdir, ydir) .* tickpad ./ sum(tickpad)
+    ydir = tickcoord_in_inputspace[2] > 0 ? +1 : -1
+    Δs = Vec2f(xdir, ydir) .* tickpad ./ sum(tickpad) * ds
     # find the x and y directions
     # multiply by the sign in order to have them going outwards at any point
-    Δp = sum([xdir, ydir] .* tickpad / sum(tickpad))  * inv_tfunc(tickcoord_in_dataspace + Δs)
+    Σp = sign(sum(Δs)) * inv_tfunc(tickcoord_in_dataspace + Δs)
     # project back to pixel space
-    pixel_Δx, pixel_Δy = project_to_pixelspace(scene, Δp) - project_to_pixelspace(scene, tickcoord_in_inputspace)
+    pixel_Δx, pixel_Δy = project_to_pixelspace(scene, Σp) - project_to_pixelspace(scene, tickcoord_in_inputspace)
     # invert direction - the vectors were previously facing the inside,
     # now they will face outside .
-    dx = -pixel_Δx
-    dy = -pixel_Δy
+    dx = pixel_Δx
+    dy = pixel_Δy
 
-
+    # Correct the angle of displacement
+    θ = atan(dy/dx)
+    if θ ∈ 0..π && tickpad[1] < tickpad[2]
+        dy = -dy
+        dx = -dx
+    elseif θ ∈ -0.5π..0.5π && tickpad[1] > tickpad[2]
+        dy = -dy
+        dx = -dx
+    end
 
     # The vector which is normal to the plot in pixel-space.
     normal_vec = Vec2f((dx, dy)./sqrt(dx^2 + dy^2))
@@ -217,7 +224,7 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
 
     padding_vec = normal_vec .* (extents.widths/2) - tickpad
 
-    # println("$ticklabel ⟹ $normal_vec ⟹ $padding_vec; $(extents.widths), $(Δp)")
+    # println("$ticklabel ⟹ $(rad2deg(θ)) ⟹ $normal_vec ⟹ $padding_vec; $(extents.widths), $(Σp)")
 
 
     return padding_vec
