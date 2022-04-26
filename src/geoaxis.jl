@@ -241,13 +241,13 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         xgridpoints[] = _xgridpoints
         ygridpoints[] = _ygridpoints
 
-        if are_ticks_colocated(ax.scene, xtickpoints[], xticklabels[], ax.xticklabelsize[])
-            ax.xticklabelsvisible[] = false
-        end
-
-        if are_ticks_colocated(ax.scene, ytickpoints[], yticklabels[], ax.yticklabelsize[])
-            ax.yticklabelsvisible[] = false
-        end
+        # if are_ticks_colocated(ax.scene, xtickpoints[], xticklabels[], ax.xticklabelsize[])
+        #     ax.xticklabelsvisible[] = false
+        # end
+        #
+        # if are_ticks_colocated(ax.scene, ytickpoints[], yticklabels[], ax.yticklabelsize[])
+        #     ax.yticklabelsvisible[] = false
+        # end
 
         return 1
         # Now, we've updated the entire axis.
