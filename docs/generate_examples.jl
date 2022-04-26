@@ -10,6 +10,7 @@ example_title_pairs = [
     "Orthographic projection" => "orthographic.jl",
     "World Population centers" => "world_population.jl",
     "Field and countries" => "field_and_countries.jl",
+    "GraphMakie with GeoMakie" => "graph_on_usa.jl"
 
 ]
 

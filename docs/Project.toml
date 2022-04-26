@@ -5,6 +5,8 @@ Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+GraphMakie = "1ecd5474-83a3-4783-bb4f-06765db800d2"
 ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
