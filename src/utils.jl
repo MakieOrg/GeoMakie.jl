@@ -192,7 +192,11 @@ function tick_direction(scene, tick_max_extent, tickcoord; ds = 0.01)
     return padding_vec
 end
 
+# Positions in pixelspace
+
 function are_ticks_colocated(scene, positions, labels, fontsize)
+    isempty(positions) && return false
+    @assert length(positions) == length(labels)
     pixel_positions = positions
     if all(isapprox(positions[1]; atol = 10.0), positions)
         return true
@@ -203,7 +207,52 @@ function are_ticks_colocated(scene, positions, labels, fontsize)
     end
 end
 
-function overlapping_ticks(scene, positions, labels, fontsize)
+function euclidean_distance(p1::Point{N, T}, p2::Point{N, T})::T where {T <: Real, N}
+    return sqrt(sum((p1 .- p2) .^2))
+end
+
+# Positions in pixelspace
+# This function assumes that all ticks are not colocated
+function remove_overlapping_ticks!(scene, xpositions, xlabels, xvisible, ypositions, ylabels, yvisible, fontsize)
+
+    nx = length(xpositions); ny = length(ypositions)
+    combined_positions = vcat(xpositions, ypositions)
+
+    # compute distances between all positions
+    # we cannot optimize this, because of literal edge cases
+    distmat = zeros((nx+ny), (nx+ny))
+    @inbounds for i in 1:(nx+ny)
+        @inbounds for j in 1:(nx+ny)
+            distmat[i, j] = euclidean_distance(combined_positions[i], combined_positions[j])
+        end
+    end
+
+    distmat += 2*fontsize * I
+
+    bad_combos = findall(distmat .< (fontsize))
+    remove = fill(0, length(bad_combos))
+
+    for (i, bad_pair) in enumerate(bad_combos)
+        remove[i] = bad_pair[1]
+    end
+
+    unique!(remove); sort!(remove)
+    length(remove)==0 && return
+    length(remove)==1 && remove[1] == 0 && return
+    remove[1] == 0 && popfirst!(remove)
+
+    splitind = findfirst(>(nx), remove)
+    if splitind == nothing
+        splitind = length(remove)+1
+    end
+
+    deleteat!(xpositions, remove[1:(splitind-1)])
+    deleteat!(xlabels,    remove[1:(splitind-1)])
+    splitind == length(remove)+1 && return
+    deleteat!(ypositions, remove[splitind:end] .- nx)
+    deleteat!(ylabels,    remove[splitind:end] .- nx)
+
+    return
 end
 
 ############################################################

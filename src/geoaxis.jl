@@ -61,10 +61,10 @@ function GeoAxis(args...;
         transformation = Proj.Transformation(Makie.to_value(source), Makie.to_value(dest), always_xy=true),
         lonlims = (-180, 180),
         latlims = (-90, 90),
-        hide_original_spines = true,
         coastlines = false,
         coastline_attributes = (;label = "Coastlines",),
         line_density = 1_000,
+        remove_overlapping_ticks = true,
         # these are the axis keywords which we will merge in
         xtickformat = geoformat_ticklabels,
         ytickformat = geoformat_ticklabels,
@@ -142,7 +142,7 @@ function GeoAxis(args...;
     # WARNING: for now, we only accept xticks on the bottom
     # and yticks on the left.
 
-    draw_geoticks!(ax, hijacked_observables, line_density)
+    draw_geoticks!(ax, hijacked_observables, line_density, remove_overlapping_ticks)
 
     ax.xaxis.protrusion[] = xprot
     ax.yaxis.protrusion[] = yprot
@@ -150,7 +150,7 @@ function GeoAxis(args...;
     return ax
 end
 
-function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
+function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_overlapping_ticks)
     topscene = ax.blockscene
     scene = ax.scene
 
@@ -196,6 +196,13 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density)
         ytickpoints.val = project_to_pixelspace(scene,
                     Point2f.(xlimits[][1], _ytickvalues)
         ) .+ Ref(Point2f(pxarea.origin) + Point2f(0, -ax.yticklabelpad[]))
+
+        remove_overlapping_ticks && remove_overlapping_ticks!(
+            scene,
+            xtickpoints.val, _xticklabels, ax.xticklabelsvisible[],
+            ytickpoints.val, _yticklabels, ax.yticklabelsvisible[],
+            max(ax.xticklabelsize[], ax.yticklabelsize[])
+        )
 
         # notify this
         xticklabels[] = _xticklabels
