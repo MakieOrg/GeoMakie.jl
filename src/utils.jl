@@ -203,7 +203,7 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
 
     # Correct the angle of displacement
     θ = atan(dy/dx)
-    if θ ∈ 0..π && tickpad[1] < tickpad[2]
+    if tickpad[1] < tickpad[2]
         dy = -dy
         dx = -dx
     elseif θ ∈ -0.5π..0.5π && tickpad[1] > tickpad[2]
@@ -224,10 +224,15 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
 
     padding_vec = normal_vec .* (extents.widths/2) - tickpad
 
-    # println("$ticklabel ⟹ $(rad2deg(θ)) ⟹ $normal_vec ⟹ $padding_vec; $(extents.widths), $(Σp)")
+    # println("$ticklabel $(rad2deg(θ)) ⟹ $(_sprinti(normal_vec)) ⟹ $(_sprinti(padding_vec)); $(_sprinti(extents.widths)), $(Σp)")
 
 
     return padding_vec
+end
+
+
+function _sprinti(obj)
+    return "[" * join(Makie.Formatters.plain(obj), ",") * "]"
 end
 
 # Positions in pixelspace
