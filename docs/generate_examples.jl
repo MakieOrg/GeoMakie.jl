@@ -15,7 +15,7 @@ example_title_pairs = [
 
 io = open(joinpath("docs", "src", "examples.md"), "w")
 
-mkpath("assets")
+assetpath = mkpath(joinpath("docs", "assets"))
 
 for ext in example_title_pairs
 
@@ -26,7 +26,7 @@ for ext in example_title_pairs
 
     test_image_dir = "test_images"
     base64data = Base64.base64encode(read(joinpath(test_image_dir, splitext(example)[1] * ".png")))
-    cp(joinpath(test_image_dir, splitext(example)[1] * ".png"), joinpath("assets", splitext(example)[1]*".png"))
+    cp(joinpath(test_image_dir, splitext(example)[1] * ".png"), joinpath(assetpath, splitext(example)[1]*".png"))
 
     println(io, "## $title")
     println()
