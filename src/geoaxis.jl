@@ -65,8 +65,8 @@ function GeoAxis(args...;
         ytickformat = geoformat_ticklabels,
         xticks = LinearTicks(7),
         yticks = LinearTicks(7),
-        xticklabelpad = 3.0,
-        yticklabelpad = 3.0,
+        xticklabelpad = 5.0,
+        yticklabelpad = 5.0,
         kw...
     )
 
@@ -183,24 +183,24 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         _ytickpos_in_inputspace = Point2f.(xlimits[][1], _ytickvalues)
 
         # Find the necessary padding for each tick
-        xtickpad = directional_pad.(
-            Ref(scene), _xtickpos_in_inputspace,
-            _xticklabels, ax.xticklabelpad[], ax.xticklabelsize[], ax.xticklabelfont[],
+        xticklabelpad = directional_pad.(
+            Ref(scene), Ref(limits), _xtickpos_in_inputspace,
+            _xticklabels, Ref(Point2f(0, ax.xticklabelpad[])), ax.xticklabelsize[], ax.xticklabelfont[],
             ax.xticklabelrotation[]
         )
-        ytickpad = directional_pad.(
-            Ref(scene), _ytickpos_in_inputspace,
-            _yticklabels, ax.yticklabelpad[], ax.yticklabelsize[], ax.yticklabelfont[],
+        yticklabelpad = directional_pad.(
+            Ref(scene), Ref(limits), _ytickpos_in_inputspace,
+            _yticklabels, Ref(Point2f(ax.yticklabelpad[], 0)), ax.yticklabelsize[], ax.yticklabelfont[],
             ax.yticklabelrotation[]
         )
 
         # update but do not notify
         xtickpoints.val = project_to_pixelspace(scene, _xtickpos_in_inputspace) .+
-                            Ref(Point2f(pxarea.origin)) .+ xtickpad
+                            Ref(Point2f(pxarea.origin)) .+ xticklabelpad
 
 
         ytickpoints.val = project_to_pixelspace(scene, _ytickpos_in_inputspace) .+
-                            Ref(Point2f(pxarea.origin)) .+ ytickpad
+                            Ref(Point2f(pxarea.origin)) .+ yticklabelpad
 
         # check for overlapping ticks and remove them (literally deleteat!(...))
         remove_overlapping_ticks && remove_overlapping_ticks!(

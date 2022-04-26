@@ -181,7 +181,7 @@ function text_bbox(textstring::AbstractString, textsize::Union{AbstractVector, N
 end
 
 # Direction finder - find how to displace the tick so that it is out of the axis
-function directional_pad(scene, tickcoord_in_inputspace, ticklabel::AbstractString, tickpad, ticksize, tickfont, tickrotation; ds = 0.01)
+function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::AbstractString, tickpad, ticksize, tickfont, tickrotation; ds = 0.01)
     # Define shorthand functions for dev purposes - these can be removed before release
     tfunc = x -> Makie.apply_transform(scene.transformation.transform_func[], x)
     inv_tfunc = x -> Makie.apply_transform(Makie.inverse_transform(scene.transformation.transform_func[]), x)
@@ -189,21 +189,23 @@ function directional_pad(scene, tickcoord_in_inputspace, ticklabel::AbstractStri
     tickcoord_in_dataspace = tfunc(tickcoord_in_inputspace)
     # determine direction to go in order to stay inbounds.
     xdir = tickcoord_in_inputspace[1] < 0 ? +1 : -1
-    ydir = tickcoord_in_inputspace[2] < 0 ? +1 : -1
+    ydir = tickcoord_in_dataspace[2] < 0 ? +1 : -1
+    # Δs = limits.widths .* ds |> minimum
+    Δs = Vec2f(xdir, ydir) .* tickpad ./ sum(tickpad)
     # find the x and y directions
     # multiply by the sign in order to have them going outwards at any point
-    Δx = xdir * inv_tfunc(tickcoord_in_dataspace + Point2f(xdir * ds, 0))
-    Δy = ydir * inv_tfunc(tickcoord_in_dataspace + Point2f(0, ydir * ds))
+    Δp = sum([xdir, ydir] .* tickpad / sum(tickpad))  * inv_tfunc(tickcoord_in_dataspace + Δs)
     # project back to pixel space
-    pixel_Δx, pixel_Δy = project_to_pixelspace(scene, [Δx, Δy]) .- Ref(project_to_pixelspace(scene, tickcoord_in_inputspace))
+    pixel_Δx, pixel_Δy = project_to_pixelspace(scene, Δp) - project_to_pixelspace(scene, tickcoord_in_inputspace)
     # invert direction - the vectors were previously facing the inside,
     # now they will face outside .
     dx = -pixel_Δx
     dy = -pixel_Δy
 
+
+
     # The vector which is normal to the plot in pixel-space.
-    normal_vec = Vec2f((dx + dy)/2)
-    normal_vec = normal_vec / sqrt(sum(normal_vec .^ 2))
+    normal_vec = Vec2f((dx, dy)./sqrt(dx^2 + dy^2))
 
     # We have computed the normal vector - now we have to get tick extents
     extents = text_bbox(
@@ -213,7 +215,10 @@ function directional_pad(scene, tickcoord_in_inputspace, ticklabel::AbstractStri
         0.0, # Makie.to_value(Makie.theme(scene, :lineheight))
     )
 
-    padding_vec = normal_vec .* (extents.widths/2 .+ tickpad)
+    padding_vec = normal_vec .* (extents.widths/2) - tickpad
+
+    # println("$ticklabel ⟹ $normal_vec ⟹ $padding_vec; $(extents.widths), $(Δp)")
+
 
     return padding_vec
 end

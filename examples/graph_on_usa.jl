@@ -29,22 +29,23 @@ g = complete_graph(length(keys(gpos)))
 positions = Point2f.(collect(keys(gpos)))
 
 fig = Figure(resolution = (1200, 800), fontsize = 22)
-ax = GeoAxis(
+ga = GeoAxis(
     fig[1, 1],
     source = "+proj=longlat +datum=WGS84",
     dest = "+proj=lcc +lon_0=-100 +lat_1=33 +lat_2=45",
-    title = "Projection: lcc +lat_1=33 +lat_2=45",
+    title = "Projection: lcc +lon_0=-100 +lat_1=33 +lat_2=45",
     coastlines = false,
     lonlims = automatic, latlims = automatic,
 )
+
 poly!(
-    ax, states_geo;
+    ga, states_geo;
     color = 1:n, colormap = (:viridis, 0.25),
     strokecolor = :black, strokewidth = 1
 )
 
 graphplot!(
-    ax, g;
+    ga, g;
     layout = _ -> positions, node_size = 1,
     edge_color = cgrad(:plasma)[LinRange(0, 1, 66)],
     node_color = cgrad(:plasma)[LinRange(0, 1, length(keys(gpos)))]
@@ -52,6 +53,6 @@ graphplot!(
 
 # Set the limits to the extrema of the data
 # (this is why we removed Alaska)
-datalims!(ax)
+datalims!(ga)
 
 fig

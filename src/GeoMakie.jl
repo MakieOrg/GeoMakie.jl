@@ -21,8 +21,9 @@ const attributes = Makie.attributes
 const volume = Makie.volume
 const Mesh = GeometryBasics.Mesh
 const Text = Makie.Text
-using Proj4
-const Proj = Proj4
+# using Proj4
+# const Proj = Proj4
+using Proj
 
 # Quick fix for Makie
 Makie.to_colormap(::Nothing) = nothing
