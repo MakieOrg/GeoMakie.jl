@@ -36,9 +36,7 @@ jobs:
           arch: ${{ matrix.arch }}
       - name: Install custom deps
         run: |
-            git clone --branch rename --single-branch https://github.com/JuliaGeo/Proj4.jl Proj;
-            git clone --depth=1 https://github.com/JuliaPlots/Makie.jl Makie;
-            julia --project=@. -e 'using Pkg;pkg"dev ./Proj ./Makie ./Makie/MakieCore ./Makie/CairoMakie"; Pkg.add("ImageMagick")'
+            julia --project=@. -e 'using Pkg;pkg"add Makie#master CairoMakie#master GLMakie#master MakieCore#master"; Pkg.add("ImageMagick")'
       - uses: actions/cache@v1
         env:
           cache-name: cache-artifacts
@@ -72,12 +70,10 @@ jobs:
           version: '1.6'
       - name: Install custom deps
         run: |
-            git clone --branch rename --single-branch https://github.com/JuliaGeo/Proj4.jl Proj;
-            git clone --depth=1 https://github.com/JuliaPlots/Makie.jl Makie;
-            julia --project=@. -e 'using Pkg;pkg"dev ./Proj ./Makie ./Makie/MakieCore ./Makie/CairoMakie"'
+            julia --project=@. -e 'using Pkg;pkg"add Makie#master MakieCore#master CairoMakie#master"'
       - name: Install dependencies
         run: |
-            julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); pkg"dev ./Proj ./Makie ./Makie/CairoMakie ./Makie/MakieCore"; Pkg.instantiate()'
+            julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); pkg"add Makie#master MakieCore#master CairoMakie#master"; Pkg.instantiate()'
             julia --project=docs/ -e 'using CairoMakie'
       - name: Build and deploy
         env:
