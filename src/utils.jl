@@ -170,24 +170,50 @@ function project_to_pixelspace(scene, points::AbstractVector{Point{N, T}}) where
     )
 end
 
+function text_bbox(textstring::AbstractString, textsize::Union{AbstractVector, Number}, font, align, rotation, justification, lineheight)
+    glyph_collection = Makie.layout_text(
+            textstring, textsize,
+            font, align, rotation, justification, lineheight,
+            RGBAf(0,0,0,0), RGBAf(0,0,0,0), 0f0
+        )
+
+    return Rect2f(Makie.boundingbox(glyph_collection, Point3f(0), Makie.to_rotation(rotation)))
+end
+
 # Direction finder - find how to displace the tick so that it is out of the axis
-
-function tick_direction(scene, tick_max_extent, tickcoord; ds = 0.01)
-    tfunc = scene.transform.transform_func[]
-    px, py = tfunc(tickcoord)
-    Δx = tfunc(tickcoord + Point2f(ds, 0))
-    Δy = tfunc(tickcoord + Point2f(0, ds))
-
-    pixel_Δx, pixel_Δy = project_to_pixelspace(scene, [Δx, Δy])
-
-    dx = tickcoord - pixel_Δx
-    dy = tickcoord - pixel_Δy
+function directional_pad(scene, tickcoord_in_inputspace, ticklabel::AbstractString, tickpad, ticksize, tickfont, tickrotation; ds = 0.01)
+    # Define shorthand functions for dev purposes - these can be removed before release
+    tfunc = x -> Makie.apply_transform(scene.transformation.transform_func[], x)
+    inv_tfunc = x -> Makie.apply_transform(Makie.inverse_transform(scene.transformation.transform_func[]), x)
+    # convert tick coordinate to dataspace
+    tickcoord_in_dataspace = tfunc(tickcoord_in_inputspace)
+    # determine direction to go in order to stay inbounds.
+    xdir = tickcoord_in_inputspace[1] < 0 ? +1 : -1
+    ydir = tickcoord_in_inputspace[2] < 0 ? +1 : -1
+    # find the x and y directions
+    # multiply by the sign in order to have them going outwards at any point
+    Δx = xdir * inv_tfunc(tickcoord_in_dataspace + Point2f(xdir * ds, 0))
+    Δy = ydir * inv_tfunc(tickcoord_in_dataspace + Point2f(0, ydir * ds))
+    # project back to pixel space
+    pixel_Δx, pixel_Δy = project_to_pixelspace(scene, [Δx, Δy]) .- Ref(project_to_pixelspace(scene, tickcoord_in_inputspace))
+    # invert direction - the vectors were previously facing the inside,
+    # now they will face outside .
+    dx = -pixel_Δx
+    dy = -pixel_Δy
 
     # The vector which is normal to the plot in pixel-space.
-    normal_vec = Vec2(-(dx + dy)/2)
-    normal_vec = normal_vec / sqrt(sum(normal_vec .^2))
+    normal_vec = Vec2f((dx + dy)/2)
+    normal_vec = normal_vec / sqrt(sum(normal_vec .^ 2))
 
-    padding_vec = normal_vec * tick_max_extent # tick_max_extent should be in px
+    # We have computed the normal vector - now we have to get tick extents
+    extents = text_bbox(
+        ticklabel, ticksize,
+        tickfont, Vec2f(0), tickrotation,
+        0.0, # Makie.to_value(Makie.theme(scene, :justification)),
+        0.0, # Makie.to_value(Makie.theme(scene, :lineheight))
+    )
+
+    padding_vec = normal_vec .* (extents.widths/2 .+ tickpad)
 
     return padding_vec
 end
@@ -220,14 +246,13 @@ function remove_overlapping_ticks!(scene, xpositions, xlabels, xvisible, ypositi
 
     # compute distances between all positions
     # we cannot optimize this, because of literal edge cases
-    distmat = zeros((nx+ny), (nx+ny))
+    distmat = fill(Inf32, (nx+ny), (nx+ny))
     @inbounds for i in 1:(nx+ny)
-        @inbounds for j in 1:(nx+ny)
+        @inbounds for j in 1:(i-1)
             distmat[i, j] = euclidean_distance(combined_positions[i], combined_positions[j])
         end
     end
 
-    distmat += 2*fontsize * I
 
     bad_combos = findall(distmat .< (fontsize))
     remove = fill(0, length(bad_combos))

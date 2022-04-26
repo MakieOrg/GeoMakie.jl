@@ -11,7 +11,7 @@ using Makie.MakieLayout.GridLayoutBase: Side
 using GeoInterface: GeoInterface, coordinates, AbstractPolygon, AbstractMultiPolygon, features, geometry
 export GeoInterface
 
-import Makie: convert_arguments, convert_attribute, to_value
+import Makie: convert_arguments, convert_attribute, to_value, automatic
 using Makie.DocStringExtensions
 
 # fix conflicts
@@ -37,6 +37,6 @@ export FileIO
 
 include("geoaxis.jl")
 
-export GeoAxis, geo2basic, datalims, datalims!
+export GeoAxis, geo2basic, datalims, datalims!, automatic
 
 end # module

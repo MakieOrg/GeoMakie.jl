@@ -2,58 +2,53 @@ using Makie: left, right, top, bottom
 using Makie.MakieLayout: height, width
 
 """
-    GeoAxis(args...; kwargs...) → ax
-Create a new axis instance `ax` that is a modified `Axis` of the Makie.jl ecosystem.
+    GeoAxis(fig_or_scene; kwargs...) → ax::Axis
+
+Create a modified `Axis` of the Makie.jl ecosystem.
 All Makie.jl plotting functions work directly on `GeoAxis`, e.g., `scatter!(ax, x, y)`.
+
+This is because it _is_ a regular `Axis` - along with the functions like `xlims!` and
+attributes like `ax.xticks`, et cetera.
 
 `GeoAxis` is appropriate for geospatial plotting because it automatically transforms all
 plotted data given a user-defined map projection. See keyword arguments below and examples
 in the online documentation. Longitude and latitude values in GeoMakie.jl are always
 assumed to be **in degrees**.
 
-In the call signature, `args...` is a standard figure location, e.g., `fig[1,1]` as given in
-`Axis`. The keyword arguments decide the geospatial projection:
+In order to automatically adjust the limits to your data, you can call `datalims!(ax)`
+on any `GeoAxis`.  Note that if your data is not adjusted to the WGS84 datum
+
+In the call signature, `fig_or_scene` can be a standard figure location, e.g., `fig[1,1]` as given in
+`Axis`. The keyword arguments decide the geospatial projection.
+
+## Keyword arguments
 
 * `source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth"`: These two keywords
   configure the map projection to be used for the given field using Proj.jl.
   See also online the section [Changing central longitude](@ref) for data that may not
   span the (expected by default) longitude range from -180 to 180.
 * `transformation = Proj.Transformation(source, dest, always_xy=true)`: Instead of
-  `source, dest` you can directly use the Proj.jl package to define the projection.
-  lines!(ax, GeoMakie.coastlines(); coastkwargs...)
-* `lonticks = -180:60:180, latticks = -90:30:90` ticks for the longitude and latitude
-  dimensions. The grid lines of the axis are also spanning these tick values.
-* `hidespines = true` Hide the axis spines (rectangle surrounding the axis).
-* `coastlines = false` draw coastlines
-* `coastline_attributes = (;)` named tuple that gets passed to the `lines` call drawing the coastline
+  `source, dest`, you can directly use the Proj.jl package to define the projection.
+* `lonlims = (-180, 180)`: The limits for longitude (x-axis).  For automatic
+  determination, pass `lonlims=automatic`.
+* `latlims = (-90, 90)`: The limits for latitude (y-axis).  For automatic
+  determination, pass `latlims=automatic`.
+* `coastlines = false`: Draw the coastlines of the world, from the Natural Earth dataset.
+* `coastline_attributes = (;)`: Attributes that get passed to the `lines` call drawing the coastline.
+* `line_density = 1000`: The number of points sampled per grid line.  Do not set this higher than 10,000.
+* `remove_overlapping_ticks = true`: Remove ticks which could overlap each other.  Y-axis ticks take priority
+  over x-axis ticks.
 
 ## Example
+
 ```julia
-using GeoMakie, GLMakie
-
-lons = -180:180
-lats = -90:90
-field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
-
-# Plot coastlines
-coastplot = lines!(ax, GeoMakie.coastlines(); color = :black, overdraw = true, coastkwargs...)
-translate!(coastplot, 0, 0, 99) # ensure they are on top of other plotted elements
-
-# Surface example
+using GeoMakie
 fig = Figure()
-ax = GeoAxis(fig[1,1])
-surface!(ax, lons, lats, field)
-display(fig)
+ax = GeoAxis(fig[1,1]; coastlines = true)
+image!(ax, -180..180, -90..90, rotr90(GeoMakie.earth()); interpolate = false)
+el = scatter!(rand(-180:180, 5), rand(-90:90, 5); color = rand(RGBf, 5))
+fig
 
-# Scatter example
-slons = rand(lons, 2000)
-slats = rand(lats, 2000)
-sfield = [exp(cosd(l)) + 3(y/90) for (l,y) in zip(slons, slats)]
-
-fig = Figure()
-ax = GeoAxis(fig[1,1])
-el = scatter!(slons, slats; color = sfield)
-display(fig)
 ```
 """
 function GeoAxis(args...;
@@ -70,8 +65,8 @@ function GeoAxis(args...;
         ytickformat = geoformat_ticklabels,
         xticks = LinearTicks(7),
         yticks = LinearTicks(7),
-        xticklabelpad = 5.0,
-        yticklabelpad = 5.0,
+        xticklabelpad = 3.0,
+        yticklabelpad = 3.0,
         kw...
     )
 
@@ -184,19 +179,30 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         _xtickvalues, _xticklabels = Makie.MakieLayout.get_ticks(xticks, identity, xtickformat, xlimits[]...)
         _ytickvalues, _yticklabels = Makie.MakieLayout.get_ticks(yticks, identity, ytickformat, ylimits[]...)
 
+        _xtickpos_in_inputspace = Point2f.(_xtickvalues, ylimits[][1])
+        _ytickpos_in_inputspace = Point2f.(xlimits[][1], _ytickvalues)
+
+        # Find the necessary padding for each tick
+        xtickpad = directional_pad.(
+            Ref(scene), _xtickpos_in_inputspace,
+            _xticklabels, ax.xticklabelpad[], ax.xticklabelsize[], ax.xticklabelfont[],
+            ax.xticklabelrotation[]
+        )
+        ytickpad = directional_pad.(
+            Ref(scene), _ytickpos_in_inputspace,
+            _yticklabels, ax.yticklabelpad[], ax.yticklabelsize[], ax.yticklabelfont[],
+            ax.yticklabelrotation[]
+        )
+
         # update but do not notify
-        # project xtickpoints from inputspace to scene dataspace (do transform)
-        # then project to scene pixelspace.
-        # TODO this is still not working right - the text positions almost look stretched
-        # or multiplied out from where they should be.
-        xtickpoints.val = project_to_pixelspace(scene,
-                    Point2f.(_xtickvalues, ylimits[][1])
-        ) .+ Ref(Point2f(pxarea.origin) + Point2f(-ax.xticklabelpad[], 0))
+        xtickpoints.val = project_to_pixelspace(scene, _xtickpos_in_inputspace) .+
+                            Ref(Point2f(pxarea.origin)) .+ xtickpad
 
-        ytickpoints.val = project_to_pixelspace(scene,
-                    Point2f.(xlimits[][1], _ytickvalues)
-        ) .+ Ref(Point2f(pxarea.origin) + Point2f(0, -ax.yticklabelpad[]))
 
+        ytickpoints.val = project_to_pixelspace(scene, _ytickpos_in_inputspace) .+
+                            Ref(Point2f(pxarea.origin)) .+ ytickpad
+
+        # check for overlapping ticks and remove them (literally deleteat!(...))
         remove_overlapping_ticks && remove_overlapping_ticks!(
             scene,
             xtickpoints.val, _xticklabels, ax.xticklabelsvisible[],
@@ -241,14 +247,6 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         xgridpoints[] = _xgridpoints
         ygridpoints[] = _ygridpoints
 
-        # if are_ticks_colocated(ax.scene, xtickpoints[], xticklabels[], ax.xticklabelsize[])
-        #     ax.xticklabelsvisible[] = false
-        # end
-        #
-        # if are_ticks_colocated(ax.scene, ytickpoints[], yticklabels[], ax.yticklabelsize[])
-        #     ax.yticklabelsvisible[] = false
-        # end
-
         return 1
         # Now, we've updated the entire axis.
     end
@@ -265,9 +263,6 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         color = ax.topspinecolor,
         # linestyle = ax.spinestyle,
         linewidth = ax.spinewidth,
-        inspectable = false,
-        xautolimits = false,
-        yautolimits = false,
         )
     decorations[:btmspineplot] = lines!(
         scene, btmspinepoints;
@@ -275,9 +270,6 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         color = ax.bottomspinecolor,
         # linestyle = ax.spinestyle,
         linewidth = ax.spinewidth,
-        inspectable = false,
-        xautolimits = false,
-        yautolimits = false,
         )
     decorations[:lftspineplot] = lines!(
         scene, lftspinepoints;
@@ -285,9 +277,6 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         color = ax.leftspinecolor,
         # linestyle = ax.spinestyle,
         linewidth = ax.spinewidth,
-        inspectable = false,
-        xautolimits = false,
-        yautolimits = false,
         )
     decorations[:rgtspineplot] = lines!(
         scene, rgtspinepoints;
@@ -295,9 +284,6 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         color = ax.rightspinecolor,
         # linestyle = ax.spinestyle,
         linewidth = ax.spinewidth,
-        inspectable = false,
-        xautolimits = false,
-        yautolimits = false,
         )
 
 
@@ -309,9 +295,6 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         color = ax.xgridcolor,
         linestyle = ax.xgridstyle,
         width = ax.xgridwidth,
-        inspectable = false,
-        xautolimits = false,
-        yautolimits = false,
     )
     decorations[:ygridplot] = lines!(
         scene, ygridpoints;
@@ -319,17 +302,10 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         color = ax.ygridcolor,
         linestyle = ax.ygridstyle,
         width = ax.ygridwidth,
-        inspectable = false,
-        xautolimits = false,
-        yautolimits = false,
     )
 
 
     # And finally, the TikZ!
-
-    # ax_scenearea = Makie.MakieLayout.sceneareanode!(ax.layoutobservables.computedbbox, ax.finallimits, ax.aspect)
-    # # # This is specifically a Scene for the text!
-    # textscene = Scene(ax.blockscene, px_area=ax_scenearea)
 
     textscene = ax.blockscene
 
@@ -344,10 +320,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         font = ax.xticklabelfont,
         textsize = ax.xticklabelsize,
         color = ax.xticklabelcolor,
-        align = (:center, :top),
-        inspectable = false,
-        xautolimits = false,
-        yautolimits = false,
+        align = (:center, :center),
     )
 
     decorations[:ytickplot] = text!(
@@ -360,10 +333,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         font = ax.yticklabelfont,
         textsize = ax.yticklabelsize,
         color = ax.yticklabelcolor,
-        align = (:right, :center),
-        inspectable = false,
-        xautolimits = false,
-        yautolimits = false,
+        align = (:center, :center),
     )
 
     # For diagnostics only!
@@ -372,6 +342,11 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
 
     # Finally, we translate these plots such that they are above the content.
     translate!.(values(decorations), 0, 0, 100)
+
+    # Set common attributes for all plots
+    setproperty!.(values(decorations), Ref(:inspectable), Ref(false))
+    setproperty!.(values(decorations), Ref(:xautolimits), Ref(false))
+    setproperty!.(values(decorations), Ref(:yautolimits), Ref(false))
 
     return decorations
 end
