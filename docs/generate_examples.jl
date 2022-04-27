@@ -15,7 +15,7 @@ example_title_pairs = [
 
 io = open(joinpath("docs", "src", "examples.md"), "w")
 
-assetpath = mkpath(joinpath("docs", "assets"))
+assetpath = mkpath(joinpath("docs", "src", "assets"))
 
 for ext in example_title_pairs
 
@@ -34,7 +34,7 @@ for ext in example_title_pairs
     println(io, readchomp(filepath))
     println(io, "```\n")
     println(io, "```@raw html")
-    println(io, "<img src=\"$(joinpath(assetpath, splitext(example)[1]*".png"))\" alt=\"$title\"></img>") # data:image/png;base64,$(base64data)\
+    println(io, "<img src=\"$(joinpath(".", "assets", splitext(example)[1]*".png"))\" alt=\"$title\"></img>") # data:image/png;base64,$(base64data)\
     println(io, "```\n")
 
 end
