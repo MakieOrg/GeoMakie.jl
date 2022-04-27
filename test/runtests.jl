@@ -16,7 +16,6 @@ end
     geomakie_path = dirname(dirname(pathof(GeoMakie)))
     examples = readdir(joinpath(geomakie_path, "examples"); join = true)
     filenames = filter(isfile, examples)
-    filter!(x -> any(endswith.(Ref(x), ["osmmakie.jl"])), filenames)
 
     test_path = mkpath(joinpath(geomakie_path, "test_images"))
     cd(test_path) do
