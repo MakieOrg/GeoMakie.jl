@@ -1,5 +1,7 @@
 using LightOSM, OSMMakie
-using GeoMakie, GLMakie
+using GeoMakie, CairoMakie
+# This works with GLMakie as well,
+# if you want interactivity!
 
 
 # load as OSMGraph
