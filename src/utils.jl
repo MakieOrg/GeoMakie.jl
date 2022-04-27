@@ -58,7 +58,10 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
 end
 
 function Makie.inverse_transform(trans::Proj.Transformation)
-    return Base.inv(trans)
+    itrans = Base.inv(trans)
+    return Makie.PointTrans{2}() do p
+        return Makie.apply_transform(itrans, p) .* 100_000
+    end
 end
 
 Base.isfinite(p::Point2f) = isfinite(p[1]) && isfinite(p[2])
@@ -68,18 +71,21 @@ function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 
     lons = Float32.(LinRange(lonrange..., 360 * 2))
     lats = Float32.(LinRange(latrange..., 180 * 2))
     # avoid PROJ wrapping 180 to -180
-    lons[1]   = nextfloat(lons[1])
-    lons[end] = prevfloat(lons[end])
-    lats[1]   = nextfloat(lats[1])
-    lats[end] = prevfloat(lats[end])
+    lons[1]   = nextfloat(lons[1])   |> nextfloat
+    lons[end] = prevfloat(lons[end]) |> prevfloat
+    lats[1]   = nextfloat(lats[1])   |> nextfloat
+    lats[end] = prevfloat(lats[end]) |> prevfloat
 
     points = Point2f.(lons, lats')
     tpoints = ptrans.(points)
-    itpoints = Makie.apply_transform((Makie.inverse_transform(ptrans)), tpoints)
+    itpoints = Makie.apply_transform(Makie.inverse_transform(ptrans), tpoints)
 
     finite_inds = findall(isfinite, itpoints)
 
+    # debug && display(Makie.heatmap(..(lonrange...), ..(latrange...), isfinite.(itpoints); colorrange = (0,1)))
+
     min, max = getindex.(Ref(itpoints), finite_inds[[begin, end]])
+
 
     return (min[1], max[1], min[2], max[2])
 end
