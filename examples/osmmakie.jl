@@ -3,6 +3,14 @@ using GeoMakie, CairoMakie
 # This works with GLMakie as well,
 # if you want interactivity!
 
+download_osm_network(:bbox; # rectangular area
+    minlat = 51.5015, # bottom left corner
+    minlon = -0.0921,
+    maxlat = 51.5154, # top right corner
+    maxlon = -0.0662,
+    network_type = :drive, # download motorways
+    save_to_file_location = "london_drive.json"
+);
 
 # load as OSMGraph
 osm = graph_from_file("london_drive.json";
