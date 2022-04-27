@@ -79,7 +79,7 @@ function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 
 
     finite_inds = findall(isfinite, itpoints)
 
-    min, max = getindex.(Ref(itpoints), finite_inds[[1, end]])
+    min, max = getindex.(Ref(itpoints), finite_inds[[begin, end]])
 
     return (min[1], max[1], min[2], max[2])
 end
@@ -182,6 +182,9 @@ function text_bbox(textstring::AbstractString, textsize::Union{AbstractVector, N
     return Rect2f(Makie.boundingbox(glyph_collection, Point3f(0), Makie.to_rotation(rotation)))
 end
 
+function find_outvec(scene, tickcoord_in_inputspace, tickcoord_in_dataspace, Δs)
+end
+
 # Direction finder - find how to displace the tick so that it is out of the axis
 function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::AbstractString, tickpad, ticksize, tickfont, tickrotation; ds = 0.01)
     # Define shorthand functions for dev purposes - these can be removed before release
@@ -261,7 +264,18 @@ end
 function remove_overlapping_ticks!(scene, xpositions, xlabels, xvisible, ypositions, ylabels, yvisible, fontsize)
 
     nx = length(xpositions); ny = length(ypositions)
+
+    !xvisible && !yvisible && return
+
     combined_positions = vcat(xpositions, ypositions)
+
+    if !xvisible
+        nx = 0
+        combined_positions = ypositions
+    elseif !yvisible
+        ny = 0
+        combined_positions = xpositions
+    end
 
     # compute distances between all positions
     # we cannot optimize this, because of literal edge cases

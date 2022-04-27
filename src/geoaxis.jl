@@ -84,7 +84,10 @@ function GeoAxis(args...;
     # Automatically determine limits!
     # TODO: should we automatically verify limits
     # or not?
-    axmin, axmax, aymin, aymax = find_transform_limits(_transformation[])
+
+    if lonlims == Makie.automatic || latlims == Makie.automatic
+        axmin, axmax, aymin, aymax = find_transform_limits(_transformation[])
+    end
 
     verified_lonlims = lonlims
     if lonlims == Makie.automatic
@@ -184,25 +187,34 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         _xtickpos_in_inputspace = Point2f.(_xtickvalues, ylimits[][1])
         _ytickpos_in_inputspace = Point2f.(xlimits[][1], _ytickvalues)
 
-        # Find the necessary padding for each tick
-        xticklabelpad = directional_pad.(
-            Ref(scene), Ref(limits), _xtickpos_in_inputspace,
-            _xticklabels, Ref(Point2f(0, ax.xticklabelpad[])), ax.xticklabelsize[], ax.xticklabelfont[],
-            ax.xticklabelrotation[]
-        )
-        yticklabelpad = directional_pad.(
-            Ref(scene), Ref(limits), _ytickpos_in_inputspace,
-            _yticklabels, Ref(Point2f(ax.yticklabelpad[], 0)), ax.yticklabelsize[], ax.yticklabelfont[],
-            ax.yticklabelrotation[]
-        )
-
         # update but do not notify
         xtickpoints.val = project_to_pixelspace(scene, _xtickpos_in_inputspace) .+
-                            Ref(Point2f(pxarea.origin)) .+ xticklabelpad
-
+                            Ref(Point2f(pxarea.origin))
 
         ytickpoints.val = project_to_pixelspace(scene, _ytickpos_in_inputspace) .+
-                            Ref(Point2f(pxarea.origin)) .+ yticklabelpad
+                            Ref(Point2f(pxarea.origin))
+
+
+        if are_ticks_colocated(scene, xtickpoints.val, _xticklabels, ax.xticklabelsize[])
+            ax.xticklabelsvisible[] = false
+        else
+            xtickpoints.val = xtickpoints.val .+ directional_pad.(
+                Ref(scene), Ref(limits), _xtickpos_in_inputspace,
+                _xticklabels, Ref(Point2f(ax.xticklabelpad[], 0)), ax.xticklabelsize[], ax.xticklabelfont[],
+                ax.xticklabelrotation[]
+            )
+        end
+
+
+        if are_ticks_colocated(scene, ytickpoints.val, _yticklabels, ax.yticklabelsize[])
+            ax.yticklabelsvisible[] = false
+        else
+            ytickpoints.val = ytickpoints.val .+ directional_pad.(
+                Ref(scene), Ref(limits), _ytickpos_in_inputspace,
+                _yticklabels, Ref(Point2f(ax.yticklabelpad[], 0)), ax.yticklabelsize[], ax.yticklabelfont[],
+                ax.yticklabelrotation[]
+            )
+        end
 
         # check for overlapping ticks and remove them (literally deleteat!(...))
         remove_overlapping_ticks && remove_overlapping_ticks!(
