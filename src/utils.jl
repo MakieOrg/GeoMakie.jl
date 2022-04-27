@@ -57,7 +57,9 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     return Rect(Vec2(umin, vmin), Vec2(umax-umin, vmax-vmin))
 end
 
-Makie.inverse_transform(p::Proj.Transformation) = Base.inv(p)
+function Makie.inverse_transform(trans::Proj.Transformation)
+    return Base.inv(trans)
+end
 
 Base.isfinite(p::Point2f) = isfinite(p[1]) && isfinite(p[2])
 
@@ -73,7 +75,7 @@ function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 
 
     points = Point2f.(lons, lats')
     tpoints = ptrans.(points)
-    itpoints = inv(ptrans).(tpoints)
+    itpoints = Makie.apply_transform((Makie.inverse_transform(ptrans)), tpoints)
 
     finite_inds = findall(isfinite, itpoints)
 
