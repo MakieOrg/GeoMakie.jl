@@ -174,7 +174,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
     ylimits = Observable((0.0f0, 0.0f0))
     # First we establish the spine points
 
-    lift(ax.finallimits, ax.xticks, ax.xtickformat, ax.yticks, ax.ytickformat, ax.scene.px_area, getproperty(ax.scene, :transformation).transform_func) do limits, xticks, xtickformat, yticks, ytickformat, pxarea, _tfunc
+    lift(ax.finallimits, ax.xticks, ax.xtickformat, ax.yticks, ax.ytickformat, ax.scene.px_area, getproperty(ax.scene, :transformation).transform_func, ax.spinewidth, ax.xgridwidth, ax.ygridwidth) do limits, xticks, xtickformat, yticks, ytickformat, pxarea, _tfunc, spinewidth, xgridwidth, ygridwidth
 
         lmin = minimum(limits)
         lmax = maximum(limits)
