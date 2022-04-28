@@ -233,9 +233,10 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         )
 
         # notify this
-        xticklabels[] = _xticklabels
-        yticklabels[] = _yticklabels
+        xticklabels.val = _xticklabels
+        yticklabels.val = _yticklabels
 
+        Makie.Observables.notify(xticklabels); Makie.Observables.notify(yticklabels)
         Makie.Observables.notify(xtickpoints); Makie.Observables.notify(ytickpoints)
 
         xrange = LinRange(xlimits[]..., line_density)
@@ -278,7 +279,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
             current_ind += line_density + 1
         end
         # now y
-        _yminorgridpoints = fill(Point2f(NaN), (line_density+1) * length(_ytickvalues))
+        _yminorgridpoints = fill(Point2f(NaN), (line_density+1) * length(_yminortickvalues))
 
         current_ind = 1
         for y in _yminortickvalues
