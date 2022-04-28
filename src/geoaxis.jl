@@ -5,7 +5,7 @@ using Makie.MakieLayout: height, width
     GeoAxis(fig_or_scene; kwargs...) → ax::Axis
 
 Create a modified `Axis` of the Makie.jl ecosystem.
-All Makie.jl plotting functions work directly on `GeoAxis`, e.g., `scatter!(ax, x, y)`.
+All Makie.jl plotting functions work directly on `GeoAxis`, e.g., `scatter!(ax, x, y)`.  You can pass any keyword which `Axis` accepts, and manipulate it just like a regular `Axis`.
 
 This is because it _is_ a regular `Axis` - along with the functions like `xlims!` and
 attributes like `ax.xticks`, et cetera.
@@ -67,8 +67,9 @@ function GeoAxis(args...;
         yticks = LinearTicks(7),
         xticklabelpad = 5.0,
         yticklabelpad = 5.0,
-        xticklabelalign = (:center, :center),
-        yticklabelalign = (:center, :center),
+        # xticklabelalign = (:center, :center),
+        # yticklabelalign = (:center, :center),
+        alignmode = Outside(),
         kw...
     )
 
@@ -106,6 +107,11 @@ function GeoAxis(args...;
         xticks = xticks,
         yticks = yticks,
         limits = (verified_lonlims, verified_latlims),
+        xticklabelpad = xticklabelpad,
+        yticklabelpad = yticklabelpad,
+        # xticklabelalign = xticklabelalign, # these do not work with Axis because it wants a float
+        # yticklabelalign = yticklabelalign, # these do not work with Axis because it wants a float
+        alignmode = alignmode,
         kw...)
 
 
@@ -177,6 +183,12 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
 
     xlimits = Observable((0.0f0, 0.0f0))
     ylimits = Observable((0.0f0, 0.0f0))
+
+    # Extract x and y ticklabel plots from the axis, to avoid duplication
+
+    decorations[:xticklabel] = ax_xticklabel_plot = ax.blockscene.plots[10]
+    decorations[:yticklabel] = ax_yticklabel_plot = ax.blockscene.plots[15]
+
     # First we establish the spine points
 
     lift(ax.finallimits, ax.xticks, ax.xtickformat, ax.yticks, ax.ytickformat, ax.xminorticks, ax.yminorticks, ax.scene.px_area, getproperty(ax.scene, :transformation).transform_func, ax.spinewidth, ax.xgridwidth, ax.ygridwidth) do limits, xticks, xtickformat, yticks, ytickformat, xminor, yminor, pxarea, _tfunc, spinewidth, xgridwidth, ygridwidth
@@ -290,6 +302,9 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         xminorgridpoints[] = _xminorgridpoints
         yminorgridpoints[] = _yminorgridpoints
 
+        ax_xticklabel_plot.align = (:center, :center)
+        ax_yticklabel_plot.align = (:center, :center)
+
         return 1
         # Now, we've updated the entire axis.
     end
@@ -397,8 +412,8 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
 
     # Currently, I hijack the axis text for this.  However, I don't know what it would do
     # to interaction times, hence why I have left the old code commented out above.
-    Makie.Observables.connect!(ax.blockscene.plots[end-3][1], Makie.@lift tuple.($yticklabels, $ytickpoints))
-    Makie.Observables.connect!(ax.blockscene.plots[end-8][1], Makie.@lift tuple.($xticklabels, $xtickpoints))
+    Makie.Observables.connect!(ax_xticklabel_plot[1], Makie.@lift tuple.($xticklabels, $xtickpoints))
+    Makie.Observables.connect!(ax_yticklabel_plot[1], Makie.@lift tuple.($yticklabels, $ytickpoints))
 
     # For diagnostics only!
     # scatter!(textscene, xtickpoints; visible = hijacked_observables[:xticklabelsvisible], color = :red, bordercolor=:black)
