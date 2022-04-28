@@ -129,6 +129,8 @@ function GeoAxis(args...;
     ## This macro is defined in `utils.jl`
     @hijack_observable :xgridvisible
     @hijack_observable :ygridvisible
+    @hijack_observable :xminorgridvisible
+    @hijack_observable :yminorgridvisible
     @hijack_observable :xticksvisible
     @hijack_observable :yticksvisible
     # @hijack_observable :xticklabelsvisible
@@ -159,6 +161,9 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
     xgridpoints = Observable(Point2f[])
     ygridpoints = Observable(Point2f[])
 
+    xminorgridpoints = Observable(Point2f[])
+    yminorgridpoints = Observable(Point2f[])
+
     xtickpoints = Observable(Point2f[])
     ytickpoints = Observable(Point2f[])
 
@@ -174,7 +179,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
     ylimits = Observable((0.0f0, 0.0f0))
     # First we establish the spine points
 
-    lift(ax.finallimits, ax.xticks, ax.xtickformat, ax.yticks, ax.ytickformat, ax.scene.px_area, getproperty(ax.scene, :transformation).transform_func, ax.spinewidth, ax.xgridwidth, ax.ygridwidth) do limits, xticks, xtickformat, yticks, ytickformat, pxarea, _tfunc, spinewidth, xgridwidth, ygridwidth
+    lift(ax.finallimits, ax.xticks, ax.xtickformat, ax.yticks, ax.ytickformat, ax.xminorticks, ax.yminorticks, ax.scene.px_area, getproperty(ax.scene, :transformation).transform_func, ax.spinewidth, ax.xgridwidth, ax.ygridwidth) do limits, xticks, xtickformat, yticks, ytickformat, xminor, yminor, pxarea, _tfunc, spinewidth, xgridwidth, ygridwidth
 
         lmin = minimum(limits)
         lmax = maximum(limits)
@@ -183,6 +188,9 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
 
         _xtickvalues, _xticklabels = Makie.MakieLayout.get_ticks(xticks, identity, xtickformat, xlimits[]...)
         _ytickvalues, _yticklabels = Makie.MakieLayout.get_ticks(yticks, identity, ytickformat, ylimits[]...)
+
+        _xminortickvalues = Makie.MakieLayout.get_minor_tickvalues(xminor, identity, _xtickvalues, xlimits[]...)
+        _yminortickvalues = Makie.MakieLayout.get_minor_tickvalues(yminor, identity, _ytickvalues, ylimits[]...)
 
         _xtickpos_in_inputspace = Point2f.(_xtickvalues, ylimits[][1])
         _ytickpos_in_inputspace = Point2f.(xlimits[][1], _ytickvalues)
@@ -261,6 +269,26 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         xgridpoints[] = _xgridpoints
         ygridpoints[] = _ygridpoints
 
+        # Do the same for minor ticks
+        _xminorgridpoints = fill(Point2f(NaN), (line_density+1) * length(_xminortickvalues))
+
+        current_ind = 1
+        for x in _xminortickvalues
+            _xminorgridpoints[current_ind:(current_ind+line_density-1)] = Point2f.(x, yrange)
+            current_ind += line_density + 1
+        end
+        # now y
+        _yminorgridpoints = fill(Point2f(NaN), (line_density+1) * length(_ytickvalues))
+
+        current_ind = 1
+        for y in _yminortickvalues
+            _yminorgridpoints[current_ind:(current_ind+line_density-1)] = Point2f.(xrange, y)
+            current_ind += line_density + 1
+        end
+
+        xminorgridpoints[] = _xminorgridpoints
+        yminorgridpoints[] = _yminorgridpoints
+
         return 1
         # Now, we've updated the entire axis.
     end
@@ -316,6 +344,22 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         color = ax.ygridcolor,
         linestyle = ax.ygridstyle,
         width = ax.ygridwidth,
+    )
+
+    decorations[:xminorgridplot] = lines!(
+        scene, xminorgridpoints;
+        visible = hijacked_observables[:xminorgridvisible],
+        color = ax.xminorgridcolor,
+        linestyle = ax.xminorgridstyle,
+        width = ax.xminorgridwidth,
+    )
+
+    decorations[:yminorgridplot] = lines!(
+        scene, yminorgridpoints;
+        visible = hijacked_observables[:yminorgridvisible],
+        color = ax.yminorgridcolor,
+        linestyle = ax.yminorgridstyle,
+        width = ax.yminorgridwidth,
     )
 
 
