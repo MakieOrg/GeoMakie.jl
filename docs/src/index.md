@@ -125,4 +125,7 @@ fig
 
 With **CairoMakie**, we recommend that you use `image!(ga, ...)` or `heatmap!(ga, ...)` to plot images or scalar fields into `ga::GeoAxis`.
 
-However, with **GLMakie**, which is much faster, these methods do not work.  If you want to plot an image `img`, you can use a surface in the following way: `surface!(ga, lonmin..lonmax, latmin..latmax, ones(size(img)...); color = img, shading = false)`.  To plot a scalar field, simply use `surface!(ga, lonmin..lonmax, latmin..latmax, field)`.  The `..` notation denotes an interval which Makie will automatically sample from to obtain the x and y points for the surface.
+However, with **GLMakie**, which is much faster, these methods do not work; if you have used them, you will see an empty axis.  If you want to plot an image `img`, you can use a surface in the following way:
+`surface!(ga, lonmin..lonmax, latmin..latmax, ones(size(img)...); color = img, shading = false)`.
+
+To plot a scalar field, simply use `surface!(ga, lonmin..lonmax, latmin..latmax, field)`.  The `..` notation denotes an interval which Makie will automatically sample from to obtain the x and y points for the surface.
