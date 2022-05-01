@@ -143,6 +143,31 @@ function geoformat_ticklabels(nums)
     return labels
 end
 
+function longitude_format(nums)
+    labels = fill("", length(nums))
+    for i in 1:length(nums)
+        east_or_west = nums[i] < 0 ? 'E' : 'W'
+        labels[i] = if round(nums[i]) == nums[i]
+            string(Int(abs(nums[i])), "ᵒ $east_or_west")
+        else
+            string(abs(nums[i]), "ᵒ $east_or_west")
+        end
+    end
+    return labels
+end
+
+function latitude_format(nums)
+    labels = fill("", length(nums))
+    for i in 1:length(nums)
+        north_or_south = nums[i] < 0 ? 'S' : 'N'
+        labels[i] = if round(nums[i]) == nums[i]
+            string(Int(abs(nums[i])), "ᵒ $north_or_south")
+        else
+            string(abs(nums[i]), "ᵒ $north_or_south")
+        end
+    end
+    return labels
+end
 
 # Project any point to coordinates in pixel space
 function project_to_pixelspace(scene, point::Point{N, T}) where {N, T}
