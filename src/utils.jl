@@ -65,6 +65,7 @@ function Makie.inverse_transform(trans::Proj.Transformation)
 end
 
 Base.isfinite(p::Point2f) = isfinite(p[1]) && isfinite(p[2])
+Base.isfinite(p::Vec2f) = isfinite(p[1]) && isfinite(p[2])
 
 function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 90))
     # Search for a good bound with decent accuracy
@@ -366,16 +367,12 @@ macro hijack_observable(name)
     return esc(quote
         getproperty(ax, $name)[] = $(false)
         hijacked_observables[$name] = Observable($(true))
-        __listener = on(getproperty(ax, $name)) do hijacked_obs_value
+        __listener = on(getproperty(ax, $name); update = true, priority = typemax(Int)) do hijacked_obs_value
             hijacked_observables[$name][] = hijacked_obs_value
             getproperty(ax, $name).val = $(false)
         end
-        # give our listener absolute priority; that means that
-        # our function will be executed first.  Even though the
-        # axis will _receive_ the signal, when it _reads_ the
-        # Observable's value, it will see only `false`.
-        pop!(getproperty(ax, $name).listeners)
-        pushfirst!(getproperty(ax, $name).listeners, __listener.f)
+        getproperty(ax, $name)[] = $(false)
+        hijacked_observables[$name][] = $(true)
 
     end)
 
