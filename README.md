@@ -11,6 +11,13 @@ This package is **in development**, and may break often.  You can install it fro
 ]add GeoMakie
 ```
 
+To check the version, run:
+```julia
+julia> ]
+pkg> status GeoMakie
+```
+To use, simply type `using GeoMakie` into the REPL.  You will also have to include the backend of your choice - we sugggest `using GLMakie` for interactive use and `using CairoMakie` for PDF or SVG output.
+
 ## Quick start
 
 The main entry point to GeoMakie is the function `GeoAxis(fig[i, j]; kw_args...)`.  It creates an axis which accepts nonlinear projections, but is otherwise identical in usage to Makie's `Axis`.
