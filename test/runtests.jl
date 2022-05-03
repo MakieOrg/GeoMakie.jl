@@ -1,5 +1,11 @@
 using GeoMakie, CairoMakie, Test
 
+Makie.set_theme!(Theme(
+    Heatmap = (rasterize = 5,),
+    Image   = (rasterize = 5,),
+    Surface = (rasterize = 5,),
+))
+
 @testset "Basics" begin
     lons = -180:180
     lats = -90:90
@@ -16,26 +22,32 @@ end
     geomakie_path = dirname(dirname(pathof(GeoMakie)))
     examples = readdir(joinpath(geomakie_path, "examples"); join = true)
     filenames = filter(isfile, examples)
+    filter!(endswith(".jl"), filenames)
 
     test_path = mkpath(joinpath(geomakie_path, "test_images"))
     cd(test_path) do
         for filename in filenames
             example_name = splitext(splitdir(filename)[2])[1]
+            printstyled("Running ", bold = true, color = :cyan)
+            println(example_name)
 
             @testset "$example_name" begin
                 @test begin
-                    include(filename)
+                    print(rpad("Include: ", 9))
+                    @time include(filename)
                     true
                 end
                 @test begin
                     savepath = "$example_name.png"
-                    CairoMakie.save(savepath, Makie.current_figure(); px_per_unit=2);
+                    print(rpad("PNG: ", 9))
+                    @time CairoMakie.save(savepath, Makie.current_figure(); px_per_unit=2);
                     isfile(savepath) && filesize(savepath) > 1000
 
                 end
                 @test begin
                     savepath = "$example_name.pdf"
-                    CairoMakie.save(savepath, Makie.current_figure());
+                    print(rpad("PDF: ", 9))
+                    @time CairoMakie.save(savepath, Makie.current_figure());
                     isfile(savepath) && filesize(savepath) > 1000
                 end
                 haskey(ENV, "CI") && rm("$example_name.pdf")

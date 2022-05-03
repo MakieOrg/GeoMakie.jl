@@ -12,7 +12,7 @@ fig = Figure()
 ax = GeoAxis(fig[1,1])
 surface!(ax, lons, lats, field; shading = false)
 # save("surf_example.png", fig; px_per_unit=2)
-display(fig)
+# display(fig)
 
 # Scatter example
 slons = rand(lons, 2000)
@@ -23,7 +23,7 @@ fig = Figure()
 ax = GeoAxis(fig[1,1])
 scatter!(slons, slats; color = sfield)
 # save("scatter_example.png", fig; px_per_unit=2)
-display(fig)
+# display(fig)
 
 # Poly example - not working yet!
 #
