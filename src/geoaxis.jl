@@ -5,21 +5,23 @@ using Makie.MakieLayout: height, width
     GeoAxis(fig_or_scene; kwargs...) → ax::Axis
 
 Create a modified `Axis` of the Makie.jl ecosystem.
-All Makie.jl plotting functions work directly on `GeoAxis`, e.g., `scatter!(ax, x, y)`.  You can pass any keyword which `Axis` accepts, and manipulate it just like a regular `Axis`.
+All Makie.jl plotting functions work directly on `GeoAxis`, e.g., `scatter!(ax, x, y)`.
+You can pass any keyword which `Axis` accepts, and manipulate it just like a
+regular `Axis`.
 
-This is because it _is_ a regular `Axis` - along with the functions like `xlims!` and
-attributes like `ax.xticks`, et cetera.
+This is because it _is_ a regular `Axis`, using the interface you are already
+familiar with, functions like `xlims!` and attributes like `ax.xticks`, etc. just work.
 
-`GeoAxis` is appropriate for geospatial plotting because it automatically transforms all
-plotted data given a user-defined map projection. See keyword arguments below and examples
-in the online documentation. Longitude and latitude values in GeoMakie.jl are always
-assumed to be **in degrees**.
+`GeoAxis` is appropriate for geospatial plotting because it automatically transforms
+all plotted data, given a user-defined map projection. See keyword arguments below
+and examples in the online documentation. Longitude and latitude values in GeoMakie.jl
+are always assumed to be **in degrees**.
 
 In order to automatically adjust the limits to your data, you can call `datalims!(ax)`
-on any `GeoAxis`.  Note that if your data is not adjusted to the WGS84 datum
+on any `GeoAxis`.
 
-In the call signature, `fig_or_scene` can be a standard figure location, e.g., `fig[1,1]` as given in
-`Axis`. The keyword arguments decide the geospatial projection.
+In the call signature, `fig_or_scene` can be a standard figure location, e.g.,
+`fig[1,1]` as given in `Axis`. The keyword arguments decide the geospatial projection.
 
 ## Keyword arguments
 
@@ -35,9 +37,10 @@ In the call signature, `fig_or_scene` can be a standard figure location, e.g., `
   determination, pass `latlims=automatic`.
 * `coastlines = false`: Draw the coastlines of the world, from the Natural Earth dataset.
 * `coastline_attributes = (;)`: Attributes that get passed to the `lines` call drawing the coastline.
-* `line_density = 1000`: The number of points sampled per grid line.  Do not set this higher than 10,000.
-* `remove_overlapping_ticks = true`: Remove ticks which could overlap each other.  Y-axis ticks take priority
-  over x-axis ticks.
+* `line_density = 1000`: The number of points sampled per grid line.  Do not set
+  this higher than 10,000 for performance and file size reasons..
+* `remove_overlapping_ticks = true`: Remove ticks which could overlap each other.
+  X-axis (longitude) ticks take priority over Y-axis (latitude) ticks.
 
 ## Example
 
