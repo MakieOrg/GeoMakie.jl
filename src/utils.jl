@@ -156,7 +156,13 @@ end
 function longitude_format(nums)
     labels = fill("", length(nums))
     for i in 1:length(nums)
-        east_or_west = nums[i] < 0 ? 'E' : 'W'
+        east_or_west = if nums[i] < 0
+            'E'
+        elseif nums[i] > 0
+            'W'
+        else
+            ''
+        end
         labels[i] = if round(nums[i]) == nums[i]
             string(Int(abs(nums[i])), "ᵒ $east_or_west")
         else
@@ -169,7 +175,13 @@ end
 function latitude_format(nums)
     labels = fill("", length(nums))
     for i in 1:length(nums)
-        north_or_south = nums[i] < 0 ? 'S' : 'N'
+        north_or_south = if nums[i] < 0
+            'S'
+        elseif nums[i] > 0
+            'N'
+        else
+            ''
+        end
         labels[i] = if round(nums[i]) == nums[i]
             string(Int(abs(nums[i])), "ᵒ $north_or_south")
         else
