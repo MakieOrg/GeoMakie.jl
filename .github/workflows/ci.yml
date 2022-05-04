@@ -73,7 +73,7 @@ jobs:
             julia --project=@. -e 'using Pkg;pkg"add Makie#master MakieCore#master CairoMakie#master GLMakie#master"'
       - name: Install dependencies
         run: |
-            julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); pkg"add Makie#master MakieCore#master CairoMakie#master"; Pkg.instantiate()'
+            julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); pkg"add Makie#master MakieCore#master CairoMakie#master GLMakie#master"; Pkg.instantiate()'
             julia --project=docs/ -e 'using CairoMakie'
       - name: Build and deploy
         env:
