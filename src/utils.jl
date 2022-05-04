@@ -161,7 +161,7 @@ function longitude_format(nums)
         elseif nums[i] > 0
             'W'
         else
-            ''
+            ' '
         end
         labels[i] = if round(nums[i]) == nums[i]
             string(Int(abs(nums[i])), "ᵒ $east_or_west")
@@ -180,7 +180,7 @@ function latitude_format(nums)
         elseif nums[i] > 0
             'N'
         else
-            ''
+            ' '
         end
         labels[i] = if round(nums[i]) == nums[i]
             string(Int(abs(nums[i])), "ᵒ $north_or_south")
