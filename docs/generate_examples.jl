@@ -4,7 +4,6 @@ using Base64
 example_title_pairs = [
     "Contourf" => "contourf.jl",
     "Axis configuration" => "axis_config.jl",
-    "Black Marble" => "blackmarble.jl",
     "Italy's states" => "italy.jl",
     "Projections" => "projections.jl",
     "Orthographic projection" => "orthographic.jl",
