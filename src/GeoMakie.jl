@@ -1,18 +1,22 @@
 module GeoMakie
 
-using Reexport
-using GeometryBasics, Colors, Makie.MakieLayout, Makie, ImageIO
-using GeoJSON
+using Statistics, LinearAlgebra
 
-using Makie.FileIO
+using Reexport
+
+using GeometryBasics, Colors, ImageIO
+
+using Makie
+
+import Makie: convert_arguments, convert_attribute, to_value, automatic
+using Makie.MakieLayout, Makie.FileIO, Makie.MakieLayout.GridLayoutBase, Makie.DocStringExtensions
 using Makie.MakieLayout: Formatting
-using Makie.MakieLayout.GridLayoutBase
 using Makie.MakieLayout.GridLayoutBase: Side
+
+using GeoJSON
 using GeoInterface: GeoInterface, coordinates, AbstractPolygon, AbstractMultiPolygon, features, geometry
 export GeoInterface
 
-import Makie: convert_arguments, convert_attribute, to_value, automatic
-using Makie.DocStringExtensions
 
 # fix conflicts
 const AbstractGeometry = GeometryBasics.AbstractGeometry
@@ -27,6 +31,9 @@ const Proj = Proj4
 
 # Quick fix for Makie
 Makie.to_colormap(::Nothing) = nothing
+
+# Resolve import conflicts
+import Makie: rotate! # use LinearAlgebra.rotate! otherwise
 
 include("conversions.jl")
 include("data.jl")
