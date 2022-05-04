@@ -1,9 +1,18 @@
-using Statistics, LinearAlgebra
 ############################################################
 #                                                          #
 #         Proj.Transform as a Makie transformation         #
 #                                                          #
 ############################################################
+
+function (transformation::Proj.Transformation)(coord::Point{N, T}) where {N, T <: Real}
+    @assert 2 ≤ N ≤ 4
+    return Point{N, T}(transformation(coord.data))
+end
+
+function (transformation::Proj.Transformation)(coord::Vec{N, T}) where {N, T <: Real}
+    @assert 2 ≤ N ≤ 4
+    return Vec{N, T}(transformation(coord.data))
+end
 
 # This function is a little gnarly.
 # In Makie, we use NaN as a blank point, i.e. any line
@@ -226,7 +235,7 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
     tickcoord_in_dataspace = tfunc(tickcoord_in_inputspace)
     # determine direction to go in order to stay inbounds.
     xdir = tickcoord_in_inputspace[1] < 0 ? +1 : -1
-    ydir = tickcoord_in_inputspace[2] > 0 ? +1 : -1
+    ydir = tickcoord_in_inputspace[2] < 0 ? +1 : -1
     Δs = Vec2f(xdir, ydir) .* tickpad ./ sum(tickpad) * ds
     # find the x and y directions
     # multiply by the sign in order to have them going outwards at any point
