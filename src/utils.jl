@@ -179,6 +179,16 @@ function latitude_format(nums)
     return labels
 end
 
+function _replace_if_automatic(typ::Type{T}, attribute::Symbol, auto) where T
+    default_attr_vals = Makie.MakieLayout.default_attribute_values(T, nothing)
+
+    if to_value(get(default_attr_vals, attribute, automatic)) == automatic
+        return auto
+    else
+        return to_value(default_attr_vals[attribute])
+    end
+end
+
 # Project any point to coordinates in pixel space
 function project_to_pixelspace(scene, point::Point{N, T}) where {N, T}
     @assert N ≤ 3

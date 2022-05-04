@@ -61,8 +61,8 @@ function GeoAxis(args...;
         line_density = 1_000,
         remove_overlapping_ticks = true,
         # these are the axis keywords which we will merge in
-        xtickformat = longitude_format,
-        ytickformat = latitude_format,
+        xtickformat = _replace_if_automatic(Axis, :xtickformat, longitude_format),
+        ytickformat = _replace_if_automatic(Axis, :ytickformat, latitude_format),
         xticks = LinearTicks(7),
         yticks = LinearTicks(7),
         xticklabelpad = 5.0,
