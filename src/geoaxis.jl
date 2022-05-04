@@ -73,7 +73,6 @@ function GeoAxis(args...;
         kw...
     )
 
-
     _transformation = Observable{Proj.Transformation}(Makie.to_value(transformation))
      Makie.Observables.onany(source, dest) do src, dst
         _transformation[] = Proj.Transformation(Makie.to_value(src), Makie.to_value(dest); always_xy = true)
@@ -181,6 +180,8 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
     lftspinepoints = Observable(Point2f[])
     rgtspinepoints = Observable(Point2f[])
 
+    clippoints = Observable(Point2f[])
+
     xlimits = Observable((0.0f0, 0.0f0))
     ylimits = Observable((0.0f0, 0.0f0))
 
@@ -260,6 +261,13 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         lftspinepoints[] = Point2f.(xlimits[][1], yrange)
         rgtspinepoints[] = Point2f.(xlimits[][2], yrange)
 
+        clippoints[] = vcat(
+            btmspinepoints[],
+            rgtspinepoints[],
+            reverse(topspinepoints[]),
+            reverse(lftspinepoints[])
+        )
+
         # now, the grid.  Each visible "gridline" is separated from the next
         # by a `Point2f(NaN)`.  The approach here allows us to avoid appending.
         # x first
@@ -313,8 +321,14 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
 
     # Time to plot!
 
-    # First, we plot the spines:
 
+    # First, we clip our scene:
+    # decorations[:clip] = clip!(scene, clippoints)
+    # translate!(decorations[:clip], 0, 0, -9999)
+    # This makes the clip plot the first in the list of plots
+    # insert!(scene.plots, 1, pop!(scene.plots))
+
+    # Now we plot the spines:
     decorations[:topspineplot] = lines!(
         scene, topspinepoints;
         visible = hijacked_observables[:topspinevisible],
