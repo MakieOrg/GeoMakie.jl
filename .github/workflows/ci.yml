@@ -36,7 +36,7 @@ jobs:
           arch: ${{ matrix.arch }}
       - name: Install custom deps
         run: |
-            julia --project=@. -e 'using Pkg;pkg"add Makie#master CairoMakie#master GLMakie#master MakieCore#master GraphMakie#master Graphs ImageMagick"'
+            julia --project=@. -e 'using Pkg;pkg"add Makie#master CairoMakie#master GLMakie#master MakieCore#master ImageMagick"'
       - uses: actions/cache@v1
         env:
           cache-name: cache-artifacts
