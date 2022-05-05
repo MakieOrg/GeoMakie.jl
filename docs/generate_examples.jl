@@ -23,6 +23,8 @@ for ext in example_title_pairs
 
     filepath = joinpath("examples", example)
 
+    !isfile(filepath) && continue
+
     test_image_dir = "test_images"
     base64data = Base64.base64encode(read(joinpath(test_image_dir, splitext(example)[1] * ".png")))
     cp(joinpath(test_image_dir, splitext(example)[1] * ".png"), joinpath(assetpath, splitext(example)[1]*".png"))

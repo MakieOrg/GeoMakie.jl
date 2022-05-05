@@ -254,6 +254,9 @@ end
 function find_outvec(scene, tickcoord_in_inputspace, tickcoord_in_dataspace, Δs)
 end
 
+function rotmat(θ)
+    return Mat{2, 2}(cos(θ), sin(θ), -sin(θ), cos(θ))
+end
 # Direction finder - find how to displace the tick so that it is out of the axis
 function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::AbstractString, tickpad, ticksize, tickfont, tickrotation; ds = 0.01)
     # Define shorthand functions for dev purposes - these can be removed before release

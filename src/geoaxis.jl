@@ -121,7 +121,9 @@ function GeoAxis(args...;
     Makie.Observables.connect!(ax.scene.transformation.transform_func, _transformation)
 
     # Plot coastlines
-    coastplot = lines!(ax, GeoMakie.coastlines(); color = :black, coastline_attributes...)
+    coast_line = Makie.convert_arguments(PointBased(), GeoMakie.coastlines())
+
+    coastplot = lines!(ax, coast_line; color = :black, coastline_attributes...)
     translate!(coastplot, 0, 0, 99) # ensure they are on top of other plotted elements
     xprot = ax.xaxis.protrusion[]
     yprot = ax.yaxis.protrusion[]
