@@ -4,15 +4,8 @@
 #                                                          #
 ############################################################
 
-function (transformation::Proj.Transformation)(coord::Point{N, T}) where {N, T <: Real}
-    @assert 2 ≤ N ≤ 4
-    return Point{N, T}(transformation(coord.data))
-end
 
-function (transformation::Proj.Transformation)(coord::Vec{N, T}) where {N, T <: Real}
-    @assert 2 ≤ N ≤ 4
-    return Vec{N, T}(transformation(coord.data))
-end
+const PROJ_RESCALE_FACTOR = 100_000
 
 # This function is a little gnarly.
 # In Makie, we use NaN as a blank point, i.e. any line
@@ -31,13 +24,13 @@ function Makie.apply_transform(t::Proj.Transformation, pt::Point{N,T}) where {N,
     # this is to catch errors - show the point which was invalid
     # and then catch it.
     try
-        f = Point(t(Vec(pt)) ./ 100_000)
+        f = Point(t(Vec(pt)) ./ PROJ_RESCALE_FACTOR)
         return f
     catch e
         # catch this annoying edge case
         # if pt[2] ≈ 90.0f0 || pt[2] ≈ -90.0f0
         #     println("Caught a 90-lat")
-        #     return Point(t(Vec(pt[1], 90.0f0)) ./ 100_000)
+        #     return Point(t(Vec(pt[1], 90.0f0)) ./ PROJ_RESCALE_FACTOR)
         # end
         println("Invalid point for transformation!")
         @show pt
@@ -69,12 +62,25 @@ end
 function Makie.inverse_transform(trans::Proj.Transformation)
     itrans = Base.inv(trans)
     return Makie.PointTrans{2}() do p
-        return Makie.apply_transform(itrans, p) .* 100_000
+        return Makie.apply_transform(itrans, p) .* PROJ_RESCALE_FACTOR
     end
 end
 
 Base.isfinite(p::Point2f) = isfinite(p[1]) && isfinite(p[2])
 Base.isfinite(p::Vec2f) = isfinite(p[1]) && isfinite(p[2])
+
+# Some minor type piracy
+
+function (transformation::Proj.Transformation)(coord::Point{N, T}) where {N, T <: Real}
+    @assert 2 ≤ N ≤ 4
+    return Point{N, T}(transformation(coord.data))
+end
+
+function (transformation::Proj.Transformation)(coord::Vec{N, T}) where {N, T <: Real}
+    @assert 2 ≤ N ≤ 4
+    return Vec{N, T}(transformation(coord.data))
+end
+
 
 function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 90))
     # Search for a good bound with decent accuracy
