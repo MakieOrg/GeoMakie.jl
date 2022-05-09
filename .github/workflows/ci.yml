@@ -34,6 +34,9 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
+      - name: Install custom deps
+        run: |
+            julia --project=@. -e 'using Pkg;pkg"add Makie#master CairoMakie#master GLMakie#master MakieCore#master ImageMagick"'
       - uses: actions/cache@v1
         env:
           cache-name: cache-artifacts
@@ -46,3 +49,34 @@ jobs:
             ${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test_images
+          path: test_images/
+  docs:
+    name: Build and deploy documentation
+    runs-on: ubuntu-latest
+    if: always()
+    needs: test
+    steps:
+      - name: Install binary dependencies
+        run: sudo apt-get update && sudo apt-get install -y xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev
+      - uses: actions/checkout@v2
+      - name: Download all workflow run artifacts
+        uses: actions/download-artifact@v3
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: '1.6'
+      - name: Install custom deps
+        run: |
+            julia --project=@. -e 'using Pkg;pkg"add Makie#master MakieCore#master CairoMakie#master GLMakie#master"'
+      - name: Install dependencies
+        run: |
+            julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); pkg"add Makie#master MakieCore#master CairoMakie#master GLMakie#master"; Pkg.instantiate()'
+            julia --project=docs/ -e 'using CairoMakie'
+      - name: Build and deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # If authenticating with SSH deploy key
+        run: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs/ docs/make.jl deploy

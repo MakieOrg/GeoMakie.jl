@@ -6,6 +6,13 @@
 /dev/
 /docs/build/
 /docs/site/
+/docs/src/examples.md
 /docs/Manifest.toml
 stuff.jl
 .vscode
+*.swp
+
+src/oldsrc
+src/experimental
+
+test_images/
