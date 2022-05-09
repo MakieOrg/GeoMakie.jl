@@ -62,7 +62,7 @@ end
 function Makie.inverse_transform(trans::Proj.Transformation)
     itrans = Base.inv(trans)
     return Makie.PointTrans{2}() do p
-        return Makie.apply_transform(itrans, p) .* PROJ_RESCALE_FACTOR
+        return Makie.apply_transform(itrans, p * PROJ_RESCALE_FACTOR) .* PROJ_RESCALE_FACTOR
     end
 end
 
