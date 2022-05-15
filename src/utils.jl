@@ -245,7 +245,7 @@ function text_bbox(textstring::AbstractString, textsize::Union{AbstractVector, N
     glyph_collection = Makie.layout_text(
             textstring, textsize,
             font, align, rotation, justification, lineheight,
-            RGBAf(0,0,0,0), RGBAf(0,0,0,0), 0f0
+            RGBAf(0,0,0,0), RGBAf(0,0,0,0), 0f0, 0f0
         )
 
     return Rect2f(Makie.boundingbox(glyph_collection, Point3f(0), Makie.to_rotation(rotation)))
