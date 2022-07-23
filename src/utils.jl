@@ -163,9 +163,9 @@ function longitude_format(nums)
     labels = fill("", length(nums))
     for i in 1:length(nums)
         east_or_west = if nums[i] < 0
-            'E'
-        elseif nums[i] > 0
             'W'
+        elseif nums[i] > 0
+            'E'
         else
             ' '
         end
