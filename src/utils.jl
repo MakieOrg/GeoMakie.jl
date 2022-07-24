@@ -401,7 +401,7 @@ function get_area_of_use(pj)
     res == 0 && @warn "There was no area of use assigned to the input PJ pointer!"
     out_area_name[] == C_NULL || println(unsafe_string(out_area_name[]))
 
-    return res == 0 ? nothing : Makie.BBox(out_west_lon_degree[], out_east_lon_degree[], out_south_lat_degree[], out_north_lat_degree[]]
+    return res == 0 ? nothing : Makie.BBox(out_west_lon_degree[], out_east_lon_degree[], out_south_lat_degree[], out_north_lat_degree[])
 end
 
 ############################################################
