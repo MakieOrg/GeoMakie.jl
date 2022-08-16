@@ -1,7 +1,7 @@
 using GeoInterface
 using GeometryBasics
 
-
+# Coerce all coordinates to Floats
 #### Hack for type inference issues for integers, related to ####################################
 #### FIX FOR https://github.com/JuliaGeometry/GeometryBasics.jl/issues/142 #####################
 #### Should be fixed by https://github.com/JuliaGeometry/GeometryBasics.jl/pull/173, perhaps. ##
