@@ -8,7 +8,7 @@ states_geo = GeoJSON.read(read(states, String))
 # Get rid of Alaska
 filter!((x->!(x.properties["name"] ∈ ("Alaska", "Hawaii", "Puerto Rico"))), states_geo.features)
 
-n = length(GeoInterface.getfeature(states_geo))
+n = length(states_geo)
 
 #g = wheel_graph(10)
 gpos = Dict(

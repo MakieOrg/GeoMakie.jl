@@ -110,7 +110,7 @@ using GeoMakie.GeoJSON
 countries_file = download("https://datahub.io/core/geo-countries/r/countries.geojson")
 countries = GeoJSON.read(read(countries_file, String))
 
-n = length(GeoInterface.getfeature(countries))
+n = length(countries)
 hm = poly!(ax, countries; color= 1:n, colormap = :dense,
     strokecolor = :black, strokewidth = 0.5, overdraw = true,
 )
