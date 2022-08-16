@@ -1,5 +1,5 @@
 using Makie: left, right, top, bottom
-using Makie.MakieLayout: height, width
+using Makie: height, width
 
 """
     GeoAxis(fig_or_scene; kwargs...) → ax::Axis
@@ -121,8 +121,8 @@ function GeoAxis(args...;
     Makie.Observables.connect!(ax.scene.transformation.transform_func, _transformation)
 
     # Plot coastlines
-    coast_line = Makie.convert_arguments(PointBased(), GeoMakie.coastlines())[1]
-
+    # TODO: Fix this! (starting at element 94 of coastlines, things get weird)
+    coast_line = GeoMakie.geoJSONtraitParse.(GeoInterface.geometry.(GeoMakie.coastlines())[1:20])
     coastplot = lines!(ax, coast_line; color = :black, coastline_attributes...)
     translate!(coastplot, 0, 0, 99) # ensure they are on top of other plotted elements
     xprot = ax.xaxis.protrusion[]
@@ -204,11 +204,11 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         xlimits[] = (lmin[1], lmax[1])
         ylimits[] = (lmin[2], lmax[2])
 
-        _xtickvalues, _xticklabels = Makie.MakieLayout.get_ticks(xticks, identity, xtickformat, xlimits[]...)
-        _ytickvalues, _yticklabels = Makie.MakieLayout.get_ticks(yticks, identity, ytickformat, ylimits[]...)
+        _xtickvalues, _xticklabels = Makie.get_ticks(xticks, identity, xtickformat, xlimits[]...)
+        _ytickvalues, _yticklabels = Makie.get_ticks(yticks, identity, ytickformat, ylimits[]...)
 
-        _xminortickvalues = Makie.MakieLayout.get_minor_tickvalues(xminor, identity, _xtickvalues, xlimits[]...)
-        _yminortickvalues = Makie.MakieLayout.get_minor_tickvalues(yminor, identity, _ytickvalues, ylimits[]...)
+        _xminortickvalues = Makie.get_minor_tickvalues(xminor, identity, _xtickvalues, xlimits[]...)
+        _yminortickvalues = Makie.get_minor_tickvalues(yminor, identity, _ytickvalues, ylimits[]...)
 
         _xtickpos_in_inputspace = Point2f.(_xtickvalues, ylimits[][1])
         _ytickpos_in_inputspace = Point2f.(xlimits[][1], _ytickvalues)

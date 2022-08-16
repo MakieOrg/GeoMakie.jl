@@ -4,10 +4,13 @@
 using Makie, CairoMakie, GeoMakie
 import Downloads
 using GeoMakie.GeoJSON
+using GeometryBasics
 
 # https://datahub.io/core/geo-countries#curl # download data from here
 worldCountries = GeoJSON.read(read(Downloads.download("https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json"), String))
-n = length(GeoMakie.GeoInterface.features(worldCountries))
+worldCountries = GeoMakie.geoJSONtraitParse.(GeoInterface.geometry.(worldCountries))
+
+n = length(GeoMakie.GeoInterface.getfeature(worldCountries))
 lons = -180:180
 lats = -90:90
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]

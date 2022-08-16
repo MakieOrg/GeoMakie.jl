@@ -15,11 +15,10 @@ You can install it from the REPL like so:
 ## GeoAxis
 Using GeoMakie.jl is straightforward, although it does assume basic knowledge of the Makie.jl ecosystem.
 
-GeoMakie.jl provides an axis for plotting geospatial data, [`GeoAxis`](@ref), and also the function [`geo2basic`](@ref) that converts an output of GeoJSON to a polygon appropriate for plotting. Both are showcased in the examples below.
+GeoMakie.jl provides an axis for plotting geospatial data, [`GeoAxis`](@ref). Both are showcased in the examples below.
 
 ```@docs
 GeoAxis
-geo2basic
 ```
 
 ## Gotchas
@@ -111,7 +110,7 @@ using GeoMakie.GeoJSON
 countries_file = download("https://datahub.io/core/geo-countries/r/countries.geojson")
 countries = GeoJSON.read(read(countries_file, String))
 
-n = length(GeoInterface.features(countries))
+n = length(GeoInterface.getfeature(countries))
 hm = poly!(ax, countries; color= 1:n, colormap = :dense,
     strokecolor = :black, strokewidth = 0.5, overdraw = true,
 )
