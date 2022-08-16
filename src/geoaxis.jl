@@ -122,7 +122,7 @@ function GeoAxis(args...;
 
     # Plot coastlines
     # TODO: Fix this! (starting at element 94 of coastlines, things get weird)
-    coast_line = GeoMakie.geoJSONtraitParse.(GeoInterface.geometry.(GeoMakie.coastlines())[1:20])
+    coast_line = GeoMakie.geoJSONtraitParse.(GeoInterface.geometry.(GeoMakie.coastlines()))
     coastplot = lines!(ax, coast_line; color = :black, coastline_attributes...)
     translate!(coastplot, 0, 0, 99) # ensure they are on top of other plotted elements
     xprot = ax.xaxis.protrusion[]
