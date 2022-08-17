@@ -16,19 +16,19 @@ function GeoInterface.convert(::Type{Point}, type::PointTrait, geom)
 end
 ### Hack over...
 
+trait_type_pairs = Dict(PolygonTrait() => Polygon,
+                        MultiPolygonTrait() => MultiPolygon,
+                        LineStringTrait() => LineString,
+                        PointTrait() => Point)
 
 function geoJSONtraitParse(geometry)
-    if GeoInterface.trait(geometry) == PolygonTrait()
-        geometry = GeoInterface.convert(Polygon, geometry)
-    elseif GeoInterface.trait(geometry) == MultiPolygonTrait()
-        geometry = GeoInterface.convert(MultiPolygon, geometry)
-    elseif GeoInterface.trait(geometry) == LineStringTrait()
-        geometry = GeoInterface.convert(LineString, geometry)
-    elseif GeoInterface.trait(geometry) == PointTrait()
-        geometry = GeoInterface.convert(Point, geometry)
-    else
+    output_type = getkey(trait_type_pairs, GeoInterface.trait(geometry), nothing)
+    
+    if isnothing(output_type)
         @warn "GeoMakie.geoJSONtraitParse: Unknown geometry type $(GeoInterface.trait(geometry))"
     end
+
+    return GeoInterface.convert(output_type, geometry)
 end
 
 
