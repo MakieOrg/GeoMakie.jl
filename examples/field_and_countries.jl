@@ -9,7 +9,7 @@ using GeoInterface
 
 # https://datahub.io/core/geo-countries#curl # download data from here
 worldCountries = GeoJSON.read(read(Downloads.download("https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json"), String))
-worldCountries = GeoMakie.geoJSONtraitParse.(GeoInterface.geometry.(worldCountries))
+worldCountries = GeoMakie.geoJSONtraitParse(worldCountries)
 
 # TODO: Type issue, Makie won't plot mixed vector of polygons and multipolygons
 worldCountries_poly = [c for c in worldCountries if GeoInterface.trait(c) == PolygonTrait()]
