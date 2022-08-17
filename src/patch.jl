@@ -38,13 +38,3 @@ function geoJSONtraitParse(featureCollection::GeoJSON.FeatureCollection)
     Vector{}
     return [geoJSONtraitParse(f) for f in featureCollection]
 end
-
-# # Add test:
-# GeoMakie.geoJSONtraitParse(GeoMakie.coastlines()[1])
-
-
-# geoJSONtraitParse(geometry)
-# convert(Array{Float64}, a)
-# GeoInterface.trait(GeoInterface.geometry.(GeoMakie.coastlines())[1])
-
-# trait_type_pairs

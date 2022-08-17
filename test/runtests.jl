@@ -1,4 +1,4 @@
-using GeoMakie, CairoMakie, Test
+using GeoMakie, GeometryBasics, CairoMakie, Test
 
 Makie.set_theme!(Theme(
     Heatmap = (rasterize = 5,),
@@ -16,6 +16,11 @@ Makie.set_theme!(Theme(
     el = surface!(ax, lons, lats, field; shading = false)
     @test true
     # display(fig)
+end
+
+@testset "geoJSONtraitParse" begin
+    @test GeoMakie.geoJSONtraitParse(GeoMakie.coastlines()) isa Vector
+    @test GeoMakie.geoJSONtraitParse(GeoMakie.coastlines()[1]) isa GeometryBasics.LineString
 end
 
 @testset "Examples" begin
