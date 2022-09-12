@@ -23,4 +23,4 @@ makedocs(;
     sitename="GeoMakie.jl",
     authors="Makie.jl contributors")
 
-deploy && deploydocs(; repo="github.com/JuliaPlots/GeoMakie.jl", target="build", push_preview=true)
+deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true)

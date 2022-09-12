@@ -1,10 +1,10 @@
 # GeoMakie
 
-## Geographic plotting utilities for Makie.jl <a href = "https://www.github.com/JuliaPlots/Makie.jl"><img src="https://raw.githubusercontent.com/JuliaPlots/Makie.jl/master/assets/logo.png" alt="Makie.jl" height="30" align = "top"></a>
+## Geographic plotting utilities for Makie.jl <a href = "https://www.github.com/MakieOrg/Makie.jl"><img src="https://raw.githubusercontent.com/MakieOrg/Makie.jl/master/assets/logo.png" alt="Makie.jl" height="30" align = "top"></a>
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaPlots.github.io/GeoMakie.jl/stable)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaPlots.github.io/GeoMakie.jl/dev)
-![CI](https://github.com/JuliaPlots/GeoMakie.jl/actions/workflows/ci.yml/badge.svg)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://geo.makie.org/stable)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://geo.makie.org/dev)
+![CI](https://github.com/MakieOrg/GeoMakie.jl/actions/workflows/ci.yml/badge.svg)
 
 This package is **in development**, and may break often.  You can install it from the REPL like so:
 ```julia
