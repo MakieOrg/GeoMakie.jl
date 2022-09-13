@@ -198,7 +198,7 @@ function latitude_format(nums)
 end
 
 function _replace_if_automatic(typ::Type{T}, attribute::Symbol, auto) where T
-    default_attr_vals = Makie.MakieLayout.default_attribute_values(T, nothing)
+    default_attr_vals = Makie.default_attribute_values(T, nothing)
 
     if to_value(get(default_attr_vals, attribute, automatic)) == automatic
         return auto

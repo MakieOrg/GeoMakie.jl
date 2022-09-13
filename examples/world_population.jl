@@ -1,6 +1,7 @@
 # This example was contributed by Martijn Visser (@visr)
 using Makie, CairoMakie, GeoMakie
 using GeoMakie.GeoJSON
+using GeometryBasics
 using Downloads
 
 source = "+proj=longlat +datum=WGS84"
@@ -19,10 +20,12 @@ ga.yticklabelsvisible[] = false
 url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/"
 land = Downloads.download(url * "ne_110m_land.geojson")
 land_geo = GeoJSON.read(read(land, String))
+land_geo = GeoMakie.geoJSONtraitParse(land_geo)
 poly!(ga, land_geo, color=:black)
 
 pop = Downloads.download(url * "ne_10m_populated_places_simple.geojson")
 pop_geo = GeoJSON.read(read(pop, String))
-scatter!(ga, GeoMakie.geo2basic(pop_geo), color="lightgrey", markersize=1.2)
+pop_geo = GeoMakie.geoJSONtraitParse(pop_geo)
+scatter!(ga, pop_geo, color="lightgrey", markersize=1.2)
 
 fig

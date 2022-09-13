@@ -66,8 +66,8 @@ function test_tickpad()
         xlimits = (lmin[1], lmax[1])
         ylimits = (lmin[2], lmax[2])
 
-        _xtickvalues, _xticklabels = Makie.MakieLayout.get_ticks(LinearTicks(7), identity, GeoMakie.geoformat_ticklabels, xlimits...)
-        _ytickvalues, _yticklabels = Makie.MakieLayout.get_ticks(LinearTicks(7), identity, GeoMakie.geoformat_ticklabels, ylimits...)
+        _xtickvalues, _xticklabels = Makie.get_ticks(LinearTicks(7), identity, GeoMakie.geoformat_ticklabels, xlimits...)
+        _ytickvalues, _yticklabels = Makie.get_ticks(LinearTicks(7), identity, GeoMakie.geoformat_ticklabels, ylimits...)
 
         _xtickpos_in_inputspace = Point2f.(_xtickvalues, ylimits[1])
         _ytickpos_in_inputspace = Point2f.(xlimits[1], _ytickvalues)
