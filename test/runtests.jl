@@ -18,16 +18,15 @@ Makie.set_theme!(Theme(
     # display(fig)
 end
 
-@testset "geoJSONtraitParse" begin
-    @test GeoMakie.geoJSONtraitParse(GeoMakie.coastlines()) isa Vector
-    @test GeoMakie.geoJSONtraitParse(GeoMakie.coastlines()[1]) isa GeometryBasics.LineString
+@testset "geo2basic" begin
+    @test GeoMakie.geo2basic(GeoMakie.coastlines()) isa Vector
+    @test GeoMakie.geo2basic(GeoMakie.coastlines()[1]) isa GeometryBasics.LineString
 end
 
 @testset "Examples" begin
     geomakie_path = dirname(dirname(pathof(GeoMakie)))
     examples = readdir(joinpath(geomakie_path, "examples"); join = true)
-    filenames = filter(isfile, examples)
-    filter!(endswith(".jl"), filenames)
+    filenames = filter(x-> isfile(x) && endswith(x, ".jl"), examples)
 
     test_path = mkpath(joinpath(geomakie_path, "test_images"))
     cd(test_path) do

@@ -12,32 +12,32 @@ example_title_pairs = [
     "GraphMakie with GeoMakie" => "graph_on_usa.jl",
 ]
 
-io = open(joinpath("docs", "src", "examples.md"), "w")
-
-assetpath = mkpath(joinpath("docs", "src", "assets"))
+example_path(files...) = abspath(joinpath(@__DIR__, "..", "examples", files...))
+doc_src(files...) = abspath(joinpath(@__DIR__, "src", files...))
+io = open(doc_src("examples.md"), "w")
 
 for ext in example_title_pairs
 
     title   = first(ext)
     example = last(ext)
 
-    filepath = joinpath("examples", example)
-
+    filepath = example_path(example)
     !isfile(filepath) && continue
+    println("Including example: $(filepath)")
+    name = splitext(example)[1] * ".png"
+    img = doc_src("images", name)
 
-    test_image_dir = "test_images"
-    base64data = Base64.base64encode(read(joinpath(test_image_dir, splitext(example)[1] * ".png")))
-    cp(joinpath(test_image_dir, splitext(example)[1] * ".png"), joinpath(assetpath, splitext(example)[1]*".png"))
+    println("    running example!")
+    include(filepath)
+    CairoMakie.save(img, Makie.current_figure(); px_per_unit=2)
 
     println(io, "## $title")
     println()
     println(io, "```julia")
     println(io, readchomp(filepath))
     println(io, "```\n")
-    println(io, "```@raw html")
-    println(io, "<img src=\"$(joinpath("..", "assets", splitext(example)[1]*".png"))\" alt=\"$title\"></img>") # data:image/png;base64,$(base64data)\
-    println(io, "```\n")
-
+    println(io, "![$title](images/$name)")
+    println(io)
 end
 
 
@@ -46,7 +46,7 @@ end
 # the generated one would be quite fast.
 println(io, "## Rotating Earth")
 
-println(io, "```julia\n$(read(joinpath("examples", "rotating_earth.jl"), String))\n```\n")
+println(io, "```julia\n$(read(example_path("rotating_earth.jl"), String))\n```\n")
 println(io,
 """
 ```@raw html
@@ -57,6 +57,6 @@ println(io,
 ```
 """
 )
-println()
+println(io)
 
 close(io)

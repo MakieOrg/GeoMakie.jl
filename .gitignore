@@ -15,4 +15,5 @@ stuff.jl
 src/oldsrc
 src/experimental
 
+docs/src/images
 test_images/
