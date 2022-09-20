@@ -24,16 +24,14 @@ function Makie.apply_transform(t::Proj.Transformation, pt::Point{N,T}) where {N,
     # this is to catch errors - show the point which was invalid
     # and then catch it.
     try
-        f = Point(t(Vec(pt)) ./ PROJ_RESCALE_FACTOR)
-        return f
+        return Point(t(Vec(pt)) ./ PROJ_RESCALE_FACTOR)
     catch e
         # catch this annoying edge case
         # if pt[2] ≈ 90.0f0 || pt[2] ≈ -90.0f0
         #     println("Caught a 90-lat")
         #     return Point(t(Vec(pt[1], 90.0f0)) ./ PROJ_RESCALE_FACTOR)
         # end
-        println("Invalid point for transformation!")
-        @show pt
+        println("Invalid point for transformation: $(pt)")
         rethrow(e)
     end
 end

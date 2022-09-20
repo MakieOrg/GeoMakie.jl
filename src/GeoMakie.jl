@@ -34,7 +34,7 @@ Makie.to_colormap(::Nothing) = nothing
 # Resolve import conflicts
 import Makie: rotate! # use LinearAlgebra.rotate! otherwise
 
-include("patch.jl")# TODO: Remove this!
+include("geojson.jl") # GeoJSON/GeoInterface support
 include("conversions.jl")
 include("data.jl")
 include("utils.jl")

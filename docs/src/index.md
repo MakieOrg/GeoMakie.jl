@@ -112,10 +112,9 @@ countries = GeoJSON.read(read(countries_file, String))
 
 n = length(countries)
 hm = poly!(ax, countries; color= 1:n, colormap = :dense,
-    strokecolor = :black, strokewidth = 0.5, overdraw = true,
+    strokecolor = :black, strokewidth = 0.5,
 )
-
-# cb2 = Colorbar(fig[1,3], hm; label = "countries index", height = Relative(0.65))
+translate!(hm, 0, 0, 100) # move above surface plot
 
 fig
 ```
