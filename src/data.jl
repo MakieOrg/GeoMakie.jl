@@ -15,7 +15,6 @@ function coastlines()
     end
 end
 
-
 function land()
     return get!(LOAD_CACHE, "land") do
         geometry = GeoJSON.read(read(assetpath("vector", "110m_land.geojson"), String))

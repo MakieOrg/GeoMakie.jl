@@ -9,12 +9,13 @@ using GeometryBasics, Colors, ImageIO
 using Makie
 
 import Makie: convert_arguments, convert_attribute, to_value, automatic
-using Makie.MakieLayout, Makie.FileIO, Makie.MakieLayout.GridLayoutBase, Makie.DocStringExtensions
-using Makie.MakieLayout: Formatting
-using Makie.MakieLayout.GridLayoutBase: Side
+using Makie, Makie.FileIO, Makie.GridLayoutBase, Makie.DocStringExtensions
+using Makie: Formatting
+using Makie.GridLayoutBase: Side
 
 using GeoJSON
-using GeoInterface: GeoInterface, coordinates, AbstractPolygon, AbstractMultiPolygon, features, geometry
+using GeoInterface: GeoInterface, coordinates, getfeature
+using GeometryBasics: Polygon, MultiPolygon
 export GeoInterface
 
 
@@ -33,6 +34,7 @@ Makie.to_colormap(::Nothing) = nothing
 # Resolve import conflicts
 import Makie: rotate! # use LinearAlgebra.rotate! otherwise
 
+include("geojson.jl") # GeoJSON/GeoInterface support
 include("conversions.jl")
 include("data.jl")
 include("utils.jl")
@@ -44,6 +46,6 @@ export FileIO
 
 include("geoaxis.jl")
 
-export GeoAxis, geo2basic, datalims, datalims!, automatic
+export GeoAxis, datalims, datalims!, automatic
 
 end # module

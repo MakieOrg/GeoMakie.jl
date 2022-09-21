@@ -15,11 +15,10 @@ You can install it from the REPL like so:
 ## GeoAxis
 Using GeoMakie.jl is straightforward, although it does assume basic knowledge of the Makie.jl ecosystem.
 
-GeoMakie.jl provides an axis for plotting geospatial data, [`GeoAxis`](@ref), and also the function [`geo2basic`](@ref) that converts an output of GeoJSON to a polygon appropriate for plotting. Both are showcased in the examples below.
+GeoMakie.jl provides an axis for plotting geospatial data, [`GeoAxis`](@ref). Both are showcased in the examples below.
 
 ```@docs
 GeoAxis
-geo2basic
 ```
 
 ## Gotchas
@@ -111,12 +110,11 @@ using GeoMakie.GeoJSON
 countries_file = download("https://datahub.io/core/geo-countries/r/countries.geojson")
 countries = GeoJSON.read(read(countries_file, String))
 
-n = length(GeoInterface.features(countries))
+n = length(countries)
 hm = poly!(ax, countries; color= 1:n, colormap = :dense,
-    strokecolor = :black, strokewidth = 0.5, overdraw = true,
+    strokecolor = :black, strokewidth = 0.5,
 )
-
-# cb2 = Colorbar(fig[1,3], hm; label = "countries index", height = Relative(0.65))
+translate!(hm, 0, 0, 100) # move above surface plot
 
 fig
 ```
@@ -129,3 +127,11 @@ However, with **GLMakie**, which is much faster, these methods do not work; if y
 `surface!(ga, lonmin..lonmax, latmin..latmax, ones(size(img)...); color = img, shading = false)`.
 
 To plot a scalar field, simply use `surface!(ga, lonmin..lonmax, latmin..latmax, field)`.  The `..` notation denotes an interval which Makie will automatically sample from to obtain the x and y points for the surface.
+
+
+
+## API
+
+```@docs
+GeoMakie.geoformat_ticklabels
+```

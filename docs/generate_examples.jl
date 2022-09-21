@@ -1,5 +1,4 @@
 # Generate examples.md, which holds a lot of the examples
-using Base64
 
 example_title_pairs = [
     "Contourf" => "contourf.jl",
@@ -12,51 +11,54 @@ example_title_pairs = [
     "GraphMakie with GeoMakie" => "graph_on_usa.jl",
 ]
 
-io = open(joinpath("docs", "src", "examples.md"), "w")
+example_path(files...) = abspath(joinpath(@__DIR__, "..", "examples", files...))
+doc_src(files...) = abspath(joinpath(@__DIR__, "src", files...))
 
-assetpath = mkpath(joinpath("docs", "src", "assets"))
-
-for ext in example_title_pairs
-
-    title   = first(ext)
-    example = last(ext)
-
-    filepath = joinpath("examples", example)
-
-    !isfile(filepath) && continue
-
-    test_image_dir = "test_images"
-    base64data = Base64.base64encode(read(joinpath(test_image_dir, splitext(example)[1] * ".png")))
-    cp(joinpath(test_image_dir, splitext(example)[1] * ".png"), joinpath(assetpath, splitext(example)[1]*".png"))
-
-    println(io, "## $title")
-    println()
-    println(io, "```julia")
-    println(io, readchomp(filepath))
-    println(io, "```\n")
-    println(io, "```@raw html")
-    println(io, "<img src=\"$(joinpath("..", "assets", splitext(example)[1]*".png"))\" alt=\"$title\"></img>") # data:image/png;base64,$(base64data)\
-    println(io, "```\n")
-
+if !isdir(doc_src("images"))
+    mkpath(doc_src("images"))
 end
 
+open(doc_src("examples.md"), "w") do io
 
-# Special case for rotating Earth
-# since we want a slow video, but
-# the generated one would be quite fast.
-println(io, "## Rotating Earth")
+    for ext in example_title_pairs
+        title = first(ext)
+        example = last(ext)
 
-println(io, "```julia\n$(read(joinpath("examples", "rotating_earth.jl"), String))\n```\n")
-println(io,
-"""
-```@raw html
-<video controls autoplay loop>
-  <source src="https://user-images.githubusercontent.com/32143268/165003843-db5984f0-9ccf-49f7-847e-88fd63e80bb4.mp4" type="video/mp4">
-  Your browser does not support this video.
-</video>
-```
-"""
-)
-println()
+        filepath = example_path(example)
+        !isfile(filepath) && continue
+        println("Including example: $(filepath)")
+        name = splitext(example)[1] * ".png"
+        img = doc_src("images", name)
 
-close(io)
+        println("    running example!")
+        include(filepath)
+        CairoMakie.save(img, Makie.current_figure(); px_per_unit=2)
+
+        println(io, "## $title")
+        println()
+        println(io, "```julia")
+        println(io, readchomp(filepath))
+        println(io, "```\n")
+        println(io, "![$title](images/$name)")
+        println(io)
+    end
+
+
+    # Special case for rotating Earth
+    # since we want a slow video, but
+    # the generated one would be quite fast.
+    println(io, "## Rotating Earth")
+
+    println(io, "```julia\n$(read(example_path("rotating_earth.jl"), String))\n```\n")
+    println(io,
+    """
+    ```@raw html
+    <video controls autoplay loop>
+    <source src="https://user-images.githubusercontent.com/32143268/165003843-db5984f0-9ccf-49f7-847e-88fd63e80bb4.mp4" type="video/mp4">
+    Your browser does not support this video.
+    </video>
+    ```
+    """)
+
+    println(io)
+end

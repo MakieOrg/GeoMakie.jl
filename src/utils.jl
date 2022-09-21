@@ -24,16 +24,14 @@ function Makie.apply_transform(t::Proj.Transformation, pt::Point{N,T}) where {N,
     # this is to catch errors - show the point which was invalid
     # and then catch it.
     try
-        f = Point(t(Vec(pt)) ./ PROJ_RESCALE_FACTOR)
-        return f
+        return Point(t(Vec(pt)) ./ PROJ_RESCALE_FACTOR)
     catch e
         # catch this annoying edge case
         # if pt[2] ≈ 90.0f0 || pt[2] ≈ -90.0f0
         #     println("Caught a 90-lat")
         #     return Point(t(Vec(pt[1], 90.0f0)) ./ PROJ_RESCALE_FACTOR)
         # end
-        println("Invalid point for transformation!")
-        @show pt
+        println("Invalid point for transformation: $(pt)")
         rethrow(e)
     end
 end
@@ -198,7 +196,7 @@ function latitude_format(nums)
 end
 
 function _replace_if_automatic(typ::Type{T}, attribute::Symbol, auto) where T
-    default_attr_vals = Makie.MakieLayout.default_attribute_values(T, nothing)
+    default_attr_vals = Makie.default_attribute_values(T, nothing)
 
     if to_value(get(default_attr_vals, attribute, automatic)) == automatic
         return auto
@@ -391,7 +389,7 @@ end
 #                                                          #
 ############################################################
 
-"""
+#=
     @hijack_observable name::Symbol
 
 Assuming the presence of a `hijacked_observables::Dict{Symbol, Any}` and `ax::Axis`,
@@ -402,7 +400,7 @@ More technically, this macro injects a function at the beginning of `ax[name].li
 forwards whatever update was made to `hijacked_observables[name]`, and sets `ax[name].val = false`.
 Thus, even though the rest of the listeners will continue to receive updates from this observable
 (in case there is a need for it to remain), its value will remain `false`.
-"""
+=#
 macro hijack_observable(name)
     return esc(quote
         getproperty(ax, $name)[] = $(false)
