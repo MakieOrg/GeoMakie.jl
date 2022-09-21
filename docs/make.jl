@@ -1,4 +1,5 @@
-using Documenter, GeoMakie
+using Documenter, GeoMakie, CairoMakie
+CairoMakie.activate!()
 
 # invoke some geomakie things to be sure
 GeoMakie.coastlines()
