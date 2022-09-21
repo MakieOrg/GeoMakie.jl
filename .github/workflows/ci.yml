@@ -9,7 +9,7 @@ on:
     tags: '*'
 jobs:
   test:
-    name: Tests, Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
+    name: Tests, Julia ${{ matrix.version }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -34,19 +34,7 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - name: Install custom deps
-        run: |
-            julia --project=@. -e 'using Pkg;pkg"add Makie#master CairoMakie#master GLMakie#master MakieCore#master ImageMagick"'
-      - uses: actions/cache@v1
-        env:
-          cache-name: cache-artifacts
-        with:
-          path: ~/.julia/artifacts
-          key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-test-${{ env.cache-name }}-
-            ${{ runner.os }}-test-
-            ${{ runner.os }}-
+      - uses: julia-actions/cache@v1
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: actions/upload-artifact@v3
@@ -57,8 +45,6 @@ jobs:
   docs:
     name: Build and deploy documentation
     runs-on: ubuntu-latest
-    if: always()
-    needs: test
     steps:
       - name: Install binary dependencies
         run: sudo apt-get update && sudo apt-get install -y xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev
@@ -67,14 +53,13 @@ jobs:
         uses: actions/download-artifact@v3
       - uses: julia-actions/setup-julia@latest
         with:
-          version: '1.6'
-      - name: Install custom deps
-        run: |
-            julia --project=@. -e 'using Pkg;pkg"add Makie#master MakieCore#master CairoMakie#master GLMakie#master"'
-      - name: Install dependencies
-        run: |
-            julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); pkg"add Makie#master MakieCore#master CairoMakie#master GLMakie#master"; Pkg.instantiate()'
-            julia --project=docs/ -e 'using CairoMakie'
+          version: '1'
+      - uses: julia-actions/cache@v1
+      - run: |
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
