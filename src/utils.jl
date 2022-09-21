@@ -389,7 +389,7 @@ end
 #                                                          #
 ############################################################
 
-"""
+#=
     @hijack_observable name::Symbol
 
 Assuming the presence of a `hijacked_observables::Dict{Symbol, Any}` and `ax::Axis`,
@@ -400,7 +400,7 @@ More technically, this macro injects a function at the beginning of `ax[name].li
 forwards whatever update was made to `hijacked_observables[name]`, and sets `ax[name].val = false`.
 Thus, even though the rest of the listeners will continue to receive updates from this observable
 (in case there is a need for it to remain), its value will remain `false`.
-"""
+=#
 macro hijack_observable(name)
     return esc(quote
         getproperty(ax, $name)[] = $(false)

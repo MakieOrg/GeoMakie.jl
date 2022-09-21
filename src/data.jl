@@ -11,14 +11,13 @@ end
 function coastlines()
     return get!(LOAD_CACHE, "coastlines") do
         geometry = GeoJSON.read(read(assetpath("vector", "110m_coastline.geojson"), String))
-        return geometry
+        return geo2basic(geometry)
     end
 end
-
 
 function land()
     return get!(LOAD_CACHE, "land") do
         geometry = GeoJSON.read(read(assetpath("vector", "110m_land.geojson"), String))
-        return geometry
+        return geo2basic(geometry)
     end
 end

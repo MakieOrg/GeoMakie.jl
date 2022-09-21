@@ -1,5 +1,4 @@
 # Generate examples.md, which holds a lot of the examples
-using Base64
 
 example_title_pairs = [
     "Contourf" => "contourf.jl",
@@ -14,49 +13,52 @@ example_title_pairs = [
 
 example_path(files...) = abspath(joinpath(@__DIR__, "..", "examples", files...))
 doc_src(files...) = abspath(joinpath(@__DIR__, "src", files...))
-io = open(doc_src("examples.md"), "w")
 
-for ext in example_title_pairs
-
-    title   = first(ext)
-    example = last(ext)
-
-    filepath = example_path(example)
-    !isfile(filepath) && continue
-    println("Including example: $(filepath)")
-    name = splitext(example)[1] * ".png"
-    img = doc_src("images", name)
-
-    println("    running example!")
-    include(filepath)
-    CairoMakie.save(img, Makie.current_figure(); px_per_unit=2)
-
-    println(io, "## $title")
-    println()
-    println(io, "```julia")
-    println(io, readchomp(filepath))
-    println(io, "```\n")
-    println(io, "![$title](images/$name)")
-    println(io)
+if !isdir(doc_src("images"))
+    mkpath(doc_src("images"))
 end
 
+open(doc_src("examples.md"), "w") do io
 
-# Special case for rotating Earth
-# since we want a slow video, but
-# the generated one would be quite fast.
-println(io, "## Rotating Earth")
+    for ext in example_title_pairs
+        title = first(ext)
+        example = last(ext)
 
-println(io, "```julia\n$(read(example_path("rotating_earth.jl"), String))\n```\n")
-println(io,
-"""
-```@raw html
-<video controls autoplay loop>
-  <source src="https://user-images.githubusercontent.com/32143268/165003843-db5984f0-9ccf-49f7-847e-88fd63e80bb4.mp4" type="video/mp4">
-  Your browser does not support this video.
-</video>
-```
-"""
-)
-println(io)
+        filepath = example_path(example)
+        !isfile(filepath) && continue
+        println("Including example: $(filepath)")
+        name = splitext(example)[1] * ".png"
+        img = doc_src("images", name)
 
-close(io)
+        println("    running example!")
+        include(filepath)
+        CairoMakie.save(img, Makie.current_figure(); px_per_unit=2)
+
+        println(io, "## $title")
+        println()
+        println(io, "```julia")
+        println(io, readchomp(filepath))
+        println(io, "```\n")
+        println(io, "![$title](images/$name)")
+        println(io)
+    end
+
+
+    # Special case for rotating Earth
+    # since we want a slow video, but
+    # the generated one would be quite fast.
+    println(io, "## Rotating Earth")
+
+    println(io, "```julia\n$(read(example_path("rotating_earth.jl"), String))\n```\n")
+    println(io,
+    """
+    ```@raw html
+    <video controls autoplay loop>
+    <source src="https://user-images.githubusercontent.com/32143268/165003843-db5984f0-9ccf-49f7-847e-88fd63e80bb4.mp4" type="video/mp4">
+    Your browser does not support this video.
+    </video>
+    ```
+    """)
+
+    println(io)
+end

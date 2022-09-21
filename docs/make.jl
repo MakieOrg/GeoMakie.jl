@@ -21,6 +21,7 @@ makedocs(;
         "Examples" => "examples.md"
         ],
     sitename="GeoMakie.jl",
-    authors="Makie.jl contributors")
+    authors="Makie.jl contributors",
+    strict=true)
 
 deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true)

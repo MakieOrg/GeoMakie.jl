@@ -127,3 +127,11 @@ However, with **GLMakie**, which is much faster, these methods do not work; if y
 `surface!(ga, lonmin..lonmax, latmin..latmax, ones(size(img)...); color = img, shading = false)`.
 
 To plot a scalar field, simply use `surface!(ga, lonmin..lonmax, latmin..latmax, field)`.  The `..` notation denotes an interval which Makie will automatically sample from to obtain the x and y points for the surface.
+
+
+
+## API
+
+```@docs
+GeoMakie.geoformat_ticklabels
+```
