@@ -6,6 +6,15 @@ Makie.set_theme!(Theme(
     Surface = (rasterize = 5,),
 ))
 
+
+@testset "LineSplitting" begin
+    lon0=-160.0
+    all_lines=GeoMakie.LineSplitting.LineSplit(GeoMakie.coastlines(),lon0)
+    Antarctica=GeoMakie.LineSplitting.LineSplit(GeoMakie.coastlines()[99],lon0)
+    @test Antarctica isa Vector
+    @test Antarctica[1] isa GeometryBasics.LineString
+end
+
 @testset "GeoMakie" begin
     @testset "Basics" begin
         lons = -180:180
