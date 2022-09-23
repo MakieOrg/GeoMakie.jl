@@ -371,6 +371,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         color = ax.xgridcolor,
         linestyle = ax.xgridstyle,
         width = ax.xgridwidth,
+        transparency=true,
     )
     decorations[:ygridplot] = lines!(
         scene, ygridpoints;
@@ -378,6 +379,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         color = ax.ygridcolor,
         linestyle = ax.ygridstyle,
         width = ax.ygridwidth,
+        transparency=true,
     )
 
     decorations[:xminorgridplot] = lines!(
@@ -386,6 +388,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         color = ax.xminorgridcolor,
         linestyle = ax.xminorgridstyle,
         width = ax.xminorgridwidth,
+        transparency=true,
     )
 
     decorations[:yminorgridplot] = lines!(
@@ -394,6 +397,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         color = ax.yminorgridcolor,
         linestyle = ax.yminorgridstyle,
         width = ax.yminorgridwidth,
+        transparency=true,
     )
 
 
