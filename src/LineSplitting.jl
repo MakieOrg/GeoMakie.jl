@@ -1,6 +1,7 @@
 module LineSplitting
 
 	import GeoMakie.LineString
+	import GeoMakie.Observable
 	import Base.split
 	
 	function LineRegroup(tmp::Vector)
@@ -36,6 +37,8 @@ module LineSplitting
 	#		tmp3b=LineString([tmp[ii][1] for ii in findall(tmp2.==2)])
 	#		[tmp3a,tmp3b]
 	end
+
+	split(tmp::Vector,dest::Observable) = tmp
 
 	function split(tmp::Vector,dest::String)
 		if occursin("+lon_0",dest)
