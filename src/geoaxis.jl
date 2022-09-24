@@ -122,6 +122,7 @@ function GeoAxis(args...;
 
     # Plot coastlines
     coast_line = GeoMakie.coastlines()
+    coast_line = GeoMakie.LineSplitting.split(coast_line,dest)
     coastplot = lines!(ax, coast_line; color = :black, coastline_attributes...)
     translate!(coastplot, 0, 0, 99) # ensure they are on top of other plotted elements
     xprot = ax.xaxis.protrusion[]
