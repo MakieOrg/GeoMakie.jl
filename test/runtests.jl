@@ -6,15 +6,6 @@ Makie.set_theme!(Theme(
     Surface = (rasterize = 5,),
 ))
 
-
-@testset "LineSplitting" begin
-    lon0=-160.0
-    all_lines=GeoMakie.LineSplitting.split(GeoMakie.coastlines(),lon0)
-    Antarctica=GeoMakie.LineSplitting.split(GeoMakie.coastlines()[99],lon0)
-    @test Antarctica isa Vector
-    @test Antarctica[1] isa GeometryBasics.LineString
-end
-
 @testset "GeoMakie" begin
     @testset "Basics" begin
         lons = -180:180
@@ -33,6 +24,11 @@ end
         @test GeoMakie.coastlines()[1] isa GeometryBasics.LineString
     end
 
+    @testset "LineSplitting" begin
+        @test split(GeoMakie.coastlines(),"+lon_0=-160") isa Vector
+        @test split(GeoMakie.coastlines(),"+lon_0=-160")[1] isa GeometryBasics.LineString
+    end
+    
     @testset "Examples" begin
         geomakie_path = dirname(dirname(pathof(GeoMakie)))
         examples = readdir(joinpath(geomakie_path, "examples"); join = true)
