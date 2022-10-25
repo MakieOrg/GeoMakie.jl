@@ -42,8 +42,8 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     
     (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
 
-    return Rect(Vec2(umin, vmin) ./ PROJ_RESCALE_FACTOR,
-                Vec2(umax-umin, vmax-vmin) ./ PROJ_RESCALE_FACTOR)
+    return Rect(Vec2(T(umin), T(vmin)) ./ PROJ_RESCALE_FACTOR,
+                Vec2(T(umax-umin), T(vmax-vmin)) ./ PROJ_RESCALE_FACTOR)
 end
 
 function Makie.inverse_transform(trans::Proj.Transformation)
