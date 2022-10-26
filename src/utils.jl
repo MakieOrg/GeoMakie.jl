@@ -37,24 +37,13 @@ function Makie.apply_transform(t::Proj.Transformation, pt::Point{N,T}) where {N,
 end
 
 function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
-    # TODO: once Proj4.jl is updated to PROJ 8.2, we can use
-    # proj_trans_bounds (https://proj.org/development/reference/functions.html#c.proj_trans_bounds)
-    N = 21
-    umin = vmin = T(Inf)
-    umax = vmax = T(-Inf)
     xmin, ymin = minimum(r)
     xmax, ymax = maximum(r)
-    for x in range(xmin, xmax; length = N)
-        for y in range(ymin, ymax; length = N)
-            u, v = Makie.apply_transform(f, Point(x, y))
-            umin = min(umin, u)
-            umax = max(umax, u)
-            vmin = min(vmin, v)
-            vmax = max(vmax, v)
-        end
-    end
+    
+    (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
 
-    return Rect(Vec2(umin, vmin), Vec2(umax-umin, vmax-vmin))
+    return Rect(Vec2(T(umin), T(vmin)) ./ PROJ_RESCALE_FACTOR,
+                Vec2(T(umax-umin), T(vmax-vmin)) ./ PROJ_RESCALE_FACTOR)
 end
 
 function Makie.inverse_transform(trans::Proj.Transformation)
