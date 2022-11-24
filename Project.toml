@@ -14,6 +14,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 Proj = "c94c279d-25a6-4763-9509-64d165bea63e"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+Shapefile = "8e980c4a-a4fe-5da2-b3a7-4b4b0353a2f4"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
 

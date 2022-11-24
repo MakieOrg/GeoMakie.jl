@@ -1,5 +1,6 @@
 using GeoInterface
 using GeometryBasics
+import Shapefile
 
 to_point2(a::AbstractVector{<: Number}) = Point2f(a[1], a[2])
 
@@ -47,4 +48,23 @@ to_multipoly(any) = GeometryBasics.MultiPolygon(any)
 # Only converts polygons and multipolygons
 function geo2basic(fc::GeoJSON.FeatureCollection)
     return map(geo2basic, fc)
+end
+
+# Shapefiles
+to_point2(p::Shapefile.Point) = Point2f(p.x, p.y)
+
+function geo2basic(shape::Shapefile.Polyline)
+    geom_pts = map(to_point2, shape.points)
+    GeometryBasics.LineString(geom_pts)
+end
+
+function geo2basic(shape::Shapefile.Polygon)
+    parts = shape.parts .+1
+    geom_pts = map(to_point2, shape.points)
+    if length(parts) == 1
+        return GeometryBasics.Polygon(geom_pts)
+    else
+        holes = map(i-> GeometryBasics.Polygon(geom_pts[parts[i]:parts[i+1]-1]), 1:length(parts)-1)
+        return GeometryBasics.MultiPolygon(holes)
+    end
 end
