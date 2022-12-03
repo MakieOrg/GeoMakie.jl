@@ -42,7 +42,7 @@ translate!(rect, Vec3f(0, 0, 100))
 
 textnode = Observable(" ")
 
-text!(popup, textnode, textsize = 30, position = textpos, color = :darkred, align = (:center, :center), raw = true, visible = visible)
+text!(popup, textnode, fontsize = 30, position = textpos, color = :darkred, align = (:center, :center), raw = true, visible = visible)
 
 on(scene.events.mouseposition) do pos
     if ispressed(scene, Mouse.left)
