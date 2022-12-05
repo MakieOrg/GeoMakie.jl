@@ -228,10 +228,10 @@ function project_to_pixelspace(scene, points::AbstractVector{Point{N, T}}) where
     )
 end
 
-function text_bbox(textstring::AbstractString, fontsize::Union{AbstractVector, Number}, font, align, rotation, justification, lineheight)
+function text_bbox(textstring::AbstractString, fontsize::Union{AbstractVector, Number}, font, fonts, align, rotation, justification, lineheight)
     glyph_collection = Makie.layout_text(
             textstring, fontsize,
-            font, align, rotation, justification, lineheight,
+            string(font), fonts, align, rotation, justification, lineheight,
             RGBAf(0,0,0,0), RGBAf(0,0,0,0), 0f0, 0f0
         )
 
@@ -279,9 +279,10 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
     normal_vec = Vec2f((dx, dy)./sqrt(dx^2 + dy^2))
 
     # We have computed the normal vector - now we have to get tick extents
+    fonts = theme(scene, :fonts)
     extents = text_bbox(
         ticklabel, ticksize,
-        tickfont, Vec2f(0), tickrotation,
+        tickfont, fonts, Vec2f(0), tickrotation,
         0.0, # Makie.to_value(Makie.theme(scene, :justification)),
         0.0, # Makie.to_value(Makie.theme(scene, :lineheight))
     )
