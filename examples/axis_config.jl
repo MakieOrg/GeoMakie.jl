@@ -15,7 +15,7 @@ axs[1, 2].spinewidth      = 5
 
 # axis 3 - messing with grids
 axs[2, 1].xgridcolor = :blue
-axs[2, 1].xgridstyle = :dashdot
+#axs[2, 1].xgridstyle = :dashdot # bug ! not working now, open independent issue for it
 axs[2, 1].ygridcolor = (:orange, 0.5)
 axs[2, 1].ygridwidth = 2.0
 
