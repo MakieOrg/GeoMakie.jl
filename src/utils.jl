@@ -37,24 +37,13 @@ function Makie.apply_transform(t::Proj.Transformation, pt::Point{N,T}) where {N,
 end
 
 function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
-    # TODO: once Proj4.jl is updated to PROJ 8.2, we can use
-    # proj_trans_bounds (https://proj.org/development/reference/functions.html#c.proj_trans_bounds)
-    N = 21
-    umin = vmin = T(Inf)
-    umax = vmax = T(-Inf)
     xmin, ymin = minimum(r)
     xmax, ymax = maximum(r)
-    for x in range(xmin, xmax; length = N)
-        for y in range(ymin, ymax; length = N)
-            u, v = Makie.apply_transform(f, Point(x, y))
-            umin = min(umin, u)
-            umax = max(umax, u)
-            vmin = min(vmin, v)
-            vmax = max(vmax, v)
-        end
-    end
+    
+    (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
 
-    return Rect(Vec2(umin, vmin), Vec2(umax-umin, vmax-vmin))
+    return Rect(Vec2(T(umin), T(vmin)) ./ PROJ_RESCALE_FACTOR,
+                Vec2(T(umax-umin), T(vmax-vmin)) ./ PROJ_RESCALE_FACTOR)
 end
 
 function Makie.inverse_transform(trans::Proj.Transformation)
@@ -239,10 +228,10 @@ function project_to_pixelspace(scene, points::AbstractVector{Point{N, T}}) where
     )
 end
 
-function text_bbox(textstring::AbstractString, textsize::Union{AbstractVector, Number}, font, align, rotation, justification, lineheight)
+function text_bbox(textstring::AbstractString, fontsize::Union{AbstractVector, Number}, font, fonts, align, rotation, justification, lineheight)
     glyph_collection = Makie.layout_text(
-            textstring, textsize,
-            font, align, rotation, justification, lineheight,
+            textstring, fontsize,
+            string(font), fonts, align, rotation, justification, lineheight,
             RGBAf(0,0,0,0), RGBAf(0,0,0,0), 0f0, 0f0
         )
 
@@ -290,9 +279,10 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
     normal_vec = Vec2f((dx, dy)./sqrt(dx^2 + dy^2))
 
     # We have computed the normal vector - now we have to get tick extents
+    fonts = theme(scene, :fonts)
     extents = text_bbox(
         ticklabel, ticksize,
-        tickfont, Vec2f(0), tickrotation,
+        tickfont, fonts, Vec2f(0), tickrotation,
         0.0, # Makie.to_value(Makie.theme(scene, :justification)),
         0.0, # Makie.to_value(Makie.theme(scene, :lineheight))
     )

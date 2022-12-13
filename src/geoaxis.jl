@@ -413,7 +413,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
     #     position = xtickpoints,
     #     rotation = ax.xticklabelrotation,
     #     font = ax.xticklabelfont,
-    #     textsize = ax.xticklabelsize,
+    #     fontsize = ax.xticklabelsize,
     #     color = ax.xticklabelcolor,
     #     align = (:center, :center),
     # )
@@ -426,7 +426,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
     #     position = ytickpoints,
     #     rotation = ax.yticklabelrotation,
     #     font = ax.yticklabelfont,
-    #     textsize = ax.yticklabelsize,
+    #     fontsize = ax.yticklabelsize,
     #     color = ax.yticklabelcolor,
     #     align = (:center, :center),
     # )
