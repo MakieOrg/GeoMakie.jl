@@ -260,17 +260,18 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         yrange = LinRange(ylimits[]..., line_density)
 
         # first update the spine
-        topspinepoints[] = Point2f.(xrange, ylimits[][2])
-        btmspinepoints[] = Point2f.(xrange, ylimits[][1])
-        lftspinepoints[] = Point2f.(xlimits[][1], yrange)
-        rgtspinepoints[] = Point2f.(xlimits[][2], yrange)
+        topspinepoints[] = project_to_pixelspace(scene, Point2f.(xrange, ylimits[][2])) .+ (Point2f(pxarea.origin),)
+        btmspinepoints[] = project_to_pixelspace(scene, Point2f.(xrange, ylimits[][1])) .+ (Point2f(pxarea.origin),)
+        lftspinepoints[] = project_to_pixelspace(scene, Point2f.(xlimits[][1], yrange)) .+ (Point2f(pxarea.origin),)
+        rgtspinepoints[] = project_to_pixelspace(scene, Point2f.(xlimits[][2], yrange)) .+ (Point2f(pxarea.origin),)
 
-        clippoints[] = vcat(
-            btmspinepoints[],
-            rgtspinepoints[],
-            reverse(topspinepoints[]),
-            reverse(lftspinepoints[])
-        )
+        # TODO: remove when clip begins.
+        # clippoints[] = vcat(
+        #     btmspinepoints[],
+        #     rgtspinepoints[],
+        #     reverse(topspinepoints[]),
+        #     reverse(lftspinepoints[])
+        # )
 
         # now, the grid.  Each visible "gridline" is separated from the next
         # by a `Point2f(NaN)`.  The approach here allows us to avoid appending.
@@ -332,30 +333,32 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
     # This makes the clip plot the first in the list of plots
     # insert!(scene.plots, 1, pop!(scene.plots))
 
-    # Now we plot the spines:
+    # Now we plot the spines.
+    # Make sure that the spines are plotted to the blockscene and not the scene, 
+    # so that they are not cropped!
     decorations[:topspineplot] = lines!(
-        scene, topspinepoints;
+        topscene, topspinepoints;
         visible = hijacked_observables[:topspinevisible],
         color = ax.topspinecolor,
         # linestyle = ax.spinestyle,
         linewidth = ax.spinewidth,
         )
     decorations[:btmspineplot] = lines!(
-        scene, btmspinepoints;
+        topscene, btmspinepoints;
         visible = hijacked_observables[:bottomspinevisible],
         color = ax.bottomspinecolor,
         # linestyle = ax.spinestyle,
         linewidth = ax.spinewidth,
         )
     decorations[:lftspineplot] = lines!(
-        scene, lftspinepoints;
+        topscene, lftspinepoints;
         visible = hijacked_observables[:leftspinevisible],
         color = ax.leftspinecolor,
         # linestyle = ax.spinestyle,
         linewidth = ax.spinewidth,
         )
     decorations[:rgtspineplot] = lines!(
-        scene, rgtspinepoints;
+        topscene, rgtspinepoints;
         visible = hijacked_observables[:rightspinevisible],
         color = ax.rightspinecolor,
         # linestyle = ax.spinestyle,
