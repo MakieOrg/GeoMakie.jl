@@ -225,7 +225,7 @@ function draw_geoticks!(ax::Axis, hijacked_observables, line_density, remove_ove
         else
             xtickpoints.val = xtickpoints.val .+ directional_pad.(
                 Ref(scene), Ref(limits), _xtickpos_in_inputspace,
-                _xticklabels, Ref(Point2f(ax.xticklabelpad[], 0)), ax.xticklabelsize[], ax.xticklabelfont[],
+                _xticklabels, Ref(Point2f(0, ax.xticklabelpad[])), ax.xticklabelsize[], ax.xticklabelfont[],
                 ax.xticklabelrotation[]
             )
         end

@@ -254,7 +254,8 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
     # determine direction to go in order to stay inbounds.
     xdir = tickcoord_in_inputspace[1] < 0 ? +1 : -1
     ydir = tickcoord_in_inputspace[2] < 0 ? +1 : -1
-    Δs = Vec2f(xdir, ydir) .* tickpad ./ sum(tickpad) * ds
+    Δs = iszero(sum(tickpad)) ? Vec2f(0) : Vec2f(xdir, ydir) .* tickpad ./ (sum(tickpad)) * ds
+    
     # find the x and y directions
     # multiply by the sign in order to have them going outwards at any point
     Σp = sign(sum(Δs)) * inv_tfunc(tickcoord_in_dataspace + Δs)
