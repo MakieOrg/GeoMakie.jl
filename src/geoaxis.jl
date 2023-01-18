@@ -78,7 +78,7 @@ function GeoAxis(args...;
 
     _transformation = Observable{Proj.Transformation}(Makie.to_value(transformation))
      Makie.Observables.onany(source, dest) do src, dst
-        _transformation[] = Proj.Transformation(Makie.to_value(src), Makie.to_value(dst); always_xy = true)
+        _transformation[] = Proj.Transformation(src, dst; always_xy = true)
     end
     Makie.Observables.onany(transformation) do trans
         _transformation[] = trans
