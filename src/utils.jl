@@ -17,14 +17,14 @@ const PROJ_RESCALE_FACTOR = 100_000
 # if so we return NaN.  Then, and only then, do we transform it.
 # This does not seem to effect times too much but can be removed
 # if necessary.
-function Makie.apply_transform(t::Proj.Transformation, pt::Point{N,T}) where {N,T}
+function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecTypes{N,T} where {N,T}
     if all(isnan.(pt))
-        return Point{N, T}(NaN)
+        return V(NaN)
     end
     # this is to catch errors - show the point which was invalid
     # and then catch it.
     try
-        return Point(t(Vec(pt)) ./ PROJ_RESCALE_FACTOR)
+        return V(t(Vec(pt)) ./ PROJ_RESCALE_FACTOR)
     catch e
         # catch this annoying edge case
         # if pt[2] ≈ 90.0f0 || pt[2] ≈ -90.0f0
@@ -53,9 +53,7 @@ function Makie.inverse_transform(trans::Proj.Transformation)
     end
 end
 
-Base.isfinite(p::Point2f) = isfinite(p[1]) && isfinite(p[2])
-Base.isfinite(p::Vec2f) = isfinite(p[1]) && isfinite(p[2])
-
+Base.isfinite(x::Union{GeometryBasics.AbstractPoint, GeometryBasics.Vec}) = all(isfinite, x)
 # Some minor type piracy
 
 function (transformation::Proj.Transformation)(coord::Point{N, T}) where {N, T <: Real}
@@ -71,21 +69,22 @@ end
 
 function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 90))
     # Search for a good bound with decent accuracy
-    lons = Float32.(LinRange(lonrange..., 360 * 2))
-    lats = Float32.(LinRange(latrange..., 180 * 2))
+    lons = Float64.(LinRange(lonrange..., 360 * 2))
+    lats = Float64.(LinRange(latrange..., 180 * 2))
     # avoid PROJ wrapping 180 to -180
     lons[1]   = nextfloat(lons[1])   |> nextfloat
     lons[end] = prevfloat(lons[end]) |> prevfloat
     lats[1]   = nextfloat(lats[1])   |> nextfloat
     lats[end] = prevfloat(lats[end]) |> prevfloat
 
-    points = Point2f.(lons, lats')
+    points = Point2{Float64}.(lons, lats')
     tpoints = ptrans.(points)
     itpoints = Makie.apply_transform(Makie.inverse_transform(ptrans), tpoints)
 
     finite_inds = findall(isfinite, itpoints)
 
     # debug && display(Makie.heatmap(..(lonrange...), ..(latrange...), isfinite.(itpoints); colorrange = (0,1)))
+    # Main.@infiltrate
 
     min, max = getindex.(Ref(itpoints), finite_inds[[begin, end]])
 

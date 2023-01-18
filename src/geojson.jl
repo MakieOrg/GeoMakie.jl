@@ -1,8 +1,6 @@
 using GeoInterface
 using GeometryBasics
 
-to_point2(a::AbstractVector{<: Number}) = Point2f(a[1], a[2])
-
 
 # The entry point - takes in any datatype, and gets its GeoInterface trait type
 # then, specializes based on trait type to produce a GeometryBasics object
