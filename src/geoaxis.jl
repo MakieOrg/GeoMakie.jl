@@ -297,6 +297,74 @@ function Makie.initialize_block!(axis::GeoAxis)
 
     draw_geoaxis!(axis, axis.target_projection, axis.elements, false)
 
+
+    subtitlepos = lift(scene.px_area, axis.titlegap, axis.titlealign, #=ax.xaxisposition, xaxis.protrusion=#; ignore_equal_values=true) do px_area,
+        titlegap, align#=, xaxisposition, xaxisprotrusion=#
+
+        align_val = if align === :center
+            0.5
+        elseif align === :left
+            0.0
+        elseif align === :right
+            1.0
+        elseif align isa Real
+            @assert 0 ≤ align ≤ 1
+            Float64(align)
+        else
+            error("Title align $align not supported.")
+        end
+
+        yoffset = Makie.top(px_area) + titlegap
+
+        return Point2f(px_area.origin[1] + px_area.widths[1] * align_val, yoffset)
+    end
+
+    titlealignnode = lift(axis.titlealign; ignore_equal_values=true) do align
+        (align, :bottom)
+    end
+
+    subtitlet = text!(
+        axis.blockscene, subtitlepos,
+        text = axis.subtitle,
+        visible = axis.subtitlevisible,
+        fontsize = axis.subtitlesize,
+        align = titlealignnode,
+        font = axis.subtitlefont,
+        color = axis.subtitlecolor,
+        lineheight = axis.subtitlelineheight,
+        markerspace = :data,
+        inspectable = false)
+
+    axis.elements[:subtitle] = subtitlet
+
+    titlepos = lift(Makie.calculate_title_position, scene.px_area, axis.titlegap, axis.subtitlegap,
+        axis.titlealign, :bottom, nothing, axis.subtitlelineheight, axis, subtitlet; ignore_equal_values=true)
+
+    titlet = text!(
+        axis.blockscene, titlepos,
+        text = axis.title,
+        visible = axis.titlevisible,
+        fontsize = axis.titlesize,
+        align = titlealignnode,
+        font = axis.titlefont,
+        color = axis.titlecolor,
+        lineheight = axis.titlelineheight,
+        markerspace = :data,
+        inspectable = false)
+
+    axis.elements[:title] = titlet
+
+
+    lift(scene.px_area, axis.titlevisible, axis.subtitlevisible, axis.xticklabelsvisible, axis.yticklabelsvisible) do px_area, args...
+        total_protrusion_bbox = reduce(union, Makie.boundingbox.(values(axis.elements)))
+        left_prot, bottom_prot = minimum(total_protrusion_bbox)
+        right_prot, top_prot   = maximum(total_protrusion_bbox)
+        left_scene, bottom_scene = minimum(px_area)
+        right_scene, top_scene   = maximum(px_area)
+
+        axis.layoutobservables.protrusions[] = Makie.GridLayoutBase.RectSides(max.(0, (left_scene - left_prot, right_prot - right_scene, bottom_scene - bottom_prot, top_prot - top_scene))...)
+    end
+
     return axis
 end
 
