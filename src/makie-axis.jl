@@ -6,8 +6,8 @@ import Makie: xautolimits, yautolimits, autolimits, getxlimits, getylimits, getl
 # Lol, really GeometryBasics?
 Base.convert(::Type{Rect2d}, x::Rect2) = Rect2d(x)
 
-Makie.xautolimits(ga::GeoAxis) = (-180, 180)
-Makie.yautolimits(ga::GeoAxis) = (-90, 90)
+# Makie.xautolimits(ga::GeoAxis) = (-180, 180)
+# Makie.yautolimits(ga::GeoAxis) = (-90, 90)
 
 function geodefaultlimits(::Tuple{Nothing, Nothing}, source_projection, target_projection)
     return Rect2d(-180, -90, 360, 180)

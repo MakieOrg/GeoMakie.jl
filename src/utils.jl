@@ -39,11 +39,16 @@ end
 function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     xmin, ymin = minimum(r)
     xmax, ymax = maximum(r)
+    try
     
     (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
 
     return Rect(Vec2(T(umin), T(vmin)) ./ PROJ_RESCALE_FACTOR,
                 Vec2(T(umax-umin), T(vmax-vmin)) ./ PROJ_RESCALE_FACTOR)
+    catch e
+        @show r
+        rethrow(e)
+    end
 end
 
 function Makie.inverse_transform(trans::Proj.Transformation)
@@ -194,7 +199,7 @@ function _replace_if_automatic(typ::Type{T}, attribute::Symbol, auto) where T
 end
 
 # Project any point to coordinates in pixel space
-function project_to_pixelspace(scene, point::Point{N, T}) where {N, T}
+function project_to_pixelspace(scene, transform_func, point::Point{N, T}) where {N, T}
     @assert N ≤ 3
     return Point{N, T}(
         Makie.project(
@@ -204,14 +209,14 @@ function project_to_pixelspace(scene, point::Point{N, T}) where {N, T}
             :data, :pixel,
             # apply the transform to go from inputspace to dataspace
             Makie.apply_transform(
-                scene.transformation.transform_func[],
+                transform_func,
                 point
             )
         )
     )
 end
 
-function project_to_pixelspace(scene, points::AbstractVector{Point{N, T}}) where {N, T}
+function project_to_pixelspace(scene, transform_func, points::AbstractVector{Point{N, T}}) where {N, T}
     Point{N, T}.(
         Makie.project.(
             # obtain the camera of the Scene which will project to its screenspace
@@ -220,7 +225,7 @@ function project_to_pixelspace(scene, points::AbstractVector{Point{N, T}}) where
             Ref(:data), Ref(:pixel),
             # apply the transform to go from inputspace to dataspace
             Makie.apply_transform(
-                scene.transformation.transform_func[],
+                transform_func,
                 points
             )
         )
@@ -244,10 +249,10 @@ function rotmat(θ)
     return Mat{2, 2}(cos(θ), sin(θ), -sin(θ), cos(θ))
 end
 # Direction finder - find how to displace the tick so that it is out of the axis
-function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::AbstractString, tickpad, ticksize, tickfont, tickrotation; ds = 0.01)
+function directional_pad(scene, transform_func, limits, tickcoord_in_inputspace, ticklabel::AbstractString, tickpad, ticksize, tickfont, tickrotation; ds = 0.01)
     # Define shorthand functions for dev purposes - these can be removed before release
-    tfunc = x -> Makie.apply_transform(scene.transformation.transform_func[], x)
-    inv_tfunc = x -> Makie.apply_transform(Makie.inverse_transform(scene.transformation.transform_func[]), x)
+    tfunc = x -> Makie.apply_transform(transform_func, x)
+    inv_tfunc = x -> Makie.apply_transform(Makie.inverse_transform(transform_func), x)
     # convert tick coordinate to dataspace
     tickcoord_in_dataspace = tfunc(tickcoord_in_inputspace)
     # determine direction to go in order to stay inbounds.
@@ -259,7 +264,7 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
     # multiply by the sign in order to have them going outwards at any point
     Σp = sign(sum(Δs)) * inv_tfunc(tickcoord_in_dataspace + Δs)
     # project back to pixel space
-    pixel_Δx, pixel_Δy = project_to_pixelspace(scene, Σp) - project_to_pixelspace(scene, tickcoord_in_inputspace)
+    pixel_Δx, pixel_Δy = project_to_pixelspace(scene, transform_func, Σp) - project_to_pixelspace(scene, transform_func, tickcoord_in_inputspace)
     # invert direction - the vectors were previously facing the inside,
     # now they will face outside .
     dx = -pixel_Δx
