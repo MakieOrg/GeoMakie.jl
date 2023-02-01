@@ -80,13 +80,13 @@ function Makie.initialize_block!(axis::GeoAxis)
     latticks = -90:30:90
     ptrans = create_transform(axis.target_projection, axis.source_projection)
     for lon in lonticks
-        coords = apply_transform(ptrans[], [Point2f(lon, l) for l in range(latticks[1], latticks[end]; length=100)])
+        coords = Makie.apply_transform(ptrans[], [Point2f(lon, l) for l in range(latticks[1], latticks[end]; length=100)])
         gridplot = lines!(axis, coords; color=:gray20, linewidth=0.5)
         translate!(gridplot, 0, 0, 100) # ensure they are on top of other plotted elements
     end
 
     for lat in latticks
-        coords = apply_transform(ptrans[], [Point2f(l, lat) for l in range(lonticks[1], lonticks[end]; length=100)])
+        coords = Makie.apply_transform(ptrans[], [Point2f(l, lat) for l in range(lonticks[1], lonticks[end]; length=100)])
         gridplot = lines!(axis, coords; color=:gray20, linewidth=0.5)
         translate!(gridplot, 0, 0, 100) # ensure they are on top of other plotted elements
     end

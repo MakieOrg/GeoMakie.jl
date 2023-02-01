@@ -200,7 +200,7 @@ function Makie.process_interaction(r::Makie.RectangleZoom, event::MouseEvent, ax
 
         r.from = prev_data
         r.to = data
-        r.rectnode[] = _chosen_limits(r, ax)
+        r.rectnode[] = Makie._chosen_limits(r, ax)
         r.active[] = true
         return Consume(true)
 
