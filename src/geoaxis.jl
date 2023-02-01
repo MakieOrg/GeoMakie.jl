@@ -7,8 +7,9 @@ Makie.@Block GeoAxis begin
     targetlimits::Observable{Rect2d}
     # "Final limits in input space"
     finallimits::Observable{Rect2d}
-    # Final limits in transformed space
-    transformedlimits::Observable{Rect2d}
+    inputlimits::Observable{Union{Nothing, Rect2d}}
+    # The default transformation, to cache and save on calls to Proj!
+    transform_func::Observable{Any}
     # interaction stuff
     mouseeventhandle::Makie.MouseEventHandle
     scrollevents::Observable{Makie.ScrollEvent}
@@ -290,13 +291,13 @@ Makie.can_be_current_axis(::GeoAxis) = true
 
 function Makie.initialize_block!(axis::GeoAxis)
 
+    ptrans = create_transform(axis.source_projection, axis.target_projection)
+    setfield!(axis, :transform_func, ptrans)
+
     scene = axis_setup!(axis)
     setfield!(axis, :elements, Dict{Symbol,Any}())
 
-
-    ptrans = create_transform(axis.source_projection, axis.target_projection)
-
-    draw_geoaxis!(axis, axis.target_projection, axis.elements, false)
+    draw_geoaxis!(axis, axis.transform_func, axis.elements, false)
 
 
     subtitlepos = lift(scene.px_area, axis.titlegap, axis.titlealign, #=ax.xaxisposition, xaxis.protrusion=#; ignore_equal_values=true) do px_area,
@@ -389,11 +390,9 @@ end
 
 # do the axis drawing
 
-function draw_geoaxis!(ax::GeoAxis, target_projection, elements, remove_overlapping_ticks)
+function draw_geoaxis!(ax::GeoAxis, transformation, elements, remove_overlapping_ticks)
     topscene = ax.blockscene
     scene = ax.scene
-
-    transformation = GeoMakie.create_transform(Observable("+proj=longlat +datum=WGS84"), target_projection)
 
     xgridpoints = Observable(Point2f[])
     ygridpoints = Observable(Point2f[])
@@ -420,7 +419,7 @@ function draw_geoaxis!(ax::GeoAxis, target_projection, elements, remove_overlapp
 
     # First we establish the spine points
 
-    lift(ax.finallimits, ax.xticks, ax.xtickformat, ax.yticks, ax.ytickformat, ax.xminorticks, ax.yminorticks, ax.scene.px_area, transformation, ax.npoints) do limits, xticks, xtickformat, yticks, ytickformat, xminor, yminor, pxarea, transform_func, npoints
+    lift(ax.inputlimits, ax.xticks, ax.xtickformat, ax.yticks, ax.ytickformat, ax.xminorticks, ax.yminorticks, ax.scene.px_area, transformation, ax.npoints) do limits, xticks, xtickformat, yticks, ytickformat, xminor, yminor, pxarea, transform_func, npoints
 
         lmin = minimum(limits)
         lmax = maximum(limits)
@@ -670,7 +669,7 @@ function draw_geoaxis!(ax::GeoAxis, target_projection, elements, remove_overlapp
     setproperty!.(values(elements), Ref(:yautolimits), Ref(false))
 
     # finally, make sure that lift runs again - for some reason, it doesn't work directly
-    notify(ax.transformedlimits)
+    notify(ax.inputlimits)
     notify(ax.finallimits)
 
     return nothing

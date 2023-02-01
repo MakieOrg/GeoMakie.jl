@@ -9,52 +9,69 @@ Base.convert(::Type{Rect2d}, x::Rect2) = Rect2d(x)
 # Makie.xautolimits(ga::GeoAxis) = (-180, 180)
 # Makie.yautolimits(ga::GeoAxis) = (-90, 90)
 
-function geodefaultlimits(::Tuple{Nothing, Nothing}, source_projection, target_projection)
-    return Rect2d(-180, -90, 360, 180)
+
+geodefaultlimits(axis::GeoAxis, limits) = geodefaultlimits(limits, axis.source_projection[], axis.target_projection[])
+
+# override for the automatic case
+function geodefaultlimits(axis::GeoAxis, ::Tuple{Nothing, Nothing})
+    # if isassigned(axis.scene)
+    #     transformed_data_limits = data_limits(axis.scene)
+    #     need_auto_limits = any(isinf.(origin(transformed_data_limits))) || any(isinf.(widths(transformed_data_limits)))
+    # else
+        need_auto_limits = true
+    # end
+
+    if need_auto_limits
+         # if the transformed data limits are infinite, nothing has been plotted
+        return Makie.apply_transform(axis.transform_func[], Rect2d(-180, -90, 360, 180)) # TODO: make this figure out what the appropriate limits are automagically
+    else
+        return transformed_data_limits
+    end
 end
 
-function geodefaultlimits(limits::Tuple{NTuple{2, <: Real}, Nothing}, source_projection, target_projection)
-    return Rect2d(limits[1][1], -90, limits[1][2] - limits[1][1], 180)
+function geodefaultlimits(axis::GeoAxis, limits::Tuple{NTuple{2, <: Real}, Nothing})
+    return Makie.apply_transform(axis.transform_func[], Rect2d(limits[1][1], -90, limits[1][2] - limits[1][1], 180))
 end
 
-function geodefaultlimits(limits::Tuple{ Nothing, NTuple{2, <: Real}}, source_projection, target_projection)
-    return Rect2d(-180, limits[2][1], 360, limits[2][2] - limits[2][1])
+function geodefaultlimits(axis::GeoAxis, limits::Tuple{ Nothing, NTuple{2, <: Real}})
+    return Makie.apply_transform(axis.transform_func[], Rect2d(-180, limits[2][1], 360, limits[2][2] - limits[2][1]))
 end
 
-function geodefaultlimits(limits::Tuple, source_projection, target_projection)
+function geodefaultlimits(axis::GeoAxis, limits::Tuple)
     (xmin, xmax), (ymin, ymax) = limits
-    return Rect2d(xmin, ymin, xmax - xmin, ymax - ymin)
+    return Makie.apply_transform(axis.transform_func[], Rect2d(xmin, ymin, xmax - xmin, ymax - ymin))
 end
 
-function geodefaultlimits(limits::Rect{2, <: Real}, source_projection, target_projection)
-    return Rect2d(limits)
+function geodefaultlimits(axis::GeoAxis, limits::Rect{2, <: Real})
+    return Makie.apply_transform(axis.transform_func[], Rect2d(limits))
 end
+
+
 
 function axis_setup!(axis::GeoAxis)
     # initialize either with user limits, or pick defaults based on scales
     # so that we don't immediately error
-    targetlimits = Observable{Rect2d}(geodefaultlimits(axis.limits[], axis.source_projection[], axis.target_projection[]))
+    targetlimits = Observable{Rect2d}(geodefaultlimits(axis, axis.limits[]))
     finallimits = Observable{Rect2d}(targetlimits[]; ignore_equal_values=true)
-    transformedlimits = Observable{Rect2d}(finallimits[]; ignore_equal_values=true)
+    inputlimits = Observable{Union{Nothing, Rect2d}}(; ignore_equal_values=true)
     setfield!(axis, :targetlimits, targetlimits)
     setfield!(axis, :finallimits, finallimits)
-    setfield!(axis, :transformedlimits, transformedlimits)
+    setfield!(axis, :inputlimits, inputlimits)
 
-    axis_transform = create_transform(axis.source_projection, axis.target_projection)
-
-    onany(finallimits, axis_transform) do finallims, tfunc
-        transformedlimits[] = Makie.apply_transform(tfunc, finallims)
+    onany(finallimits, axis.transform_func) do finallims, tfunc
+        result = Makie.apply_transform(Makie.inverse_transform(tfunc), finallims)
+        inputlimits[] = result
     end
-    notify(axis_transform)
+    notify(finallimits)
 
     # set up transformed limits
     # TODO get correct values rather than defaulting to all-Earth
 
     topscene = axis.blockscene
-    scenearea = Makie.sceneareanode!(axis.layoutobservables.computedbbox, transformedlimits, DataAspect())
+    scenearea = Makie.sceneareanode!(axis.layoutobservables.computedbbox, finallimits, DataAspect())
     scene = Scene(topscene, px_area=scenearea)
     axis.scene = scene
-    onany(Makie.update_axis_camera, camera(scene), scene.transformation.transform_func, transformedlimits, axis.xreversed, axis.yreversed)
+    onany(Makie.update_axis_camera, camera(scene), scene.transformation.transform_func, finallimits, axis.xreversed, axis.yreversed)
     notify(axis.layoutobservables.suggestedbbox)
     Makie.register_events!(axis, scene)
     on(axis.limits) do mlims

@@ -28,7 +28,7 @@ function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecType
     catch e
         # catch this annoying edge case
         # if pt[2] ≈ 90.0f0 || pt[2] ≈ -90.0f0
-        #     println("Caught a 90-lat")
+        #     println("Caught a 90° latitude")
         #     return Point(t(Vec(pt[1], 90.0f0)) ./ PROJ_RESCALE_FACTOR)
         # end
         println("Invalid point for transformation: $(pt)")
@@ -51,10 +51,40 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     end
 end
 
+_apply_inverse(itrans, p) = Makie.apply_transform(itrans, p .* PROJ_RESCALE_FACTOR) .* PROJ_RESCALE_FACTOR
+
 function Makie.inverse_transform(trans::Proj.Transformation)
     itrans = Base.inv(trans)
-    return Makie.PointTrans{2}() do p
-        return Makie.apply_transform(itrans, p) .* PROJ_RESCALE_FACTOR
+    return Makie.PointTrans{2}(Base.Fix1(_apply_inverse, itrans))
+end
+
+function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie._apply_inverse), Proj.Transformation}}, r::Rect2{T}) where T
+    f = t.f.x
+    xmin, ymin = minimum(r) .* PROJ_RESCALE_FACTOR
+    xmax, ymax = maximum(r) .* PROJ_RESCALE_FACTOR
+    try
+    
+        (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
+
+    if isinf(umin)
+        umin = -180.0
+    end
+    if isinf(umax)
+        umax = 180.0
+    end
+
+    if isinf(vmin)
+        vmin = -90.0
+    end
+    if isinf(vmax)
+        vmax = 90.0
+    end
+
+    return Rect(Vec2(T(umin), T(vmin)),
+                Vec2(T(umax-umin), T(vmax-vmin)))
+    catch e
+        @show r
+        rethrow(e)
     end
 end
 
