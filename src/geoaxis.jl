@@ -73,8 +73,6 @@ Makie.@Block GeoAxis begin
 end
 Makie.can_be_current_axis(::GeoAxis) = true
 
-include("makie-axis.jl")
-
 function Makie.initialize_block!(axis::GeoAxis)
     scene = axis_setup!(axis)
     lonticks = -180:60:180

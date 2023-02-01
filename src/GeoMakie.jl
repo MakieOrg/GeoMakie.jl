@@ -45,6 +45,7 @@ export Proj
 export FileIO
 
 include("geoaxis.jl")
+include("makie-axis.jl")
 
 export GeoAxis, datalims, datalims!, automatic
 
