@@ -7,7 +7,7 @@ using Downloads
 source = "+proj=longlat +datum=WGS84"
 dest = "+proj=natearth2"
 
-url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/"
+url = "https://raw.githack.com/nvkelso/natural-earth-vector/master/geojson/"
 land = Downloads.download(url * "ne_110m_land.geojson")
 land_geo = GeoJSON.read(read(land, String))
 pop = Downloads.download(url * "ne_10m_populated_places_simple.geojson")
@@ -17,8 +17,8 @@ begin
     fig = Figure(resolution = (1000,500))
     ga = GeoAxis(
         fig[1, 1];
-        source = source,
-        dest = dest
+        source_projection = source,
+        target_projection = dest
     )
 
     ga.xticklabelsvisible[] = false

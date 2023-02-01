@@ -5,12 +5,10 @@ destnode = Observable("+proj=ortho")
 fig = Figure()
 ga = GeoAxis(
     fig[1, 1],
-    coastlines = true,
-    dest = destnode,
-    lonlims = Makie.automatic
+    target_projection = destnode,
 )
-image!(-180..180, -90..90, rotr90(GeoMakie.earth()); interpolate = false)
-hidedecorations!(ga)
+image!(ga, -180..180, -90..90, rotr90(GeoMakie.earth()); interpolate = false)
+hidedecorations!(ga) # TODO implement hidedecorations/spines
 
 record(fig, "rotating_earth_ortho.mp4"; framerate=30) do io
     for lon in -90:90
@@ -20,3 +18,4 @@ record(fig, "rotating_earth_ortho.mp4"; framerate=30) do io
         recordframe!(io)
     end
 end
+# TODO this doesn't work!

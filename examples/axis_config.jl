@@ -5,7 +5,8 @@ fig = Figure(resolution = (1000,1000))
 axs = [GeoAxis(fig[i, j]) for i in 1:2, j in 1:2]
 
 # axis 1 - I want an orthographic projection.
-axs[1, 1].scene.transformation.transform_func[] = Proj.Transformation("+proj=latlong","+proj=ortho")
+# axis 1 does not work - TODO!
+axs[1, 1].source_projection[] = "+proj=ortho"
 xlims!(axs[1, 1], -90, 90)
 
 # axis 2 - wacky spines
