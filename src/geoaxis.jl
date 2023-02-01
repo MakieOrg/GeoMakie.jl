@@ -71,6 +71,7 @@ Makie.@Block GeoAxis begin
         yscale = identity
     end
 end
+Makie.can_be_current_axis(::GeoAxis) = true
 
 include("makie-axis.jl")
 
@@ -81,13 +82,13 @@ function Makie.initialize_block!(axis::GeoAxis)
     ptrans = create_transform(axis.target_projection, axis.source_projection)
     for lon in lonticks
         coords = Makie.apply_transform(ptrans[], [Point2f(lon, l) for l in range(latticks[1], latticks[end]; length=100)])
-        gridplot = lines!(axis, coords; color=:gray20, linewidth=0.5)
+        gridplot = lines!(scene, coords; color=:gray20, linewidth=0.5)
         translate!(gridplot, 0, 0, 100) # ensure they are on top of other plotted elements
     end
 
     for lat in latticks
         coords = Makie.apply_transform(ptrans[], [Point2f(l, lat) for l in range(lonticks[1], lonticks[end]; length=100)])
-        gridplot = lines!(axis, coords; color=:gray20, linewidth=0.5)
+        gridplot = lines!(scene, coords; color=:gray20, linewidth=0.5)
         translate!(gridplot, 0, 0, 100) # ensure they are on top of other plotted elements
     end
     setfield!(axis, :elements, Dict{Symbol,Any}())
@@ -122,7 +123,7 @@ function Makie.plot!(P::Type{<:Poly}, axis::GeoAxis, args...; kw_attributes...)
     attributes = Makie.Attributes(kw_attributes)
     source = pop!(attributes, :source, axis.source_projection)
     transformfunc = create_transform(axis.target_projection, source)
-    arg = geomakie_transform(transformfunc, args...)
+    arg = geomakie_transform(transformfunc, convert.(Observable, args)...)
     plt = Makie.plot!(axis.scene, P, attributes, arg)
     if Makie.is_open_or_any_parent(axis.scene)
         reset_limits!(axis)
@@ -135,13 +136,20 @@ function Makie.plot!(P::Makie.PlotFunc, axis::GeoAxis, args...; kw_attributes...
     Makie.plot!(axis, P, attributes, args...)
 end
 
-
 function geomakie_transform(trans, points::AbstractVector{<: Point2})
     return Makie.apply_transform(trans, points)
 end
 
-function geomakie_transform(trans, polygons::AbstractVector{<:Polygon})
-    return map(poly-> geomakie_transform(trans, poly), polygons)
+function geomakie_transform(trans, vec::AbstractVector)
+    return map(x-> geomakie_transform(trans, x), vec)
+end
+
+function geomakie_transform(trans, geom::GeoJSON.FeatureCollection)
+    return geomakie_transform(trans, convert_arguments(Poly, geom)[1])
+end
+
+function geomakie_transform(trans, geom)
+    return geomakie_transform(trans, convert_arguments(Poly, geom)[1])
 end
 
 function geomakie_transform(trans, polygon::Polygon)
@@ -149,11 +157,13 @@ function geomakie_transform(trans, polygon::Polygon)
         geomakie_transform(trans, GeometryBasics.coordinates(polygon.exterior)),
         geomakie_transform.((trans,), GeometryBasics.coordinates.(polygon.interiors)),
     )
-    return map(poly -> Makie.apply_transform(trans, poly), polygons)
 end
 
-geomakie_transform(t::Observable, p::AbstractVector{<:Polygon}) = lift(geomakie_transform, t, p)
+function geomakie_transform(trans, polygon::MultiPolygon)
+    return MultiPolygon(geomakie_transform.((trans,), polygon.polygons))
+end
+
 
 function geomakie_transform(trans::Observable, obs...)
-    return map((args...)-> Makie.apply_transform(args...), trans, obs...)
+    return map((args...) -> geomakie_transform(args...), trans, obs...)
 end
