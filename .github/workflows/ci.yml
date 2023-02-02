@@ -36,7 +36,7 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v1
       - uses: julia-actions/julia-buildpkg@v1
-      - run: julia --project=. -e "using Pkg; pkg"add Makie#sd/geomakie CairoMakie#sd/geomakie GLMakie#sd/geomakie" # TODO remove this later!
+      - run: julia --project=. -e 'using Pkg; pkg"add Makie#sd/geomakie CairoMakie#sd/geomakie GLMakie#sd/geomakie"' # TODO remove this later!
       - uses: julia-actions/julia-runtest@v1
       - uses: actions/upload-artifact@v3
         if: always()
