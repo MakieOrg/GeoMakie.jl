@@ -17,7 +17,7 @@ Makie.@Block GeoAxis begin
     # "The plot elements of the axis - spines, ticks, labels, etc."
     elements::Dict{Symbol, Any}
     @attributes begin
-
+        # Geoaxis/crs stuff
         "The default source CRS of input data"
         source_projection = "+proj=longlat +datum=WGS84"
         "The destination CRS for the axis"
@@ -26,7 +26,8 @@ Makie.@Block GeoAxis begin
         npoints = 1_000
 
         # appearance controls
-
+        "The set of fonts which text in the axis should use.s"
+        fonts = @inherit(:fonts, Makie.minimal_default.fonts)
         "The axis title string."
         title = ""
         "The font family of the title."
@@ -323,39 +324,57 @@ function Makie.initialize_block!(axis::GeoAxis)
         (align, :bottom)
     end
 
-    subtitlet = text!(
+    subtitleplot = text!(
         axis.blockscene, subtitlepos,
         text = axis.subtitle,
         visible = axis.subtitlevisible,
         fontsize = axis.subtitlesize,
         align = titlealignnode,
         font = axis.subtitlefont,
+        fonts = axis.fonts,
         color = axis.subtitlecolor,
         lineheight = axis.subtitlelineheight,
         markerspace = :data,
         inspectable = false)
 
-    axis.elements[:subtitle] = subtitlet
+    axis.elements[:subtitle] = subtitleplot
 
-    titlepos = lift(Makie.calculate_title_position, scene.px_area, axis.titlegap, axis.subtitlegap,
-        axis.titlealign, :bottom, nothing, axis.subtitlelineheight, axis, subtitlet; ignore_equal_values=true)
+    titlepos = lift(
+        Makie.calculate_title_position, 
+        scene.px_area, axis.titlegap, axis.subtitlegap, axis.titlealign, :bottom, nothing, axis.subtitlelineheight, axis, subtitleplot; 
+        ignore_equal_values=true
+    )
 
-    titlet = text!(
+    titleplot = text!(
         axis.blockscene, titlepos,
         text = axis.title,
         visible = axis.titlevisible,
         fontsize = axis.titlesize,
         align = titlealignnode,
         font = axis.titlefont,
+        fonts = axis.fonts,
         color = axis.titlecolor,
         lineheight = axis.titlelineheight,
         markerspace = :data,
         inspectable = false)
 
-    axis.elements[:title] = titlet
+    axis.elements[:title] = titleplot
 
+    update_protrusions_observable = Observable{Bool}(true)
 
-    lift(scene.px_area, axis.titlevisible, axis.subtitlevisible, axis.xticklabelsvisible, axis.yticklabelsvisible) do px_area, args...
+    # on any update to any of the args which is not only a position change, update the protrusions!
+    onany(titleplot.text, titleplot.visible, titleplot.fontsize, titlealignnode, titleplot.font, titleplot.lineheight) do args...
+        update_protrusions_observable[] = true
+    end
+
+    onany(subtitleplot.text, subtitleplot.visible, subtitleplot.fontsize, subtitleplot.font, subtitleplot.lineheight) do args...
+        update_protrusions_observable[] = true
+    end
+
+    # onany()
+# 
+    on(update_protrusions_observable; ignore_equal_values = false) do _notification_argument
+        px_area = scene.px_area[]
         total_protrusion_bbox = reduce(union, Makie.boundingbox.(values(axis.elements)))
         left_prot, bottom_prot = minimum(total_protrusion_bbox)
         right_prot, top_prot   = maximum(total_protrusion_bbox)

@@ -97,21 +97,6 @@ function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 
     return (min[1], max[1], min[2], max[2])
 end
 
-# This is the code for the function body of `apply_transform(f::Proj4.Transformation, r::Rect2)` once Proj4.jl is renamed to Proj.jl
-# out_xmin = Ref{Float64}(0.0)
-# out_ymin = Ref{Float64}(0.0)
-# out_xmax = Ref{Float64}(0.0)
-# out_ymax = Ref{Float64}(0.0)
-# try
-#     Proj.proj_trans_bounds(C_NULL, f.pj, Proj.PJ_FWD, minimum(r)..., maximum(r)..., out_xmin, out_ymin, out_xmax, out_ymax, N)
-# catch e
-#     @show r
-#     @show out_xmin[] out_xmax[] out_ymin[] out_ymax[]
-#     rethrow(e)
-# end
-#
-# return Rect2{T}((out_xmin[], out_xmax[] - out_xmin[]), (out_ymin[], out_ymax[] - out_ymin[]))
-
 
 ############################################################
 #                                                          #
@@ -251,8 +236,8 @@ end
 # Direction finder - find how to displace the tick so that it is out of the axis
 function directional_pad(scene, transform_func, limits, tickcoord_in_inputspace, ticklabel::AbstractString, tickpad, ticksize, tickfont, tickrotation; ds = 0.01)
     # Define shorthand functions for dev purposes - these can be removed before release
-    tfunc = x -> Makie.apply_transform(transform_func, x)
-    inv_tfunc = x -> Makie.apply_transform(Makie.inverse_transform(transform_func), x)
+    tfunc = Base.Fix1(Makie.apply_transform, transform_func)
+    inv_tfunc = Base.Fix1(Makie.apply_transform, Makie.inverse_transform(transform_func))
     # convert tick coordinate to dataspace
     tickcoord_in_dataspace = tfunc(tickcoord_in_inputspace)
     # determine direction to go in order to stay inbounds.
