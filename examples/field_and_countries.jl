@@ -21,7 +21,7 @@ ax = GeoAxis(
     target_projection = "+proj=vandg",
     title = "World Countries",
     tellheight = true,
-    # limits = ((-180, 180), (-90, 90))
+    limits = ((-180, 180), (-90, 90))
 )
 
 hm1 = surface!(ax, lons, lats, field; shading = false)
