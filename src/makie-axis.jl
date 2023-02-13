@@ -46,6 +46,26 @@ function geodefaultlimits(axis::GeoAxis, limits::Rect{2, <: Real})
     return Makie.apply_transform(axis.transform_func[], Rect2d(limits))
 end
 
+inputdefaultlimits(axis::GeoAxis, limits) = limits
+inputdefaultlimits(axis::GeoAxis, limits::NTuple{2, Nothing}) = Rect2d(-180, -90, 360, 180)
+inputdefaultlimits(axis::GeoAxis, limits::NTuple{2, <: NTuple{2, Nothing}}) = Rect2d(-180, -90, 360, 180)
+
+function inputdefaultlimits(axis::GeoAxis, limits::Tuple{NTuple{2, <: Real}, Nothing})
+    return Rect2d(limits[1][1], -90, limits[1][2] - limits[1][1], 180)
+end
+
+function inputdefaultlimits(axis::GeoAxis, limits::Tuple{ Nothing, NTuple{2, <: Real}})
+    return Rect2d(-180, limits[2][1], 360, limits[2][2] - limits[2][1])
+end
+
+function inputdefaultlimits(axis::GeoAxis, limits::Tuple)
+    (xmin, xmax), (ymin, ymax) = limits
+    return Rect2d(xmin, ymin, xmax - xmin, ymax - ymin)
+end
+
+function inputdefaultlimits(axis::GeoAxis, limits::Rect{2, <: Real})
+    return Rect2d(limits)
+end
 
 
 function axis_setup!(axis::GeoAxis)
@@ -53,14 +73,25 @@ function axis_setup!(axis::GeoAxis)
     # so that we don't immediately error
     targetlimits = Observable{Rect2d}(geodefaultlimits(axis, axis.limits[]))
     finallimits = Observable{Rect2d}(targetlimits[]; ignore_equal_values=true)
-    inputlimits = Observable{Union{Nothing, Rect2d}}(; ignore_equal_values=true)
+    inputfinallimits = Observable{Union{Nothing, Rect2d}}(inputdefaultlimits(axis, axis.inputlimits[]); ignore_equal_values=true)
     setfield!(axis, :targetlimits, targetlimits)
     setfield!(axis, :finallimits, finallimits)
-    setfield!(axis, :inputlimits, inputlimits)
+    setfield!(axis, :inputfinallimits, inputfinallimits)
 
-    onany(finallimits, axis.transform_func) do finallims, tfunc
-        result = Makie.apply_transform(Makie.inverse_transform(tfunc), finallims)
-        inputlimits[] = result
+    on(axis.inputlimits) do inputlims
+        targetlimits[] = geodefaultlimits(axis, inputlims)
+    end
+
+    onany(finallimits, axis.transform_func, axis.inputlimits) do finallims, tfunc, inputlims
+        @show finallims
+        result = try
+             Makie.apply_transform(Makie.inverse_transform(tfunc), finallims)
+        catch e
+            @warn "Error in inverse transforming finallims"
+            inputdefaultlimits(axis, inputlims)
+        end
+        @show result
+        inputfinallimits[] = result
     end
     notify(finallimits)
 
@@ -147,24 +178,38 @@ function Makie.reset_limits!(axis::GeoAxis; xauto = true, yauto = true, zauto = 
         error("Invalid y-limits as ylims[1] <= ylims[2] is not met for $ylims.")
     end
 
+    if round(xlims[1]) == -180
+        xlims = (-180, xlims[2])
+    end
+    if round(xlims[2]) == 180
+        xlims = (xlims[1], 180)
+    end
+    if round(ylims[1]) == -90
+        ylims = (-90, ylims[2])
+    end
+    if round(ylims[2]) == 90
+        ylims = (ylims[1], 90)
+    end
     axis.targetlimits[] = Makie.BBox(xlims..., ylims...)
 
     nothing
 end
 
-function autolimits(axis::GeoAxis, dim::Integer)
+function Makie.autolimits(axis::GeoAxis, dim::Integer)
     # try getting x limits for the axis and then union them with linked axes
     lims = Makie.getlimits(axis, dim)
     dimsym = dim == 1 ? :x : :y
     margin = getproperty(axis, Symbol(dimsym, :autolimitmargin))[]
     if !isnothing(lims)
-        lims = Makie.expandlimits(lims, margin[1], margin[2], identity)
+        return lims
     end
 
     # if no limits have been found, use the targetlimits directly
     if isnothing(lims)
-        lims = Makie.limits(axis.targetlimits[], dim)
+        _lims = geodefaultlimits(axis, (lims, lims))
+        lims = (_lims.origin[dim], _lims.origin[dim] + _lims.widths[dim]) 
     end
+
     return lims
 end
 

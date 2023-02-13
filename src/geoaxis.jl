@@ -7,7 +7,7 @@ Makie.@Block GeoAxis begin
     targetlimits::Observable{Rect2d}
     # "Final limits in input space"
     finallimits::Observable{Rect2d}
-    inputlimits::Observable{Union{Nothing, Rect2d}}
+    inputfinallimits::Observable{Union{Nothing, Rect2d}}
     # The default transformation, to cache and save on calls to Proj!
     transform_func::Observable{Any}
     # interaction stuff
@@ -254,8 +254,10 @@ Makie.@Block GeoAxis begin
         xautolimitmargin::Tuple{Float64,Float64} = (0f0, 0f0)
         "The relative margins added to the autolimits in y direction."
         yautolimitmargin::Tuple{Float64,Float64} = (0f0, 0f0)
-        "The limits that the user has manually set. They are reinstated when calling `reset_limits!` and are set to nothing by `autolimits!`. Can be either a tuple (xlow, xhigh, ylow, high) or a tuple (nothing_or_xlims, nothing_or_ylims). Are set by `xlims!`, `ylims!` and `limits!`."
+        "The limits that the user has manually set. They are reinstated when calling `reset_limits!` and are set to nothing by `autolimits!`. Can be either a tuple (xlow, xhigh, ylow, high) or a tuple (nothing_or_xlims, nothing_or_ylims). Are set by `transformedlimits!` and zoom operations."
         limits = (nothing, nothing)
+        "These are the input space limits (usually long/lat) which the user specifies, esp. for ticks etc.  They feed in to `limits` and thereby transformed limits."
+        inputlimits = (nothing, nothing)
 
 
         "The button for panning."
@@ -374,7 +376,7 @@ function Makie.initialize_block!(axis::GeoAxis)
 
     # onany()
 # 
-    on(update_protrusions_observable; ignore_equal_values = false) do _notification_argument
+    on(update_protrusions_observable) do _notification_argument
         px_area = scene.px_area[]
         total_protrusion_bbox = reduce(union, Makie.boundingbox.(values(axis.elements)))
         left_prot, bottom_prot = minimum(total_protrusion_bbox)
@@ -419,7 +421,7 @@ function draw_geoaxis!(ax::GeoAxis, transformation, elements, remove_overlapping
 
     # First we establish the spine points
 
-    lift(ax.inputlimits, ax.xticks, ax.xtickformat, ax.yticks, ax.ytickformat, ax.xminorticks, ax.yminorticks, ax.scene.px_area, transformation, ax.npoints) do limits, xticks, xtickformat, yticks, ytickformat, xminor, yminor, pxarea, transform_func, npoints
+    lift(ax.inputfinallimits, ax.finallimits, ax.xticks, ax.xtickformat, ax.yticks, ax.ytickformat, ax.xminorticks, ax.yminorticks, scene.px_area, transformation, ax.npoints) do limits, _transformedlimits, xticks, xtickformat, yticks, ytickformat, xminor, yminor, pxarea, transform_func, npoints
 
         lmin = minimum(limits)
         lmax = maximum(limits)
@@ -488,7 +490,7 @@ function draw_geoaxis!(ax::GeoAxis, transformation, elements, remove_overlapping
         lftspinepoints[] = project_to_pixelspace(scene, transform_func, Point2f.(xlimits[][1], yrange)) .+ (Point2f(pxarea.origin),)
         rgtspinepoints[] = project_to_pixelspace(scene, transform_func, Point2f.(xlimits[][2], yrange)) .+ (Point2f(pxarea.origin),)
 
-        # TODO: remove when clip begins.
+        # TODO: uncomment when clip begins.
         # clippoints[] = vcat(
         #     btmspinepoints[],
         #     rgtspinepoints[],
@@ -654,8 +656,6 @@ function draw_geoaxis!(ax::GeoAxis, transformation, elements, remove_overlapping
         align = (:center, :center),
     )
 
-
-    # Previously, I hijacked the axis text for this.  However, I don't know what it wo÷
     # For diagnostics only!
     # scatter!(textscene, xtickpoints; visible = ax[:xticklabelsvisible], color = :red, bordercolor=:black)
     # scatter!(textscene, ytickpoints; visible = ax[:yticklabelsvisible], color = :red, bordercolor=:black)
@@ -664,12 +664,12 @@ function draw_geoaxis!(ax::GeoAxis, transformation, elements, remove_overlapping
     translate!.(values(elements), 0, 0, 100)
 
     # Set common attributes for all plots
-    setproperty!.(values(elements), Ref(:inspectable), Ref(false))
-    setproperty!.(values(elements), Ref(:xautolimits), Ref(false))
-    setproperty!.(values(elements), Ref(:yautolimits), Ref(false))
+    setproperty!.(values(elements), (:inspectable,), (false,))
+    setproperty!.(values(elements), (:xautolimits,), (false,))
+    setproperty!.(values(elements), (:yautolimits,), (false,))
 
     # finally, make sure that lift runs again - for some reason, it doesn't work directly
-    notify(ax.inputlimits)
+    notify(ax.inputfinallimits)
     notify(ax.finallimits)
 
     return nothing
@@ -744,7 +744,10 @@ end
 
 function Makie.plot!(P::Makie.PlotFunc, axis::GeoAxis, args...; kw_attributes...)
     attributes = Makie.Attributes(kw_attributes)
-    Makie.plot!(axis, P, attributes, args...)
+    p = Makie.plot!(axis, P, attributes, args...)
+    lift(axis.transform_func) do tf
+        p.transformation.transform_func[] = tf
+    end
 end
 
 function geomakie_transform(trans, points::AbstractVector{<: Point2})
@@ -764,6 +767,7 @@ function geomakie_transform(trans, geom)
 end
 
 function geomakie_transform(trans, polygon::Polygon)
+    # TODO: cut poly edges at transformed points
     return Polygon(
         geomakie_transform(trans, GeometryBasics.coordinates(polygon.exterior)),
         geomakie_transform.((trans,), GeometryBasics.coordinates.(polygon.interiors)),
