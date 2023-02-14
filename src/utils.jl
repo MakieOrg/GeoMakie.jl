@@ -171,15 +171,36 @@ function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 
     return (min[1], max[1], min[2], max[2])
 end
 
-# how to find the border of a projected area in geospace:
-# operate in transformed space, in the Scene's limits
-# project to lat long space
-# whatever is infinite is then outside lat long space
-# thus, this is the border/spine line.
+"""
+    geospine_obs(ga::GeoAxis; padding = 10, density = 2)::Observable{Vector{Point2f}}
 
-# padding - required for the spine to be correct, in case the projection's valid area
-# goes right up against the scene.
-function geospine_obs(ga::GeoAxis; lonrange = (-180, 180), latrange = (-90, 90), padding = 10)
+This function returns an Observable which represents the true border of the geoaxis in question.  
+The observable is lifted on the geoaxis's transform, scene, and final (transformed) limits.
+
+## Approach
+
+Basically, we create a grid of density `density` of the Scene's pixel area, 
+in transformed space (with some `padding` added to each side).  Then, we 
+apply the inverse of `ga.transform_func` to the grid positions, which 
+projects them from transformed to input (lon/lat) space.  This yields
+finite values where the transformed values correspond to some lon/lat,
+and infinite values where they do not.
+
+These values form a Boolean mask.  We find the contour of this mask at level 0.5, 
+then return that as a vector of Point2f in the pixelspace of `ga.blockscene`, to which
+this can be plotted.
+
+## Keyword arguments
+- `padding`: Pads each side by that amount of space in transformed space.  Helps with transforms.
+- `density`: The pixel density of the grid - each real pixel will have `density^2` grid cells.
+
+"""
+function geospine_obs(ga::GeoAxis; padding = 10, density = 2)
+    # how to find the border of a projected area in nonlinearly transformed space:
+    # operate in transformed space, in the Scene's limits
+    # project to input space
+    # whatever is infinite/invalid is then outside lat long space
+    # from this, border/spine line is just the contour at 0.5, if valid → true and invalid → false.
     spineline = Observable(Point2f[])
     lift(ga.transform_func, ga.scene.px_area, ga.finallimits) do ptrans, pxarea, finallims
         # empty the spineline
