@@ -65,6 +65,12 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     end
 end
 
+function Makie.apply_transform(f::Proj.Transformation, r::Rect3{T}) where {T}
+    r2 = Rect2{T}(r)
+    tr2 = Makie.apply_transform(f, r2)
+    return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
+end
+
 _apply_inverse(itrans, p) = Makie.apply_transform(itrans, p .* PROJ_RESCALE_FACTOR) .* PROJ_RESCALE_FACTOR
 
 function Makie.inverse_transform(trans::Proj.Transformation)
@@ -113,6 +119,12 @@ function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie.
         @show r
         rethrow(e)
     end
+end
+
+function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie._apply_inverse), Proj.Transformation}}, r::Rect3{T}) where {T}
+    r2 = Rect2{T}(r)
+    tr2 = Makie.apply_transform(t, r2)
+    return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
 end
 
 Base.isfinite(x::Union{GeometryBasics.AbstractPoint, GeometryBasics.Vec}) = all(isfinite, x)

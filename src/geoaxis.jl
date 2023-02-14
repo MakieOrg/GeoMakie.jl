@@ -93,7 +93,7 @@ Makie.@Block GeoAxis begin
         "The x (longitude) ticks - can be a vector or a Makie tick finding algorithm."
         xticks = Makie.automatic
         "The y (latitude) ticks - can be a vector or a Makie tick finding algorithm."
-        yticks = Makie.automatic 
+        yticks = Makie.automatic
         "Format for x (longitude) ticks."
         xtickformat = Makie.automatic
         "Format for y (latitude) ticks."
@@ -343,8 +343,8 @@ function Makie.initialize_block!(axis::GeoAxis)
     axis.elements[:subtitle] = subtitleplot
 
     titlepos = lift(
-        Makie.calculate_title_position, 
-        scene.px_area, axis.titlegap, axis.subtitlegap, axis.titlealign, :bottom, nothing, axis.subtitlelineheight, axis, subtitleplot; 
+        Makie.calculate_title_position,
+        scene.px_area, axis.titlegap, axis.subtitlegap, axis.titlealign, :bottom, nothing, axis.subtitlelineheight, axis, subtitleplot;
         ignore_equal_values=true
     )
 
@@ -375,8 +375,8 @@ function Makie.initialize_block!(axis::GeoAxis)
     end
 
     # onany()
-# 
-    on(update_protrusions_observable) do _notification_argument
+#
+    lift(update_protrusions_observable; ignore_equal_values = false) do _notification_argument
         px_area = scene.px_area[]
         total_protrusion_bbox = reduce(union, Makie.boundingbox.(values(axis.elements)))
         left_prot, bottom_prot = minimum(total_protrusion_bbox)
@@ -556,7 +556,7 @@ function draw_geoaxis!(ax::GeoAxis, transformation, elements, remove_overlapping
     # insert!(scene.plots, 1, pop!(scene.plots))
 
     # Now we plot the spines.
-    # Make sure that the spines are plotted to the blockscene and not the scene, 
+    # Make sure that the spines are plotted to the blockscene and not the scene,
     # so that they are not cropped!
     elements[:topspineplot] = lines!(
         topscene, topspinepoints;
@@ -642,7 +642,7 @@ function draw_geoaxis!(ax::GeoAxis, transformation, elements, remove_overlapping
         color = ax.xticklabelcolor,
         align = (:center, :center),
     )
-    
+
     elements[:yticklabelplot] = text!(
         textscene,
         yticklabels;
