@@ -146,18 +146,23 @@ function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 
     lons = Float64.(LinRange(lonrange..., 360 * 4))
     lats = Float64.(LinRange(latrange..., 180 * 4))
     # avoid PROJ wrapping 180 to -180
-    lons[1]   = nextfloat(lons[1])   |> nextfloat |> nextfloat# |> nextfloat |> nextfloat
-    lons[end] = prevfloat(lons[end]) |> prevfloat |> prevfloat# |> prevfloat |> prevfloat
-    lats[1]   = nextfloat(lats[1])   |> nextfloat |> nextfloat#
-    lats[end] = prevfloat(lats[end]) |> prevfloat |> prevfloat#
+    # lons[1]   = nextfloat(lons[1])   |> nextfloat |> nextfloat# |> nextfloat |> nextfloat
+    # lons[end] = prevfloat(lons[end]) |> prevfloat |> prevfloat# |> prevfloat |> prevfloat
+    # lats[1]   = nextfloat(lats[1])   |> nextfloat |> nextfloat#
+    # lats[end] = prevfloat(lats[end]) |> prevfloat |> prevfloat#
 
     points = Point2{Float64}.(lons, lats')
     tpoints = ptrans.(points)
     itpoints = Point2{Float64}.(inv(ptrans).(tpoints))
 
+    inf_cont_mask = isfinite.(itpoints)
+
     finite_inds = findall(isfinite, itpoints)
 
-    display(Makie.heatmap(..(lonrange...), ..(latrange...), isfinite.(itpoints); colorrange = (0,1), colormap = [:gray90, :green], axis = (title = "Valid region for:", subtitle = "$ptrans", aspect = DataAspect()), Figure = (resolution = (1200, 1200),)))
+    f = Figure(resolution = (1200, 1000))
+    Label(f[1, 1]; text = "$ptrans", word_wrap = true, justification = :left, tellheight = true, tellwidth = false)
+    a, p = Makie.contour(f[2, 1], ..(lonrange...), ..(latrange...), inf_cont_mask; colorrange = (0,1), colormap = [:gray90, :green], axis = (title = "Valid region", aspect = DataAspect()))
+    display(f)
     # Main.@infiltrate
 
     min, max = getindex.(Ref(itpoints), finite_inds[[begin, end]])
