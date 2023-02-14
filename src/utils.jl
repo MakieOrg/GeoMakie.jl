@@ -171,6 +171,51 @@ function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 
     return (min[1], max[1], min[2], max[2])
 end
 
+# how to find the border of a projected area in geospace:
+# operate in transformed space, in the Scene's limits
+# project to lat long space
+# whatever is infinite is then outside lat long space
+# thus, this is the border/spine line.
+
+# padding - required for the spine to be correct, in case the projection's valid area
+# goes right up against the scene.
+function geospine_obs(ga::GeoAxis; lonrange = (-180, 180), latrange = (-90, 90), padding = 10)
+    spineline = Observable(Point2f[])
+    lift(ga.transform_func, ga.scene.px_area, ga.finallimits) do ptrans, pxarea, finallims
+        # empty the spineline
+        empty!(spineline.val)
+        # TODO: if you zoom in sufficiently, this should somehow correct itself or otherwise not display
+        # but how do you do that?
+        # maybe have some criterion - either geospine or normal spines, but not both
+        # create a grid of the Scene's pixel area, in transformed space
+        xmin, ymin = minimum(finallims)
+        xmax, ymax = maximum(finallims)
+        xs = Float64.(LinRange(xmin - padding, xmax + padding, round(Int, (pxarea.widths[1] + 2 * padding) * 2))) # resolution is 2x pixel resolution, no particular reason.
+        ys = Float64.(LinRange(ymin - padding, ymax + padding, round(Int, (pxarea.widths[2] + 2 * padding) * 2)))
+        # points in transformed space
+        tpoints = Point2{Float64}.(xs, ys')
+        # points in lon/lat space
+        itpoints = Makie.apply_transform(Makie.inverse_transform(ptrans), tpoints)
+        
+        finite_mask = isfinite.(itpoints)
+
+        # there are only two possible values in the finite mask.
+        # so, we can compute the correct spine contour.
+        spine_contour = Makie.Contours.contours(xs, ys, Float32.(finite_mask), [0.5f0])
+        for element in Makie.Contours.lines(first(Makie.Contours.levels(spine_contour)))
+            append!(
+                spineline.val, 
+                Point2f.(Makie.project.((camera(ga.scene),), :data, :pixel, element.vertices)) .+ (pxarea.origin,)
+            )
+        end
+
+        notify(spineline)
+
+    end
+
+    return spineline
+end
+
 
 ############################################################
 #                                                          #

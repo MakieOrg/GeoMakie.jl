@@ -83,14 +83,14 @@ function axis_setup!(axis::GeoAxis)
     end
 
     onany(finallimits, axis.transform_func, axis.inputlimits) do finallims, tfunc, inputlims
-        @show finallims
+        # @show finallims
         result = try
              Makie.apply_transform(Makie.inverse_transform(tfunc), finallims)
         catch e
             @warn "Error in inverse transforming finallims"
             inputdefaultlimits(axis, inputlims)
         end
-        @show result
+        # @show result
         inputfinallimits[] = result
     end
     notify(finallimits)
