@@ -119,6 +119,73 @@ function axis_setup!(axis::GeoAxis)
     return scene
 end
 
+# need this to work well
+
+function iterate_really_transformed(plot)
+    points = Makie.point_iterator(plot)
+    t = Makie.transformation(plot)
+    model = Makie.model_transform(t)
+    # TODO: without this, axes with log scales error.  Why?
+    trans_func = Makie.transform_func(t)
+    # trans_func = identity
+    iterate_really_transformed(points, model, to_value(get(plot, :space, :data)), trans_func)
+end
+
+function iterate_really_transformed(points, model, space, trans_func)
+    (Makie.to_ndim(Point3f, Makie.project(model, Makie.apply_transform(trans_func, point, space)), 0f0) for point in points)
+end
+ 
+
+function transformed_limits(plot::AbstractPlot)
+    Makie.limits_from_transformed_points(iterate_really_transformed(plot))
+end
+
+function _update_rect(rect::Rect{N, T}, point::Point{N, T}) where {N, T}
+    mi = minimum(rect)
+    ma = maximum(rect)
+    mis_mas = map(mi, ma, point) do _mi, _ma, _p
+        (isnan(_mi) ? _p : _p < _mi ? _p : _mi), (isnan(_ma) ? _p : _p > _ma ? _p : _ma)
+    end
+    new_o = map(first, mis_mas)
+    new_w = map(mis_mas) do (mi, ma)
+        ma - mi
+    end
+    typeof(rect)(new_o, new_w)
+end
+
+function transformed_limits(scenelike, exclude=(p)-> false)
+    bb_ref = Base.RefValue(Rect3f())
+    Makie.foreach_plot(scenelike) do plot
+        if !exclude(plot)
+            Makie.update_boundingbox!(bb_ref, transformed_limits(plot))
+        end
+    end
+    return bb_ref[]
+end
+
+# A few overloads for performance
+function transformed_limits(plot::Surface)
+    mini_maxi = Makie.extrema_nan.((plot.x[], plot.y[], plot.z[]))
+    mini = first.(mini_maxi)
+    maxi = last.(mini_maxi)
+    return apply_transform(transform_func(plot), Rect3f(mini, maxi .- mini), to_value(get(plot, :space, :data)))
+end
+
+function transformed_limits(plot::Heatmap)
+    mini_maxi = Makie.extrema_nan.((plot.x[], plot.y[]))
+    mini = Vec3f(first.(mini_maxi)..., 0)
+    maxi = Vec3f(last.(mini_maxi)..., 0)
+    return apply_transform(transform_func(plot), Rect3f(mini, maxi .- mini), to_value(get(plot, :space, :data)))
+end
+
+function transformed_limits(plot::Image)
+    mini_maxi = Makie.extrema_nan.((plot.x[], plot.y[]))
+    mini = Vec3f(first.(mini_maxi)..., 0)
+    maxi = Vec3f(last.(mini_maxi)..., 0)
+    return apply_transform(transform_func(plot), Rect3f(mini, maxi .- mini), to_value(get(plot, :space, :data)))
+end
+
+
 function Makie.autolimits!(ax::GeoAxis)
     ax.limits[] = (nothing, nothing)
     return
@@ -233,7 +300,7 @@ function getlimits(la::GeoAxis, dim)
         return !to_value(get(plot, :visible, true))
     end
     # get all data limits, minus the excluded plots
-    boundingbox = Makie.data_limits(la.scene, exclude)
+    boundingbox = transformed_limits(la.scene, exclude)
     # if there are no bboxes remaining, `nothing` signals that no limits could be determined
     Makie.isfinite_rect(boundingbox) || return nothing
 
