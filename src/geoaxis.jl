@@ -378,7 +378,7 @@ function Makie.initialize_block!(axis::GeoAxis)
 #
     lift(update_protrusions_observable; ignore_equal_values = false) do _notification_argument
         px_area = scene.px_area[]
-        total_protrusion_bbox = reduce(union, Makie.boundingbox.(values(axis.elements)))
+        total_protrusion_bbox = reduce(union, Makie.boundingbox.(filter(p -> to_value(get(p, :visible, true)), collect(values(axis.elements)))))
         left_prot, bottom_prot = minimum(total_protrusion_bbox)
         right_prot, top_prot   = maximum(total_protrusion_bbox)
         left_scene, bottom_scene = minimum(px_area)
