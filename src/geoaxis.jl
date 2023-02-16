@@ -700,6 +700,68 @@ function Makie.ylims!(ax::GeoAxis, ylims)
 end
 
 
+function Makie.hidexdecorations!(la::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true,
+    minorgrid = true, minorticks = true)
+    if label
+        la.xlabelvisible = false
+    end
+    if ticklabels
+        la.xticklabelsvisible = false
+    end
+    if ticks
+        la.xticksvisible = false
+    end
+    if grid
+        la.xgridvisible = false
+    end
+    if minorgrid
+        la.xminorgridvisible = false
+    end
+    if minorticks
+        la.xminorticksvisible = false
+    end
+end
+
+function Makie.hideydecorations!(la::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true,
+    minorgrid = true, minorticks = true)
+    if label
+        la.ylabelvisible = false
+    end
+    if ticklabels
+        la.yticklabelsvisible = false
+    end
+    if ticks
+        la.yticksvisible = false
+    end
+    if grid
+        la.ygridvisible = false
+    end
+    if minorgrid
+        la.yminorgridvisible = false
+    end
+    if minorticks
+        la.yminorticksvisible = false
+    end
+end
+
+function Makie.hidedecorations!(la::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true,
+    minorgrid = true, minorticks = true)
+hidexdecorations!(la; label = label, ticklabels = ticklabels, ticks = ticks, grid = grid,
+    minorgrid = minorgrid, minorticks = minorticks)
+hideydecorations!(la; label = label, ticklabels = ticklabels, ticks = ticks, grid = grid,
+    minorgrid = minorgrid, minorticks = minorticks)
+end
+
+function Makie.hidespines!(la::GeoAxis, spines::Symbol... = (:l, :r, :b, :t)...)
+    :l in spines && (la.leftspinevisible = false)
+    :r in spines && (la.rightspinevisible = false)
+    :b in spines && (la.bottomspinevisible = false)
+    :t in spines && (la.topspinevisible = false)
+    if !isempty(setdiff(spines, (:l, :r, :b, :t)))
+        error("Invalid spine identifier $x. Valid options are :l, :r, :b and :t.")
+    end
+end
+
 
 """
     create_transform(dest::String, source::String)
@@ -720,7 +782,7 @@ function Makie.plot!(
     attributes::Makie.Attributes, args...; kw_attributes...)
     allattrs = merge(attributes, Attributes(kw_attributes))
     source = pop!(allattrs, :source, axis.source_projection)
-    transformfunc = create_transform(source, axis.target_projection)
+    transformfunc = source == axis.source_projection ? axis.transform_func : create_transform(source, axis.target_projection)
     trans = Transformation(transformfunc)
     allattrs[:transformation] = trans
     plt = Makie.plot!(axis.scene, P, allattrs, args...)
@@ -745,9 +807,7 @@ end
 function Makie.plot!(P::Makie.PlotFunc, axis::GeoAxis, args...; kw_attributes...)
     attributes = Makie.Attributes(kw_attributes)
     p = Makie.plot!(axis, P, attributes, args...)
-    lift(axis.transform_func) do tf
-        p.transformation.transform_func[] = tf
-    end
+    return p
 end
 
 function geomakie_transform(trans, points::AbstractVector{<: Point2})
@@ -842,13 +902,13 @@ function geospine_obs(ga::GeoAxis; padding = 10, density = 2)
         finite_mask = isfinite.(itpoints)
         if padding != 0
             # bottom
-            finite_mask[1:padding, :] = false
+            finite_mask[1:padding, :] .= false
             # top
-            finite_mask[(end-padding):end, :] = false
+            finite_mask[(end-padding):end, :] .= false
             # left
-            finite_mask[:, 1:padding] = false
+            finite_mask[:, 1:padding] .= false
             # right
-            finite_mask[:, (end-padding):end] = false
+            finite_mask[:, (end-padding):end] .= false
         end
 
         # there are only two possible values in the finite mask.
