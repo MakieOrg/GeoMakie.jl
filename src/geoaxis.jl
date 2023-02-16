@@ -661,7 +661,7 @@ function draw_geoaxis!(ax::GeoAxis, transformation, elements, remove_overlapping
     # scatter!(textscene, ytickpoints; visible = ax[:yticklabelsvisible], color = :red, bordercolor=:black)
 
     # Finally, we translate these plots such that they are above the content.
-    translate!.(values(elements), 0, 0, 100)
+    translate!.(values(elements), 0, 0, 1000)
 
     # Set common attributes for all plots
     setproperty!.(values(elements), (:inspectable,), (false,))
