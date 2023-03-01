@@ -445,7 +445,7 @@ module LineSplitting
 		[split(a,lon0) for a in tmp]
 	end
 	
-	function split(tmp::LineString,lon0=-160.0)
+	function split(tmp::LineString, lon0::Real)
 		lon0<0.0 ? lon1=lon0+180 : lon1=lon0-180 
 		np=length(tmp)
 		tmp2=fill(0,np)
