@@ -24,7 +24,7 @@ Makie.set_theme!(Theme(
         @test GeoMakie.coastlines()[1] isa GeometryBasics.LineString
     end
 
-    @testset "LineSplitting" begin
+    @testset "Line Splitting" begin
         @test split(GeoMakie.coastlines(),"+lon_0=-160") isa Vector
         @test split(GeoMakie.coastlines(),"+lon_0=-160")[1] isa GeometryBasics.LineString
     end
