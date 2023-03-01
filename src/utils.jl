@@ -441,7 +441,7 @@ module LineSplitting
 		coastlines_custom
 	end
 	
-	function split(tmp::Vector,lon0=-160.0)
+	function split(tmp::Vector{<:LineString}, lon0::Real)
 		[split(a,lon0) for a in tmp]
 	end
 	
