@@ -463,7 +463,7 @@ module LineSplitting
 
 	split(tmp::Vector,dest::Observable) = tmp
 
-	function split(tmp::Vector,dest::String)
+	function split(tmp::Vector{<:LineString},dest::String)
 		if occursin("+lon_0",dest)
 			tmp1=split(dest)
 			tmp2=findall(occursin.(Ref("+lon_0"),tmp1))[1]
