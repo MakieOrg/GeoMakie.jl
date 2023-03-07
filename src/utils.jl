@@ -131,7 +131,7 @@ julia> geoformat_ticklabels([1.0, 1.1, 2.5, 25])
  "1.1ᵒ"
  "2.5ᵒ"
  "25ᵒ"
- ```
+```
 """
 function geoformat_ticklabels(nums)
     labels = fill("", length(nums))
