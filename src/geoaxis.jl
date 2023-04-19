@@ -77,8 +77,8 @@ include("makie-axis.jl")
 
 function Makie.initialize_block!(axis::GeoAxis)
     scene = axis_setup!(axis)
-    lonticks = -180:60:180
-    latticks = -90:30:90
+    lonticks = -180:10:180
+    latticks = -90:10:90
     ptrans = create_transform(axis.target_projection, axis.source_projection)
     for lon in lonticks
         coords = Makie.apply_transform(ptrans[], [Point2f(lon, l) for l in range(latticks[1], latticks[end]; length=100)])

@@ -113,6 +113,25 @@ end
 xautolimits(axis::GeoAxis) = autolimits(axis, 1)
 yautolimits(axis::GeoAxis) = autolimits(axis, 2)
 
+function iterate_transformed(plot)
+    points = Makie.point_iterator(plot)
+    t = Makie.transformation(plot)
+    model = Makie.model_transform(t)
+    trans_func = Makie.transform_func(t)
+    return Makie.iterate_transformed(points, model, to_value(get(plot, :space, :data)), trans_func)
+end
+
+function transformed_limits(scenelike, exclude=(p) -> false)
+    bb_ref = Base.RefValue(Rect3f())
+    Makie.foreach_plot(scenelike) do plot
+        if !exclude(plot)
+            box = Makie.limits_from_transformed_points(iterate_transformed(plot))
+            Makie.update_boundingbox!(bb_ref, box)
+        end
+    end
+    return bb_ref[]
+end
+
 
 function getlimits(la::GeoAxis, dim)
     # find all plots that don't have exclusion attributes set
@@ -130,7 +149,7 @@ function getlimits(la::GeoAxis, dim)
         return !to_value(get(plot, :visible, true))
     end
     # get all data limits, minus the excluded plots
-    boundingbox = Makie.data_limits(la.scene, exclude)
+    boundingbox = transformed_limits(la.scene, exclude)
     # if there are no bboxes remaining, `nothing` signals that no limits could be determined
     Makie.isfinite_rect(boundingbox) || return nothing
 
