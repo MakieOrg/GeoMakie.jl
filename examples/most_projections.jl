@@ -1,5 +1,7 @@
 using Makie, CairoMakie
 using GeoMakie
+using ProgressMeter
+
 
 projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=aea +lat_1=29.5 +lat_2=42.5", "+proj=aeqd", "+proj=airy", "+proj=aitoff",
@@ -30,9 +32,6 @@ projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=wag5", "+proj=wag6", "+proj=wag7", "+proj=webmerc +datum=WGS84", "+proj=weren",
 "+proj=wink1", "+proj=wink2", "+proj=wintri"]
 
-using TimerOutputs
-const to = TimerOutput()
-
 fig = Figure(resolution=(1500, 9000))
 
 geoaxes = []
@@ -51,6 +50,8 @@ k = 1
         ga = GeoAxis(
             fig[i*2, j]; 
             target_projection=projections[k], 
+            spinecolor = :red,
+            spinewidth = 3,
             # title=projections[k], 
             # xticklabelsvisible = false,
             # yticklabelsvisible = false,
