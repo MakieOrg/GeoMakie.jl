@@ -4,7 +4,6 @@
 #                                                          #
 ############################################################
 
-
 const PROJ_RESCALE_FACTOR = 100_000
 
 # This function is a little gnarly.
@@ -28,7 +27,7 @@ function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecType
     catch e
         # catch this annoying edge case
         # if pt[2] ≈ 90.0f0 || pt[2] ≈ -90.0f0
-        #     println("Caught a 90-lat")
+        #     println("Caught a 90° latitude")
         #     return Point(t(Vec(pt[1], 90.0f0)) ./ PROJ_RESCALE_FACTOR)
         # end
         println("Invalid point for transformation: $(pt)")
@@ -39,18 +38,93 @@ end
 function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     xmin, ymin = minimum(r)
     xmax, ymax = maximum(r)
+
+    if isapprox(xmin, -180, rtol = 1e-4)
+        xmin - -180e0
+    end
+    if isapprox(xmax, 180; rtol = 1e-4)
+        xmax = 180e0
+    end
+    if isapprox(ymin, -90; rtol = 1e-4)
+        ymin = -90e0
+    end
+    if isapprox(ymax, 90; rtol = 1e-4)
+        ymax = 90e0
+    end
+
+    try
     
     (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
 
     return Rect(Vec2(T(umin), T(vmin)) ./ PROJ_RESCALE_FACTOR,
                 Vec2(T(umax-umin), T(vmax-vmin)) ./ PROJ_RESCALE_FACTOR)
+    catch e
+        @show r
+        rethrow(e)
+    end
 end
+
+function Makie.apply_transform(f::Proj.Transformation, r::Rect3{T}) where {T}
+    r2 = Rect2{T}(r)
+    tr2 = Makie.apply_transform(f, r2)
+    return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
+end
+
+_apply_inverse(itrans, p) = Makie.apply_transform(itrans, p .* PROJ_RESCALE_FACTOR) .* PROJ_RESCALE_FACTOR
 
 function Makie.inverse_transform(trans::Proj.Transformation)
     itrans = Base.inv(trans)
-    return Makie.PointTrans{2}() do p
-        return Makie.apply_transform(itrans, p) .* PROJ_RESCALE_FACTOR
+    return Makie.PointTrans{2}(Base.Fix1(_apply_inverse, itrans))
+end
+
+function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie._apply_inverse), Proj.Transformation}}, r::Rect2{T}) where T
+    f = t.f.x
+    xmin, ymin = minimum(r) .* PROJ_RESCALE_FACTOR
+    xmax, ymax = maximum(r) .* PROJ_RESCALE_FACTOR
+    try
+    
+        (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
+        @show umin umax vmin vmax
+
+    if !isfinite(umin) || abs(umin) > 1e8
+        umin = -180.0
     end
+    if !isfinite(umax) || abs(umax) > 1e8
+        umax = 180.0
+    end
+
+    if !isfinite(vmin) || abs(vmin) > 1e8
+        vmin = -90.0
+    end
+    if !isfinite(vmax) || abs(vmax) > 1e8
+        vmax = 90.0
+    end
+
+    if isapprox(umin, -180, rtol = 1e-4)
+        umin - -180e0
+    end
+    if isapprox(umax, 180; rtol = 1e-4)
+        umax = 180e0
+    end
+    if isapprox(vmin, -90; rtol = 1e-4)
+        vmin = -90e0
+    end
+    if isapprox(vmax, 90; rtol = 1e-4)
+        vmax = 90e0
+    end
+
+    return Rect(Vec2(T(umin), T(vmin)),
+                Vec2(T(umax-umin), T(vmax-vmin)))
+    catch e
+        @show r
+        rethrow(e)
+    end
+end
+
+function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie._apply_inverse), Proj.Transformation}}, r::Rect3{T}) where {T}
+    r2 = Rect2{T}(r)
+    tr2 = Makie.apply_transform(t, r2)
+    return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
 end
 
 Base.isfinite(x::Union{GeometryBasics.AbstractPoint, GeometryBasics.Vec}) = all(isfinite, x)
@@ -403,5 +477,44 @@ macro hijack_observable(name)
         hijacked_observables[$name][] = $(true)
 
     end)
+
+end
+
+
+############################################################
+#             Spine and rectangle intersection             #
+############################################################
+
+"""
+    interset_spine_and_rect(spineline::Vector{<: Point2}, box::Rect2)
+
+
+"""
+function interset_spine_and_rect(spineline::Vector{<: Point2}, box::Rect2)
+
+    boxxmin, boxymin = minimum(box)
+    boxxmax, boxymax = maximum(box)
+    box_line = Point2f[(boxxmin, boxymin), (boxxmax, boxymin), (boxxmax, boxymax), (boxxmin, boxymax), (boxxmin, boxymin)]
+
+    final_line = Vector{Point2f}()
+    sizehint!(final_line, length(spineline))
+
+    this_point_in_box = in(spineline[1], box) # check if we are currently in the box
+    next_point_in_box = in(spineline[2], box) # check if we will go into the box at the end of this segment
+
+    if this_point_in_box # inside the box - use the spine!
+        push!(final_line, spineline[1])
+    else # outside the box - use the box point!
+    end
+
+    for i in 2:(length(spineline) - 1)
+        # check if the spineline intercepts the box line
+        this_point_in_box = in(spineline[i], box)
+        next_point_in_box = in(spineline[i + 1], box)
+        
+    end
+
+    # to finish, check whether you're in the box or not
+    # ifnot, then connect to the 
 
 end

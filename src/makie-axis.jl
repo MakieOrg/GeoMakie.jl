@@ -31,6 +31,7 @@ function axis_setup!(axis::GeoAxis)
     if fl == finallimits[]
         notify(finallimits)
     end
+    
     return scene
 end
 

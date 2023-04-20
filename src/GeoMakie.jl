@@ -45,6 +45,11 @@ export Proj
 export FileIO
 
 include("geoaxis.jl")
+include("makie-axis.jl")
+include("geospine.jl")
+
+# some basic recipes
+include("mesh_image.jl")
 
 export GeoAxis, datalims, datalims!, automatic
 
