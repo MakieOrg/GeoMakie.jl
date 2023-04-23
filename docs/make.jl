@@ -14,7 +14,7 @@ end
 
 # use Literate for examples
 examples = readdir(joinpath(dirname(@__DIR__), "examples"); join = true)
-deleteat!(examples, collect(axes(examples, 1))[!isfile.(examples)])
+deleteat!(examples, collect(axes(examples, 1))[(!).(isfile.(examples))])
 for example in examples
     Literate.markdown(example, joinpath(@__DIR__, "src"); documenter = true)
 end
