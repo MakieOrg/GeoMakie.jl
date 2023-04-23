@@ -375,7 +375,7 @@ function Makie.plot!(
     axis::GeoAxis, P::Makie.PlotFunc,
     attributes::Makie.Attributes, args...; kw_attributes...)
     allattrs = merge(attributes, Attributes(kw_attributes))
-    source = pop!(allattrs, :source, axis.source_projection)
+    source = pop!(allattrs, :source_projection, axis.source_projection)
     transformfunc = create_transform(axis.target_projection, source)
     trans = Transformation(transformfunc)
     allattrs[:transformation] = trans
