@@ -19,10 +19,14 @@ makedocs(;
     format=Documenter.HTML(; prettyurls=deploy, collapselevel=3),
     pages=[
         "GeoMakie.jl" => "index.md",
-        "Examples" => "examples.md"
+        "Examples" => "examples.md",
+        "Nonlinear transforms" => "nonlinear_transforms.md",
+        "Developer documentation" => [
+            "Architecture" => "architecture.md"
+        ]
         ],
     sitename="GeoMakie.jl",
-    authors="Makie.jl contributors",
+    authors="Anshul Singhvi and the Makie.jl contributors",
     strict=true)
 
 deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true)
