@@ -38,6 +38,7 @@ include("geojson.jl") # GeoJSON/GeoInterface support
 include("conversions.jl")
 include("data.jl")
 include("utils.jl")
+include("geodesy.jl")
 
 @reexport using Colors, Makie
 export Proj
