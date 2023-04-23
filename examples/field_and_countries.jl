@@ -1,4 +1,4 @@
-# This example was taken from Lazar Alonso's
+# This example was taken from Lazaro Alonso's
 # BeautifulMakie.jl repository.  It has some really
 # good stuff - check it out!
 using Makie, CairoMakie, GeoMakie

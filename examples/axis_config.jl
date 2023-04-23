@@ -1,3 +1,7 @@
+# How to mess with GeoAxis
+# !!! warning
+#     This was written for the old API and doesn't work for the new one!
+
 using Makie, CairoMakie, GeoMakie
 
 fig = Figure(resolution = (1000,1000))

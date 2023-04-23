@@ -77,4 +77,5 @@ k = 1
     k += 1
 end
 
-@time save("most_projections.png", fig; px_per_unit = 2)
+fig
+# If you are curious, run `@time save("most_projections.png", fig; px_per_unit = 2)`.

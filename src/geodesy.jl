@@ -6,7 +6,7 @@ function Makie.apply_transform(f::Geodesy.ECEFfromLLA, pt::V) where V <: VecType
     # The convention in Makie is that x is longitude, y is latitude, and z is altitude if present.
     # However, the `LLA` coordinate space expects x to be latitude and y to be longitude,
     # so we have to manually swap the coordinates.
-    return V((f(LLA(pt[2], pt[1], pt[3])) ./ 5f4)...)
+    return V((f(LLA(pt[2], pt[1], pt[3])) ./ 2.5f3)...)
     # Enterprising observers will note the division by 50,000.  This is to "normalize" the sphere; 
     # Geodesy.jl outputs in meters, which would make the sphere hilariously large. 
     # This also fits well with Makie's limit finding, which works in input space, and not transformed space.

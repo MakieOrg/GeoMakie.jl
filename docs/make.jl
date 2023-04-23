@@ -1,4 +1,5 @@
-using Documenter, GeoMakie, CairoMakie
+using Documenter, Literate
+using GeoMakie, CairoMakie
 CairoMakie.activate!()
 
 # invoke some geomakie things to be sure
@@ -11,7 +12,12 @@ if deploy && !haskey(ENV, "GITHUB_TOKEN")
     deploy = false
 end
 
-include("generate_examples.jl")
+# use Literate for examples
+examples = readdir(joinpath(dirname(@__DIR__), "examples"); join = true)
+deleteat!(examples, collect(axes(examples, 1))[!isfile.(examples)])
+for example in examples
+    Literate.markdown(example, joinpath(@__DIR__, "src"); documenter = true)
+end
 
 makedocs(;
     modules=[GeoMakie],
@@ -19,7 +25,21 @@ makedocs(;
     format=Documenter.HTML(; prettyurls=deploy, collapselevel=3),
     pages=[
         "GeoMakie.jl" => "index.md",
-        "Examples" => "examples.md",
+        "Examples" => [
+            "Basic examples" => "basic.md",
+            "Geostationary satellite image" => "geostationary_image.md",
+            "Contourf" => "contourf.md",
+            "Axis configuration" => "axis_config.md",
+            "Geodetic transformation to the sphere" => "geodesy.md",
+            # "Italy's states" => "italy.md",
+            "Most Projections" => "most_projections.md",
+            "Projections" => "projections.md",
+            "Orthographic projection" => "orthographic.md",
+            "World Population centers" => "world_population.md",
+            "Field and countries" => "field_and_countries.md",
+            "Mesh image recipe" => "meshimage.md",
+            # "GraphMakie with GeoMakie" => "graph_on_usa.md",
+        ],
         "Nonlinear transforms" => "nonlinear_transforms.md",
         "Developer documentation" => [
             "Architecture" => "architecture.md"
