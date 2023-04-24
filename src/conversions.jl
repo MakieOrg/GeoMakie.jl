@@ -1,6 +1,7 @@
 # # Helper functions
 to_point2(a::Vector{<: T}) where T = Point2{T}(a[1], a[2])
 to_point2(a::AbstractVector{T}) where T <: Number = Point2{T}(a[1], a[2])
+to_point2(a::Tuple{T1 <: Number, T2 <: Number}) where {T1, T2} = Point2{promote_type(T1, T2)}(a[1], a[2])
 
 # set the default plot type for Vectors of polygons,
 # so that they are plotted using the most efficient method!
