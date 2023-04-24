@@ -385,7 +385,7 @@ function Makie.plot!(
     # ALSO TODO: get Rasters.jl hooked up to GeoInterface.crs.
 
     # Now, we construct a transformation, knowing the previous kwargs and the new transform.
-    trans = Transformation(transformfunc; get(allattrs[:transformation], (;))...)
+    trans = Transformation(transformfunc; get(allattrs, :transformation, Attributes())...)
     allattrs[:transformation] = trans
     # Plot using the altered keyword arguments
     plt = Makie.plot!(axis.scene, P, allattrs, args...)
