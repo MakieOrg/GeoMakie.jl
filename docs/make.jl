@@ -35,6 +35,7 @@ makedocs(;
             "Orthographic projection" => "orthographic.md",
             "Geostationary satellite image" => "geostationary_image.md",
             "Contourf" => "contourf.md",
+            "Multiple CRS" => "multiple_crs.md"
             "World Population centers" => "world_population.md",
             "Field and countries" => "field_and_countries.md",
             "Mesh image recipe" => "meshimage.md",
