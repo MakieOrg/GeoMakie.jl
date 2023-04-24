@@ -371,15 +371,25 @@ function create_transform(dest::Observable, source::Observable)
     return map!(create_transform, result, dest, source)
 end
 
+# This is where we override the stuff to make it our stuff.
+
 function Makie.plot!(
     axis::GeoAxis, P::Makie.PlotFunc,
     attributes::Makie.Attributes, args...; kw_attributes...)
     allattrs = merge(attributes, Attributes(kw_attributes))
+    # get the source projection and pass it backend
     source = pop!(allattrs, :source_projection, axis.source_projection)
     transformfunc = create_transform(axis.target_projection, source)
-    trans = Transformation(transformfunc)
+    # TODO: get this to automatically figure the projection out based on
+    # GeoInterface.crs or similar.
+    # ALSO TODO: get Rasters.jl hooked up to GeoInterface.crs.
+
+    # Now, we construct a transformation, knowing the previous kwargs and the new transform.
+    trans = Transformation(transformfunc; get(allattrs[:transformation], (;))...)
     allattrs[:transformation] = trans
+    # Plot using the altered keyword arguments
     plt = Makie.plot!(axis.scene, P, allattrs, args...)
+    
     if Makie.is_open_or_any_parent(axis.scene)
         reset_limits!(axis)
     end

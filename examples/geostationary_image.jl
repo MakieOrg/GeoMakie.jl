@@ -15,7 +15,7 @@ surface!(
     -5500000..5500000, -5500000..5500000, # the bounding box in input space for the image
     ones(size(img)...); # dummy points to create the surface
     color = img,
-    source_projection = img_crs
+    source_projection = "+proj=geos +h=35786000"
 )
 fig
 

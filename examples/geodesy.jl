@@ -12,6 +12,7 @@ tmax_raster = cat(tmax_stack...; dims = Ti(1:12))
 # First, we extract a slice of the datacube in time:
 current_raster = tmax_raster[Ti(axes(tmax_raster, 3)[1])]
 # then, convert it using Makie's `convert_arguments` functionality, which replaces e.g. missing with NaN and straightens axes.
+# This is what the plotting recipe will ultimately see.
 x, y, z = Makie.convert_arguments(Makie.ContinuousSurface(), current_raster)
 # We want any place with missing data to show up as black, so we replace all NaNs with 0.  
 # For the type of data we're using, and the type of visualization, this is a reasonable assumption.
