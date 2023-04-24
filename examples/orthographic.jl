@@ -8,10 +8,10 @@ fig = Figure()
 ga = GeoAxis(
     fig[1, 1],
     target_projection="+proj=ortho",
-    title = "Orthographic projection with proper limits"
+    title = "Orthographic projection"
 )
 # hidedecorations!(ga)
-lines!(ga, GeoMakie.coastlines())
+lines!(ga, GeoMakie.coastlines(); transformation = (; translation = (0, 0, 1)))
 sp = surface!(ga, lons, lats, field; shading = false, colormap = :rainbow_bgyrm_35_85_c69_n256)
 cb = Colorbar(fig[1, 2], sp)
 
