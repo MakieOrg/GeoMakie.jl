@@ -1,7 +1,7 @@
-# GeoMakie in
-using GeoMakie
+# GeoMakie integrates Makie's transformation interface and Geodesy.jl.
+# Let's get a Raster and set our data up:
+using Makie, GeoMakie
 using Rasters, Dates
-ENV["RASTERDATASOURCES_PATH"] = joinpath(first(Base.DEPOT_PATH), "artifacts") # hide
 joinpath(homedir(), "Downloads", "GEOSCarb_CASAGFED3v3_Flux.3hour.x576_y361.200301.nc") # hide
 
 # First, load the Raster.
@@ -36,4 +36,4 @@ record(f, "earth_temperature_deformations.mp4", axes(env_transfer_raw_raster, 3)
     surface_mesh = CairoMakie.surface2mesh(x, y, transform_z .* 1e8) # 1e8 is a scale factor to make deformations look good!
     p.input_args[1][] = surface_mesh
 end
-
+# ![](earth_temperature_deformations.mp4)

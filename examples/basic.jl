@@ -1,4 +1,4 @@
-using GeoMakie, CairoMakie
+using Makie, GeoMakie, CairoMakie
 
 lons = -180:180
 lats = -90:90

@@ -52,27 +52,26 @@ k = 1
             target_projection=projections[k], 
             spinecolor = :red,
             spinewidth = 3,
-            # title=projections[k], 
-            # xticklabelsvisible = false,
-            # yticklabelsvisible = false,
-            # tellheight = true, tellwidth = true
+            ## title=projections[k], 
+            ## xticklabelsvisible = false,
+            ## yticklabelsvisible = false,
+            ## tellheight = true, tellwidth = true
         )
         lines!(ga, GeoMakie.coastlines())
 
-        # lines!(ga.blockscene, GeoMakie.geospine_obs(ga); linewidth = 1.5, color = :blue)
+        ## lines!(ga.blockscene, GeoMakie.geospine_obs(ga); linewidth = 1.5, color = :blue)
 
         push!(geoaxes, ga)
-        # hidedecorations!(ga)
-        # hidespines!(ga)
+        ## hidedecorations!(ga)
+        ## hidespines!(ga)
 
-        # Makie.update_state_before_display()
+        ## Makie.update_state_before_display()
 
     catch ex
         println(projections[k])
         println(ex)
-        
     finally
-        # save(joinpath(@__DIR__, "images", "$k.png"), fig; update = true)
+        ## save(joinpath(@__DIR__, "images", "$k.png"), fig; update = true)
     end
     k += 1
 end

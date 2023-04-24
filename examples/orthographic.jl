@@ -1,4 +1,4 @@
-using GeoMakie, CairoMakie
+using Makie, GeoMakie, CairoMakie
 
 # Limited-domain projections (like orthographic) must have
 # their limits correctly set!

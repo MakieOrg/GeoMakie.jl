@@ -1,4 +1,4 @@
-using GeoMakie, CairoMakie
+using Makie, GeoMakie, CairoMakie
 using Downloads, FileIO
 # Download a geostationary satellite image
 img = rotr90(FileIO.load(Downloads.download("https://gist.github.com/pelson/5871263/raw/EIDA50_201211061300_clip2.png")))

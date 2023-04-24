@@ -17,8 +17,8 @@ begin
     fig = Figure(resolution = (1000,500))
     ga = GeoAxis(
         fig[1, 1];
-        source = source,
-        dest = dest
+        source_projection = source,
+        target_projection = dest
     )
 
     ga.xticklabelsvisible[] = false

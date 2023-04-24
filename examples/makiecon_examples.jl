@@ -1,6 +1,6 @@
-using GeoMakie, CairoMakie
+using Makie, GeoMakie, CairoMakie
 
-using Rasters
+using Rasters # deliver Rasters unto this world
 
 prec_raster = Raster(WorldClim{Climate}, :prec; month = 7)
 

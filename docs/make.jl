@@ -1,6 +1,10 @@
 using Documenter, Literate
-using GeoMakie, CairoMakie
-CairoMakie.activate!()
+using GeoMakie, CairoMakie, Makie
+# Set some global settings
+# Good quality CairoMakie with PNG
+CairoMakie.activate!(px_per_unit = 2, type = :png)
+# Rasters should download into the artifacts folder (so they can be cached :D)
+ENV["RASTERDATASOURCES_PATH"] = joinpath(first(Base.DEPOT_PATH), "artifacts")
 
 # invoke some geomakie things to be sure
 GeoMakie.coastlines()
@@ -27,17 +31,18 @@ makedocs(;
         "GeoMakie.jl" => "index.md",
         "Examples" => [
             "Basic examples" => "basic.md",
+            "New API" => "new.md",
+            "Orthographic projection" => "orthographic.md",
             "Geostationary satellite image" => "geostationary_image.md",
             "Contourf" => "contourf.md",
-            "Axis configuration" => "axis_config.md",
-            "Geodetic transformation to the sphere" => "geodesy.md",
-            # "Italy's states" => "italy.md",
-            "Most Projections" => "most_projections.md",
-            "Projections" => "projections.md",
-            "Orthographic projection" => "orthographic.md",
             "World Population centers" => "world_population.md",
             "Field and countries" => "field_and_countries.md",
             "Mesh image recipe" => "meshimage.md",
+            "Geodetic transformation to the sphere" => "geodesy.md",
+            "Axis configuration" => "axis_config.md",
+            # "Italy's states" => "italy.md",
+            "Most Projections" => "most_projections.md",
+            "Projections" => "projections.md",
             # "GraphMakie with GeoMakie" => "graph_on_usa.md",
         ],
         "Nonlinear transforms" => "nonlinear_transforms.md",
