@@ -86,35 +86,35 @@ function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie.
         (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
         @show umin umax vmin vmax
 
-    if !isfinite(umin) || abs(umin) > 1e8
-        umin = -180.0
-    end
-    if !isfinite(umax) || abs(umax) > 1e8
-        umax = 180.0
-    end
+        if !isfinite(umin) || abs(umin) > 1e8
+            umin = -180.0
+        end
+        if !isfinite(umax) || abs(umax) > 1e8
+            umax = 180.0
+        end
 
-    if !isfinite(vmin) || abs(vmin) > 1e8
-        vmin = -90.0
-    end
-    if !isfinite(vmax) || abs(vmax) > 1e8
-        vmax = 90.0
-    end
+        if !isfinite(vmin) || abs(vmin) > 1e8
+            vmin = -90.0
+        end
+        if !isfinite(vmax) || abs(vmax) > 1e8
+            vmax = 90.0
+        end
 
-    if isapprox(umin, -180, rtol = 1e-4)
-        umin - -180e0
-    end
-    if isapprox(umax, 180; rtol = 1e-4)
-        umax = 180e0
-    end
-    if isapprox(vmin, -90; rtol = 1e-4)
-        vmin = -90e0
-    end
-    if isapprox(vmax, 90; rtol = 1e-4)
-        vmax = 90e0
-    end
+        if isapprox(umin, -180, rtol = 1e-4)
+            umin - -180e0
+        end
+        if isapprox(umax, 180; rtol = 1e-4)
+            umax = 180e0
+        end
+        if isapprox(vmin, -90; rtol = 1e-4)
+            vmin = -90e0
+        end
+        if isapprox(vmax, 90; rtol = 1e-4)
+            vmax = 90e0
+        end
 
-    return Rect(Vec2(T(umin), T(vmin)),
-                Vec2(T(umax-umin), T(vmax-vmin)))
+        return Rect(Vec2(T(umin), T(vmin)),
+                    Vec2(T(umax-umin), T(vmax-vmin)))
     catch e
         @show r
         rethrow(e)
@@ -490,29 +490,40 @@ end
 
 
 """
-function interset_spine_and_rect(spineline::Vector{<: Point2}, box::Rect2)
-
-    boxxmin, boxymin = minimum(box)
-    boxxmax, boxymax = maximum(box)
-    box_line = Point2f[(boxxmin, boxymin), (boxxmax, boxymin), (boxxmax, boxymax), (boxxmin, boxymax), (boxxmin, boxymin)]
+function interset_spine_and_rect(spine_line::Vector{<: Point2}, box::Rect2)
 
     final_line = Vector{Point2f}()
-    sizehint!(final_line, length(spineline))
+    sizehint!(final_line, length(spine_line))
 
-    this_point_in_box = in(spineline[1], box) # check if we are currently in the box
-    next_point_in_box = in(spineline[2], box) # check if we will go into the box at the end of this segment
+    this_point_in_box = in(spine_line[1], box) # check if we are currently in the box
+    next_point_in_box = in(spine_line[2], box) # check if we will go into the box at the end of this segment
 
     if this_point_in_box # inside the box - use the spine!
-        push!(final_line, spineline[1])
+        push!(final_line, spine_line[1])
     else # outside the box - use the box point!
     end
 
-    for i in 2:(length(spineline) - 1)
-        # check if the spineline intercepts the box line
-        this_point_in_box = in(spineline[i], box)
-        next_point_in_box = in(spineline[i + 1], box)
+    for i in 2:(length(spine_line) - 1)
+        # check if the spine_line intercepts the box line
+        this_point_in_box = next_point_in_box # don't repeat checks
+        next_point_in_box = in(spine_line[i + 1], box)
         
+        # if there is a change in state, change the box operator
+        if this_point_in_box == next_point_in_box 
+            if this_point_in_box
+                push!(final_line, spine_line[i])
+            end
+        else # this_point_in_box != next_point_in_box - there is a change in state
+            # if next_point_in_box
+            # end
+            # currently no-op, do nothing!
+        end
     end
+
+    if spine_line[begin] != spine_line[end]
+    end
+
+    return final_line
 
     # to finish, check whether you're in the box or not
     # ifnot, then connect to the 

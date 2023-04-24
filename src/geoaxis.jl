@@ -323,9 +323,44 @@ function get_geospine(transform_func, pxarea, finallimits, spinetype::Observable
     end
 end
 
+function _get_geospine_with_limits(transform_func, finallimits, ga)
+    final_vec = Vector{Point2f}(undef, 10_000 * 4)
+    limit_lines = Point2f[
+        (-180, -90),
+        (-180, 90),
+        (180, 90),
+        (180, -90),
+        (-180, -90)
+    ]
+    current_index = 1
+
+    for i in 1:4
+        final_vec[current_index:(current_index + 10_000 - 1)] .= Makie.apply_transform(transform_func, Point2f.(
+            LinRange(limit_lines[i][1], limit_lines[i+1][1], 10_000),
+            LinRange(limit_lines[i][2], limit_lines[i+1][2], 10_000)
+        ))
+        current_index += 10_000
+    end
+
+    return final_vec
+end
+
+# TODO: blursed type piracy 🚢
+
+function Base.in(point::Point{N}, rect::Rect{N}) where N
+    return all((rect.origin[i] ≤ point[i] ≤ rect.widths[i] + rect.origin[i] for i in 1:N))
+end
+
 function geospine_frame(transform_func, finallimits, ga)
     xmin, ymin = minimum(finallimits)
     xmax, ymax = maximum(finallimits)
+
+    # transformed_spine
+
+    # for point in transformed_spine_curve
+
+    # end
+
     return Point2f[(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax), (xmin, ymin)]
 end
 
