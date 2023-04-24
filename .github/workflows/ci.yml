@@ -59,6 +59,9 @@ jobs:
           julia --project=docs -e '
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.add(name = "Makie", rev = "as/transformed_space")
+            Pkg.add(name = "MakieCore", rev = "as/transformed_space")
+            Pkg.add(name = "CairoMakie", rev = "as/transformed_space")
             Pkg.instantiate()'
       - name: Build and deploy
         env:

@@ -1,6 +1,6 @@
 # GeoMakie integrates Makie's transformation interface and Geodesy.jl.
 # Let's get a Raster and set our data up:
-using Makie, GeoMakie
+using Makie, GeoMakie, CairoMakie
 using Rasters, Dates
 joinpath(homedir(), "Downloads", "GEOSCarb_CASAGFED3v3_Flux.3hour.x576_y361.200301.nc") # hide
 
