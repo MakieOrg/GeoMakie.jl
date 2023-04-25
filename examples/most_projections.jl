@@ -31,13 +31,9 @@ projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=vitk1 +lat_1=45 +lat_2=55", "+proj=wag1", "+proj=wag2", "+proj=wag3", "+proj=wag4",
 "+proj=wag5", "+proj=wag6", "+proj=wag7", "+proj=webmerc +datum=WGS84", "+proj=weren",
 "+proj=wink1", "+proj=wink2", "+proj=wintri"]
-
 fig = Figure(resolution=(1500, 9000))
-
 geoaxes = []
-
 k = 1
-
 @time @showprogress for i in 1:39, j in 1:3
     try
         Label(

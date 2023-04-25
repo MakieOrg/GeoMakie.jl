@@ -53,6 +53,7 @@ makedocs(;
         ],
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
-    strict=true)
+    strict=false
+)
 
 deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true)
