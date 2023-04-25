@@ -29,13 +29,14 @@ makedocs(;
     format=Documenter.HTML(; prettyurls=deploy, collapselevel=3),
     pages=[
         "GeoMakie.jl" => "index.md",
+        "Nonlinear transforms" => "nonlinear_transforms.md",
         "Examples" => [
             "Basic examples" => "basic.md",
             "New API" => "new.md",
             "Orthographic projection" => "orthographic.md",
             "Geostationary satellite image" => "geostationary_image.md",
             "Contourf" => "contourf.md",
-            "Multiple CRS" => "multiple_crs.md"
+            "Multiple CRS" => "multiple_crs.md",
             "World Population centers" => "world_population.md",
             "Field and countries" => "field_and_countries.md",
             "Mesh image recipe" => "meshimage.md",
@@ -46,9 +47,8 @@ makedocs(;
             "Projections" => "projections.md",
             # "GraphMakie with GeoMakie" => "graph_on_usa.md",
         ],
-        "Nonlinear transforms" => "nonlinear_transforms.md",
         "Developer documentation" => [
-            "Architecture" => "architecture.md"
+            "Architecture" => "architecture.md",
         ]
         ],
     sitename="GeoMakie.jl",
