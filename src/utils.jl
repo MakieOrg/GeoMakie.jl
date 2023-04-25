@@ -515,12 +515,18 @@ function interset_spine_and_rect(spine_line::Vector{<: Point2}, box::Rect2)
             end
         else # this_point_in_box != next_point_in_box - there is a change in state
             # if next_point_in_box
+                # keep track of which side the spine intersected with
+                # if there was no change, then we're on the same side
+                # meaning that just changing the point is fine.
+                #
+                # However, if the side changed, then we have to plot the shared corner
+                # or corners, in order to maintain the zspine.
             # end
-            # currently no-op, do nothing!
         end
     end
 
     if spine_line[begin] != spine_line[end]
+        push!(spine_line, spine_line[begin])
     end
 
     return final_line
@@ -529,3 +535,36 @@ function interset_spine_and_rect(spine_line::Vector{<: Point2}, box::Rect2)
     # ifnot, then connect to the 
 
 end
+
+# Example
+
+# julia> fig = Figure(); ax1 = GeoAxis(fig[1, 1], target_projection = "+proj=vitk1 +lat_1=45 +lat_2=55",title = "vitk1", spinetype = :frame); fig
+
+# julia> _geosp = GeoMakie._get_geospine_with_limits(ax1.transform_func[], ax1.finallimits[], ax1; npoints = 1000)
+# 4000-element Vector{Point{2, Float32}}:
+#  [-139.35233, 265.114]
+#  [-139.21873, 264.9644]
+#  [-139.08514, 264.8148]
+#  [-138.95155, 264.6652]
+#  [-138.81796, 264.51556]
+#  [-138.68439, 264.36594]
+#  [-138.5508, 264.21634]
+#  [-138.4172, 264.0667]
+#  ⋮
+#  [-143.81636, 261.0104]
+#  [-143.08066, 261.70328]
+#  [-142.34158, 262.3926]
+#  [-141.59921, 263.07837]
+#  [-140.85352, 263.76053]
+#  [-140.10457, 264.4391]
+#  [-139.35233, 265.114]
+
+# julia> @benchmark GeoMakie.interset_spine_and_rect($(_geosp), $(ax1.finallimits[]))
+# BenchmarkTools.Trial: 10000 samples with 1 evaluation.
+#  Range (min … max):  13.875 μs … 53.458 μs  ┊ GC (min … max): 0.00% … 0.00%
+#  Time  (median):     15.333 μs              ┊ GC (median):    0.00%
+#  Time  (mean ± σ):   15.585 μs ±  1.622 μs  ┊ GC (mean ± σ):  0.00% ± 0.00%
+
+#    ▃▄       █▄▇▁▂ ▁ ▂                                          
+#   ▂██▃▂▁▃▂▂▂█████▅███▆█▄▄▃▄▃▄▂▃▂▂▂▂▁▂▁▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ ▃
+#   13.9 μs         Histogram: frequency by time          20 μs <
