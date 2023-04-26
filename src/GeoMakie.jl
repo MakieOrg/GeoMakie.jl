@@ -14,10 +14,13 @@ using Makie: Formatting
 using Makie.GridLayoutBase: Side
 
 using GeoJSON
+using GeoInterface
+using GeoInterfaceMakie
 using GeoInterface: GeoInterface, coordinates, getfeature
 using GeometryBasics: Polygon, MultiPolygon
 export GeoInterface
 
+GeoInterfaceMakie.@enable GeoJSON.Geometry
 
 # fix conflicts
 const AbstractGeometry = GeometryBasics.AbstractGeometry
