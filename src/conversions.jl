@@ -4,8 +4,8 @@ to_point2(a::AbstractVector{T}) where T <: Number = Point2{T}(a[1], a[2])
 
 # set the default plot type for Vectors of polygons,
 # so that they are plotted using the most efficient method!
-plottype(::Vector{<: GeometryBasics.MultiPolygon}) = Mesh
-plottype(::Vector{<: GeometryBasics.Polygon}) = Mesh
+plottype(::Vector{<: GeometryBasics.MultiPolygon}) = Poly
+plottype(::Vector{<: GeometryBasics.Polygon}) = Poly
 
 # Define a specialized conversion function for images with intervals
 # This means that one can plot images with intervals into GeoMakie
