@@ -16,7 +16,7 @@ To check the version, run:
 julia> ]
 pkg> status GeoMakie
 ```
-To use, simply type `using GeoMakie` into the REPL.  You will also have to include the backend of your choice - we sugggest `using GLMakie` for interactive use and `using CairoMakie` for PDF or SVG output.
+To use, simply type `using GeoMakie` into the REPL.  You will also have to include the backend of your choice - we suggest `using GLMakie` for interactive use and `using CairoMakie` for PDF or SVG output.
 
 ## Quick start
 
