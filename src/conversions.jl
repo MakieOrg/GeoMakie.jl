@@ -1,6 +1,7 @@
 # # Helper functions
 to_point2(a::Vector{<: T}) where T = Point2{T}(a[1], a[2])
 to_point2(a::AbstractVector{T}) where T <: Number = Point2{T}(a[1], a[2])
+to_point2(a::NTuple{2, T}) where T <: Number = Point2{T}(a[1], a[2])
 
 # set the default plot type for Vectors of polygons,
 # so that they are plotted using the most efficient method!
