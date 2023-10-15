@@ -28,7 +28,7 @@ function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecType
     catch e
         # catch this annoying edge case
         # if pt[2] ≈ 90.0f0 || pt[2] ≈ -90.0f0
-        #     println("Caught a 90-lat")
+        #     println("Caught a 90° latitude")
         #     return Point(t(Vec(pt[1], 90.0f0)) ./ PROJ_RESCALE_FACTOR)
         # end
         println("Invalid point for transformation: $(pt)")
@@ -39,18 +39,92 @@ end
 function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     xmin, ymin = minimum(r)
     xmax, ymax = maximum(r)
+
+    if isapprox(xmin, -180, rtol = 1e-4)
+        xmin - -180e0
+    end
+    if isapprox(xmax, 180; rtol = 1e-4)
+        xmax = 180e0
+    end
+    if isapprox(ymin, -90; rtol = 1e-4)
+        ymin = -90e0
+    end
+    if isapprox(ymax, 90; rtol = 1e-4)
+        ymax = 90e0
+    end
+
+    try
     
     (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
 
     return Rect(Vec2(T(umin), T(vmin)) ./ PROJ_RESCALE_FACTOR,
                 Vec2(T(umax-umin), T(vmax-vmin)) ./ PROJ_RESCALE_FACTOR)
+    catch e
+        @show r
+        rethrow(e)
+    end
 end
+
+function Makie.apply_transform(f::Proj.Transformation, r::Rect3{T}) where {T}
+    r2 = Rect2{T}(r)
+    tr2 = Makie.apply_transform(f, r2)
+    return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
+end
+
+_apply_inverse(itrans, p) = Makie.apply_transform(itrans, p .* PROJ_RESCALE_FACTOR) .* PROJ_RESCALE_FACTOR
 
 function Makie.inverse_transform(trans::Proj.Transformation)
     itrans = Base.inv(trans)
-    return Makie.PointTrans{2}() do p
-        return Makie.apply_transform(itrans, p) .* PROJ_RESCALE_FACTOR
+    return Makie.PointTrans{2}(Base.Fix1(_apply_inverse, itrans))
+end
+
+function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie._apply_inverse), Proj.Transformation}}, r::Rect2{T}) where T
+    f = t.f.x
+    xmin, ymin = minimum(r) .* PROJ_RESCALE_FACTOR
+    xmax, ymax = maximum(r) .* PROJ_RESCALE_FACTOR
+    try
+    
+        (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
+
+    if isinf(umin) || abs(umin) > 1e8
+        umin = -180.0
     end
+    if isinf(umax) || abs(umax) > 1e8
+        umax = 180.0
+    end
+
+    if isinf(vmin) || abs(vmin) > 1e8
+        vmin = -90.0
+    end
+    if isinf(vmax) || abs(vmax) > 1e8
+        vmax = 90.0
+    end
+
+    if isapprox(umin, -180, rtol = 1e-4)
+        umin - -180e0
+    end
+    if isapprox(umax, 180; rtol = 1e-4)
+        umax = 180e0
+    end
+    if isapprox(vmin, -90; rtol = 1e-4)
+        vmin = -90e0
+    end
+    if isapprox(vmax, 90; rtol = 1e-4)
+        vmax = 90e0
+    end
+
+    return Rect(Vec2(T(umin), T(vmin)),
+                Vec2(T(umax-umin), T(vmax-vmin)))
+    catch e
+        @show r
+        rethrow(e)
+    end
+end
+
+function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie._apply_inverse), Proj.Transformation}}, r::Rect3{T}) where {T}
+    r2 = Rect2{T}(r)
+    tr2 = Makie.apply_transform(t, r2)
+    return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
 end
 
 Base.isfinite(x::Union{GeometryBasics.AbstractPoint, GeometryBasics.Vec}) = all(isfinite, x)
@@ -69,21 +143,26 @@ end
 
 function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 90))
     # Search for a good bound with decent accuracy
-    lons = Float64.(LinRange(lonrange..., 360 * 2))
-    lats = Float64.(LinRange(latrange..., 180 * 2))
+    lons = Float64.(LinRange(lonrange..., 360 * 4))
+    lats = Float64.(LinRange(latrange..., 180 * 4))
     # avoid PROJ wrapping 180 to -180
-    lons[1]   = nextfloat(lons[1])   |> nextfloat
-    lons[end] = prevfloat(lons[end]) |> prevfloat
-    lats[1]   = nextfloat(lats[1])   |> nextfloat
-    lats[end] = prevfloat(lats[end]) |> prevfloat
+    # lons[1]   = nextfloat(lons[1])   |> nextfloat |> nextfloat# |> nextfloat |> nextfloat
+    # lons[end] = prevfloat(lons[end]) |> prevfloat |> prevfloat# |> prevfloat |> prevfloat
+    # lats[1]   = nextfloat(lats[1])   |> nextfloat |> nextfloat#
+    # lats[end] = prevfloat(lats[end]) |> prevfloat |> prevfloat#
 
     points = Point2{Float64}.(lons, lats')
     tpoints = ptrans.(points)
-    itpoints = Makie.apply_transform(Makie.inverse_transform(ptrans), tpoints)
+    itpoints = Point2{Float64}.(inv(ptrans).(tpoints))
+
+    inf_cont_mask = isfinite.(itpoints)
 
     finite_inds = findall(isfinite, itpoints)
 
-    # debug && display(Makie.heatmap(..(lonrange...), ..(latrange...), isfinite.(itpoints); colorrange = (0,1)))
+    f = Figure(resolution = (1200, 1000))
+    Label(f[1, 1]; text = "$ptrans", word_wrap = true, justification = :left, tellheight = true, tellwidth = false)
+    a, p = Makie.contour(f[2, 1], ..(lonrange...), ..(latrange...), inf_cont_mask; colorrange = (0,1), colormap = [:gray90, :green], axis = (title = "Valid region", aspect = DataAspect()))
+    display(f)
     # Main.@infiltrate
 
     min, max = getindex.(Ref(itpoints), finite_inds[[begin, end]])
@@ -91,21 +170,6 @@ function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 
 
     return (min[1], max[1], min[2], max[2])
 end
-
-# This is the code for the function body of `apply_transform(f::Proj4.Transformation, r::Rect2)` once Proj4.jl is renamed to Proj.jl
-# out_xmin = Ref{Float64}(0.0)
-# out_ymin = Ref{Float64}(0.0)
-# out_xmax = Ref{Float64}(0.0)
-# out_ymax = Ref{Float64}(0.0)
-# try
-#     Proj.proj_trans_bounds(C_NULL, f.pj, Proj.PJ_FWD, minimum(r)..., maximum(r)..., out_xmin, out_ymin, out_xmax, out_ymax, N)
-# catch e
-#     @show r
-#     @show out_xmin[] out_xmax[] out_ymin[] out_ymax[]
-#     rethrow(e)
-# end
-#
-# return Rect2{T}((out_xmin[], out_xmax[] - out_xmin[]), (out_ymin[], out_ymax[] - out_ymin[]))
 
 
 ############################################################
@@ -194,7 +258,7 @@ function _replace_if_automatic(typ::Type{T}, attribute::Symbol, auto) where T
 end
 
 # Project any point to coordinates in pixel space
-function project_to_pixelspace(scene, point::Point{N, T}) where {N, T}
+function project_to_pixelspace(scene, transform_func, point::Point{N, T}) where {N, T}
     @assert N ≤ 3
     return Point{N, T}(
         Makie.project(
@@ -204,14 +268,14 @@ function project_to_pixelspace(scene, point::Point{N, T}) where {N, T}
             :data, :pixel,
             # apply the transform to go from inputspace to dataspace
             Makie.apply_transform(
-                scene.transformation.transform_func[],
+                transform_func,
                 point
             )
         )
     )
 end
 
-function project_to_pixelspace(scene, points::AbstractVector{Point{N, T}}) where {N, T}
+function project_to_pixelspace(scene, transform_func, points::AbstractVector{Point{N, T}}) where {N, T}
     Point{N, T}.(
         Makie.project.(
             # obtain the camera of the Scene which will project to its screenspace
@@ -220,7 +284,7 @@ function project_to_pixelspace(scene, points::AbstractVector{Point{N, T}}) where
             Ref(:data), Ref(:pixel),
             # apply the transform to go from inputspace to dataspace
             Makie.apply_transform(
-                scene.transformation.transform_func[],
+                transform_func,
                 points
             )
         )
@@ -244,10 +308,10 @@ function rotmat(θ)
     return Mat{2, 2}(cos(θ), sin(θ), -sin(θ), cos(θ))
 end
 # Direction finder - find how to displace the tick so that it is out of the axis
-function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::AbstractString, tickpad, ticksize, tickfont, tickrotation; ds = 0.01)
+function directional_pad(scene, transform_func, limits, tickcoord_in_inputspace, ticklabel::AbstractString, tickpad, ticksize, tickfont, tickrotation; ds = 0.01)
     # Define shorthand functions for dev purposes - these can be removed before release
-    tfunc = x -> Makie.apply_transform(scene.transformation.transform_func[], x)
-    inv_tfunc = x -> Makie.apply_transform(Makie.inverse_transform(scene.transformation.transform_func[]), x)
+    tfunc = Base.Fix1(Makie.apply_transform, transform_func)
+    inv_tfunc = Base.Fix1(Makie.apply_transform, Makie.inverse_transform(transform_func))
     # convert tick coordinate to dataspace
     tickcoord_in_dataspace = tfunc(tickcoord_in_inputspace)
     # determine direction to go in order to stay inbounds.
@@ -259,7 +323,7 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
     # multiply by the sign in order to have them going outwards at any point
     Σp = sign(sum(Δs)) * inv_tfunc(tickcoord_in_dataspace + Δs)
     # project back to pixel space
-    pixel_Δx, pixel_Δy = project_to_pixelspace(scene, Σp) - project_to_pixelspace(scene, tickcoord_in_inputspace)
+    pixel_Δx, pixel_Δy = project_to_pixelspace(scene, transform_func, Σp) - project_to_pixelspace(scene, transform_func, tickcoord_in_inputspace)
     # invert direction - the vectors were previously facing the inside,
     # now they will face outside .
     dx = -pixel_Δx
