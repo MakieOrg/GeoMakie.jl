@@ -24,6 +24,11 @@ Makie.set_theme!(Theme(
         @test GeoMakie.coastlines()[1] isa GeometryBasics.LineString
     end
 
+    @testset "Line Splitting" begin
+        @test split(GeoMakie.coastlines(),"+lon_0=-160") isa Vector
+        @test split(GeoMakie.coastlines(),"+lon_0=-160")[1] isa GeometryBasics.LineString
+    end
+    
     @testset "Examples" begin
         geomakie_path = dirname(dirname(pathof(GeoMakie)))
         examples = readdir(joinpath(geomakie_path, "examples"); join = true)
