@@ -29,7 +29,7 @@ projtup[] = [source, dest]
 
 figure = Figure()
 ga = GeoAxis(figure[1, 1]; dest = "+proj=moll")
-surfplot = surface!(ga, xs, ys; color = field, shading = false)
+surfplot = surface!(ga, xs, ys; color = field, shading = NoShading)
 
 ph = on(pm) do pm
     projtup[] = [Projection("+proj=lonlat +lon_0=180 +pm=$pm"), Projection("+proj=moll +lon_0=-pm +pm=$pm")]

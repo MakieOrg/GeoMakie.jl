@@ -11,7 +11,7 @@ geo = GeoJSON.read(read(all_states))
 
 fig = Figure()
 ga = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=12.5 +lat_0=42", lonlims=(12, 13), latlims = GeoMakie.automatic)
-poly!(ga, geo; strokecolor = :blue, strokewidth = 1, color = (:blue, 0.5), shading = false);
+poly!(ga, geo; strokecolor = :blue, strokewidth = 1, color = (:blue, 0.5), shading = NoShading);
 autolimits!(ga)
 
 fig
@@ -59,9 +59,9 @@ fig
 
 # col = rand(length(xs)*length(ys))
 # GLMakie.activate!(inline = true)
-# mesh(msh; color = col, shading = false)
+# mesh(msh; color = col, shading = NoShading)
 # CairoMakie.activate!()
-# mesh(msh; color = col, shading = false)
+# mesh(msh; color = col, shading = NoShading)
 
 # h5open("/Users/anshul/desktop/test.h5") do file
 #     global cth = file["cth"][:,:]
@@ -71,5 +71,5 @@ fig
 
 # fig = Figure()
 # ga = GeoAxis(fig[1,1]; coastlines=true, dest = "+proj=ortho", lonlims = (-10,10), latlims=(35,55));
-# surface!(ga, lon, lat, cth; shading = false)
+# surface!(ga, lon, lat, cth; shading = NoShading)
 # fig

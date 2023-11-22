@@ -14,7 +14,7 @@ Makie.set_theme!(Theme(
 
         fig = Figure()
         ax = GeoAxis(fig[1,1])
-        el = surface!(ax, lons, lats, field; shading = false)
+        el = surface!(ax, lons, lats, field; shading = NoShading)
         @test true
         # display(fig)
     end

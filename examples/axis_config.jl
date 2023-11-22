@@ -4,7 +4,7 @@
 
 using Makie, CairoMakie, GeoMakie
 
-fig = Figure(resolution = (1000,1000))
+fig = Figure(size = (1000,1000))
 
 axs = [GeoAxis(fig[i, j]) for i in 1:2, j in 1:2]
 

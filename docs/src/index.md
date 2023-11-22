@@ -37,7 +37,7 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
 fig = Figure()
 ax = GeoAxis(fig[1,1])
-surface!(ax, lons, lats, field; shading = false)
+surface!(ax, lons, lats, field; shading = NoShading)
 fig
 ```
 
@@ -68,7 +68,7 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
 fig = Figure()
 ax = GeoAxis(fig[1,1]; dest = "+proj=wintri")
-surface!(ax, lons, lats, field; shading = false)
+surface!(ax, lons, lats, field; shading = NoShading)
 fig
 ```
 
@@ -103,7 +103,7 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
 fig = Figure()
 ax = GeoAxis(fig[1,1])
-sf = surface!(ax, lons, lats, field; shading = false)
+sf = surface!(ax, lons, lats, field; shading = NoShading)
 cb1 = Colorbar(fig[1,2], sf; label = "field", height = Relative(0.65))
 
 using GeoMakie.GeoJSON
@@ -124,7 +124,7 @@ fig
 With **CairoMakie**, we recommend that you use `image!(ga, ...)` or `heatmap!(ga, ...)` to plot images or scalar fields into `ga::GeoAxis`.
 
 However, with **GLMakie**, which is much faster, these methods do not work; if you have used them, you will see an empty axis.  If you want to plot an image `img`, you can use a surface in the following way:
-`surface!(ga, lonmin..lonmax, latmin..latmax, ones(size(img)...); color = img, shading = false)`.
+`surface!(ga, lonmin..lonmax, latmin..latmax, ones(size(img)...); color = img, shading = NoShading)`.
 
 To plot a scalar field, simply use `surface!(ga, lonmin..lonmax, latmin..latmax, field)`.  The `..` notation denotes an interval which Makie will automatically sample from to obtain the x and y points for the surface.
 

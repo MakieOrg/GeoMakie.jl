@@ -48,7 +48,7 @@ function geo2basic(vector::AbstractVector{<:AbstractVector})
         x = first(vector)
         if x isa AbstractVector && length(x) == 2 && x[1] isa Real
             return to_point2.(vector)
-        elseif x isa AbstractVector && eltype(x) <: AbstractVector
+        elseif x isa AbstractVector && eltype(x) <: Union{AbstractVector, Tuple}
             linestrings = map(x-> to_point2.(x), vector)
             return GeometryBasics.Polygon(linestrings[1], linestrings[2:end])
         else

@@ -14,7 +14,7 @@ pop = Downloads.download(url * "ne_10m_populated_places_simple.geojson")
 pop_geo = GeoJSON.read(read(pop, String))
 
 begin
-    fig = Figure(resolution = (1000,500))
+    fig = Figure(size = (1000,500))
     ga = GeoAxis(
         fig[1, 1];
         source_projection = source,
@@ -29,10 +29,10 @@ begin
         popi > 0 ? sqrt(popi) : 0.0
     end
     mini, maxi = extrema(popisqrt)
-    size = map(popisqrt) do popi
+    msize = map(popisqrt) do popi
         normed = (popi .- mini) ./ (maxi - mini)
         return (normed * 20) .+ 1
     end
-    scatter!(ga, pop_geo, color=popisqrt, markersize=size)
+    scatter!(ga, pop_geo; color=popisqrt, markersize=msize)
     fig
 end

@@ -1,7 +1,5 @@
 using Makie, CairoMakie
 using GeoMakie
-using ProgressMeter
-
 
 projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=aea +lat_1=29.5 +lat_2=42.5", "+proj=aeqd", "+proj=airy", "+proj=aitoff",
@@ -34,21 +32,21 @@ projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 fig = Figure(resolution=(1500, 9000))
 geoaxes = []
 k = 1
-@time @showprogress for i in 1:39, j in 1:3
+@time for i in 1:39, j in 1:3
     try
         Label(
-            fig[i*2-1, j]; 
-            text = projections[k], 
-            fontsize = 20, 
+            fig[i*2-1, j];
+            text = projections[k],
+            fontsize = 20,
             tellwidth = false, tellheight = true
         )
 
         ga = GeoAxis(
-            fig[i*2, j]; 
-            target_projection=projections[k], 
+            fig[i*2, j];
+            target_projection=projections[k],
             spinecolor = :red,
             spinewidth = 3,
-            ## title=projections[k], 
+            ## title=projections[k],
             ## xticklabelsvisible = false,
             ## yticklabelsvisible = false,
             ## tellheight = true, tellwidth = true

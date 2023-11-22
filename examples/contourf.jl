@@ -10,5 +10,5 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 # Surface example
 fig = Figure()
 ax = GeoAxis(fig[1,1])
-contourf!(ax, lons, lats, field; shading = false)
+contourf!(ax, lons, lats, field; shading = NoShading)
 fig

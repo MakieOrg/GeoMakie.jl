@@ -31,7 +31,7 @@ relev_inds = [
 
 function test_tickpad()
 
-    fig = Figure(resolution = (1600,1600))
+    fig = Figure(size = (1600,1600))
 
     gas_decs = [GeoAxis(fig[i, j]; dest = "+proj=natearth") for i in 1:3, j in 1:4]
     gas = first.(gas_decs)[:]
@@ -73,11 +73,12 @@ function test_tickpad()
         _ytickpos_in_inputspace = Point2f.(xlimits[1], _ytickvalues)
 
         # update but do not notify
+        origin_point = Point2f(ax.scene.viewport[].origin)
         xtickpoints = GeoMakie.project_to_pixelspace(ax.scene, _xtickpos_in_inputspace) .+
-                            Ref(Point2f(ax.scene.px_area[].origin))
+                      Ref(origin_point)
 
         ytickpoints = GeoMakie.project_to_pixelspace(ax.scene, _ytickpos_in_inputspace) .+
-                            Ref(Point2f(ax.scene.px_area[].origin))
+                      Ref(origin_point)
 
 
         xtickpad = GeoMakie.directional_pad.(

@@ -31,7 +31,7 @@ function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecType
         #     return Point(t(Vec(pt[1], 90.0f0)) ./ PROJ_RESCALE_FACTOR)
         # end
         println("Invalid point for transformation: $(pt)")
-        rethrow(e)
+        return V(NaN)
     end
 end
 
@@ -53,7 +53,7 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     end
 
     try
-    
+
     (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
 
     return Rect(Vec2(T(umin), T(vmin)) ./ PROJ_RESCALE_FACTOR,
@@ -82,7 +82,7 @@ function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie.
     xmin, ymin = minimum(r) .* PROJ_RESCALE_FACTOR
     xmax, ymax = maximum(r) .* PROJ_RESCALE_FACTOR
     try
-    
+
         (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
         @show umin umax vmin vmax
 
@@ -157,12 +157,7 @@ function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 
 
     finite_inds = findall(isfinite, itpoints)
 
-    # debug && display(Makie.heatmap(..(lonrange...), ..(latrange...), isfinite.(itpoints); colorrange = (0,1)))
-    # Main.@infiltrate
-
     min, max = getindex.(Ref(itpoints), finite_inds[[begin, end]])
-
-
     return (min[1], max[1], min[2], max[2])
 end
 
@@ -328,7 +323,7 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
     xdir = tickcoord_in_inputspace[1] < 0 ? +1 : -1
     ydir = tickcoord_in_inputspace[2] < 0 ? +1 : -1
     Δs = iszero(sum(tickpad)) ? Vec2f(0) : Vec2f(xdir, ydir) .* tickpad ./ (sum(tickpad)) * ds
-    
+
     # find the x and y directions
     # multiply by the sign in order to have them going outwards at any point
     Σp = sign(sum(Δs)) * inv_tfunc(tickcoord_in_dataspace + Δs)
@@ -379,7 +374,6 @@ end
 function are_ticks_colocated(scene, positions, labels, fontsize)
     isempty(positions) && return false
     @assert length(positions) == length(labels)
-    pixel_positions = positions
     if all(isapprox(positions[1]; atol = 10.0), positions)
         return true
     elseif false
@@ -453,33 +447,6 @@ end
 #                                                          #
 ############################################################
 
-#=
-    @hijack_observable name::Symbol
-
-Assuming the presence of a `hijacked_observables::Dict{Symbol, Any}` and `ax::Axis`,
-hijacks the Observable `ax[name]` and redirects all its updates to `hijacked_observables[name]`,
-while keeping `ax[name]` as `false`.
-
-More technically, this macro injects a function at the beginning of `ax[name].listeners`, which
-forwards whatever update was made to `hijacked_observables[name]`, and sets `ax[name].val = false`.
-Thus, even though the rest of the listeners will continue to receive updates from this observable
-(in case there is a need for it to remain), its value will remain `false`.
-=#
-macro hijack_observable(name)
-    return esc(quote
-        getproperty(ax, $name)[] = $(false)
-        hijacked_observables[$name] = Observable($(true))
-        __listener = on(getproperty(ax, $name); update = true, priority = typemax(Int)) do hijacked_obs_value
-            hijacked_observables[$name][] = hijacked_obs_value
-            getproperty(ax, $name).val = $(false)
-        end
-        getproperty(ax, $name)[] = $(false)
-        hijacked_observables[$name][] = $(true)
-
-    end)
-
-end
-
 
 ############################################################
 #             Spine and rectangle intersection             #
@@ -507,9 +474,9 @@ function interset_spine_and_rect(spine_line::Vector{<: Point2}, box::Rect2)
         # check if the spine_line intercepts the box line
         this_point_in_box = next_point_in_box # don't repeat checks
         next_point_in_box = in(spine_line[i + 1], box)
-        
+
         # if there is a change in state, change the box operator
-        if this_point_in_box == next_point_in_box 
+        if this_point_in_box == next_point_in_box
             if this_point_in_box
                 push!(final_line, spine_line[i])
             end
@@ -532,7 +499,7 @@ function interset_spine_and_rect(spine_line::Vector{<: Point2}, box::Rect2)
     return final_line
 
     # to finish, check whether you're in the box or not
-    # ifnot, then connect to the 
+    # ifnot, then connect to the
 
 end
 
@@ -565,6 +532,6 @@ end
 #  Time  (median):     15.333 μs              ┊ GC (median):    0.00%
 #  Time  (mean ± σ):   15.585 μs ±  1.622 μs  ┊ GC (mean ± σ):  0.00% ± 0.00%
 
-#    ▃▄       █▄▇▁▂ ▁ ▂                                          
+#    ▃▄       █▄▇▁▂ ▁ ▂
 #   ▂██▃▂▁▃▂▂▂█████▅███▆█▄▄▃▄▃▄▂▃▂▂▂▂▁▂▁▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ ▃
 #   13.9 μs         Histogram: frequency by time          20 μs <

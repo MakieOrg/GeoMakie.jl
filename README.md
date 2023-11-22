@@ -16,7 +16,7 @@ To check the version, run:
 julia> ]
 pkg> status GeoMakie
 ```
-To use, simply type `using GeoMakie` into the REPL.  You will also have to include the backend of your choice - we sugggest `using GLMakie` for interactive use and `using CairoMakie` for PDF or SVG output.
+To use, simply type `using GeoMakie` into the REPL.  You will also have to include the backend of your choice - we suggest `using GLMakie` for interactive use and `using CairoMakie` for PDF or SVG output.
 
 ## Quick start
 
@@ -48,14 +48,14 @@ field = [exp(cosd(lon)) + 3(lat/90) for lon in fieldlons, lat in fieldlats]
 img = rotr90(GeoMakie.earth())
 land = GeoMakie.land()
 
-fig = Figure(resolution = (1000, 1000))
+fig = Figure(size = (1000, 1000))
 
 ga1 = GeoAxis(fig[1, 1]; dest = "+proj=ortho", coastlines = true, lonlims = (-90, 90), title = "Orthographic\n ")
 ga2 = GeoAxis(fig[1, 2]; dest = "+proj=moll", title = "Image of Earth\n ")
 ga3 = GeoAxis(fig[2, 1]; coastlines = false, title = "Plotting polygons")
 ga4 = GeoAxis(fig[2, 2]; dest = "+proj=natearth", title = "Auto limits") # you can plot geodata on regular axes too
 
-surface!(ga1, fieldlons, fieldlats, field; colormap = :rainbow_bgyrm_35_85_c69_n256, shading = false)
+surface!(ga1, fieldlons, fieldlats, field; colormap = :rainbow_bgyrm_35_85_c69_n256, shading = NoShading)
 image!(ga2, -180..180, -90..90, img; interpolate = false) # this must be included
 poly!(ga3, land[50:100]; color = 1:51, colormap = (:plasma, 0.5))
 poly!(ga4, land[22]); datalims!(ga4)

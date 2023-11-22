@@ -15,7 +15,7 @@ function axis_setup!(axis::GeoAxis)
     setfield!(axis, :finallimits, finallimits)
     topscene = axis.blockscene
     scenearea = Makie.sceneareanode!(axis.layoutobservables.computedbbox, finallimits, axis.aspect)
-    scene = Scene(topscene, px_area=scenearea)
+    scene = Scene(topscene, viewport=scenearea)
     axis.scene = scene
     onany(Makie.update_axis_camera, camera(scene), scene.transformation.transform_func, finallimits, axis.xreversed, axis.yreversed)
     notify(axis.layoutobservables.suggestedbbox)
@@ -23,7 +23,7 @@ function axis_setup!(axis::GeoAxis)
     on(axis.limits) do mlims
         reset_limits!(axis)
     end
-    onany(scene.px_area, targetlimits) do pxa, lims
+    onany(scene, scene.viewport, targetlimits) do pxa, lims
         Makie.adjustlimits!(axis)
     end
     fl = finallimits[]
@@ -31,7 +31,7 @@ function axis_setup!(axis::GeoAxis)
     if fl == finallimits[]
         notify(finallimits)
     end
-    
+
     return scene
 end
 
@@ -115,7 +115,7 @@ xautolimits(axis::GeoAxis) = autolimits(axis, 1)
 yautolimits(axis::GeoAxis) = autolimits(axis, 2)
 
 function iterate_transformed(plot)
-    points = Makie.point_iterator(plot)
+    points = decompose(Point, Makie.data_limits(plot))
     t = Makie.transformation(plot)
     model = Makie.model_transform(t)
     trans_func = Makie.transform_func(t)
@@ -170,7 +170,7 @@ function Makie.RectangleZoom(f::Function, ax::GeoAxis; kw...)
     faces = [1 2 5; 5 2 6; 2 3 6; 6 3 7; 3 4 7; 7 4 8; 4 1 8; 8 1 5]
     # plot to blockscene, so ax.scene stays exclusive for user plots
     # That's also why we need to pass `ax.scene` to _selection_vertices, so it can project to that space
-    mesh = mesh!(ax.blockscene, selection_vertices, faces, color=(:black, 0.2), shading=false,
+    mesh = mesh!(ax.blockscene, selection_vertices, faces, color=(:black, 0.2), shading = NoShading,
         inspectable=false, visible=r.active, transparency=true)
     # translate forward so selection mesh and frame are never behind data
     translate!(mesh, 0, 0, 100)
@@ -299,10 +299,7 @@ function Makie.process_interaction(s::Makie.ScrollZoom, event::Makie.ScrollEvent
                         # now to 0..1
                         0.5 .+ 0.5
 
-        xscale = ax.xscale[]
-        yscale = ax.yscale[]
-
-        transf = (xscale, yscale)
+        transf = identity
         tlimits_trans = Makie.apply_transform(transf, tlimits[])
 
         xorigin = tlimits_trans.origin[1]

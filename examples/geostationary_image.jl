@@ -10,6 +10,8 @@ lines!(ga, GeoMakie.coastlines())
 
 ga.title[] = "Image from geostationary satellite" # this doesn't do anything - yet!
 
+#=
+# Surface could be used as well but is slower!
 surface!(
     ga,
     -5500000..5500000, -5500000..5500000, # the bounding box in input space for the image
@@ -17,15 +19,11 @@ surface!(
     color = img,
     source_projection = "+proj=geos +h=35786000"
 )
-fig
+=#
 
-# or
-# ```julia
-# meshimage!(
-#     ga,
-#     -5500000..5500000, -5500000..5500000,
-#     img;
-#     source_projection = "+proj=geos +h=35786000", # the image was taken from a geostationary satellite at these coordinates
-#     npoints = 100
-# ) # significantly more efficient, and with better interpolation to boot!
-# ```
+meshimage!(ga,
+    -5500000 .. 5500000, -5500000 .. 5500000, img;
+    source_projection="+proj=geos +h=35786000",
+    npoints=100
+)
+fig

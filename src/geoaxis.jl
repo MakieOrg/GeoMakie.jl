@@ -1,6 +1,6 @@
 const Rect2d = Rect2{Float64}
 
-Makie.@Block GeoAxis begin
+Makie.@Block GeoAxis <: Makie.AbstractAxis begin
     scene::Scene
     targetlimits::Observable{Rect2d}
     finallimits::Observable{Rect2d}
@@ -11,6 +11,9 @@ Makie.@Block GeoAxis begin
     elements::Dict{Symbol, Any}
     transform_func::Observable{Any}
     @attributes begin
+        # unused - only for compat with Makie AbstractAxis functions
+        xscale = identity
+        yscale = identity
         "The horizontal alignment of the block in its suggested bounding box."
         halign = :center
         "The vertical alignment of the block in its suggested bounding box."
@@ -258,24 +261,21 @@ Makie.@Block GeoAxis begin
     end
 end
 
-Makie.can_be_current_axis(::GeoAxis) = true
-
-
 function Makie.initialize_block!(axis::GeoAxis)
-    scene = #=plot_scene, grid_scene = =# axis_setup!(axis)
+    scene = axis_setup!(axis)
     grid_scene = scene
-    # grid_scene = Scene(scene)
 
-    transform_obs = Observable{Any}()
-    lift(axis.target_projection, axis.source_projection) do tp, sp
+    transform_obs = Observable{Any}(nothing; ignore_equal_values = true)
+
+    onany(scene, axis.target_projection, axis.source_projection; update=true) do tp, sp
         transform_obs[] = create_transform(tp, sp)
     end
 
     setfield!(axis, :transform_func, transform_obs)
 
-    lonticks_line_obs = Observable{Vector{Point2f}}(Point2f[])
-    latticks_line_obs = Observable{Vector{Point2f}}(Point2f[])
-    lift(axis.xticks, axis.yticks) do lonticks, latticks
+    lonticks_line_obs = Observable{Vector{Point2f}}(Point2f[]; ignore_equal_values = true)
+    latticks_line_obs = Observable{Vector{Point2f}}(Point2f[]; ignore_equal_values = true)
+    onany(scene, axis.xticks, axis.yticks; update=true) do lonticks, latticks
         final_lon_vec = Point2f[]
         for lon in lonticks
             coords = Makie.to_ndim.(Point2f, Makie.apply_transform(transform_obs[], [Point2f(lon, l) for l in range(latticks[begin], latticks[end]; length=100)]), 0f0)
@@ -301,48 +301,26 @@ function Makie.initialize_block!(axis::GeoAxis)
     translate!(latgridplot, 0, 0, 100)
 
     # now, find the spine!
-    spine_line_obs = get_geospine(axis.transform_func, axis.scene.px_area, axis.finallimits, axis.spinetype, axis)
+    spine_line_obs = get_geospine(axis.transform_func, axis.scene.viewport, axis.finallimits, axis.spinetype, axis)
     spine_plot = lines!(grid_scene, spine_line_obs; color = axis.spinecolor, linewidth = axis.spinewidth, visible = axis.spinevisible)
     translate!(spine_plot, 0, 0, 100)
-
-    setfield!(axis, :elements, Dict{Symbol,Any}())
-    # getfield(axis, :elements)[:xgrid] = longridplot
-    # getfield(axis, :elements)[:ygrid] = latgridplot
+    elements = Dict{Symbol,Any}()
+    setfield!(axis, :elements, elements)
+    elements[:xgrid] = longridplot
+    elements[:ygrid] = latgridplot
+    elements[:spine] = spine_plot
     return axis
 end
 
 function get_geospine(transform_func, pxarea, finallimits, spinetype::Observable{Symbol}, ga::GeoAxis,)
-
     # TODO: kludge
     if spinetype[] == :frame
-        return lift(geospine_frame, transform_func, finallimits, ga)
+        return lift(geospine_frame, ga.scene, finallimits)
     elseif spinetype[] == :geospine
-        return lift(geospine_geo, transform_func, pxarea, finallimits, ga)
+        return lift(geospine_geo, ga.scene, transform_func, pxarea, ga)
     else
-        error()
+        error("spinetype needs to be :frame or :geospine. Found: $(spinetype[])")
     end
-end
-
-function _get_geospine_with_limits(transform_func, finallimits, ga; npoints = 1000)
-    final_vec = Vector{Point2f}(undef, npoints * 4)
-    limit_lines = Point2f[
-        (-180, -90),
-        (-180, 90),
-        (180, 90),
-        (180, -90),
-        (-180, -90)
-    ]
-    current_index = 1
-
-    for i in 1:4
-        final_vec[current_index:(current_index + npoints - 1)] .= Makie.apply_transform(transform_func, Point2f.(
-            LinRange(limit_lines[i][1], limit_lines[i+1][1], npoints),
-            LinRange(limit_lines[i][2], limit_lines[i+1][2], npoints)
-        ))
-        current_index += npoints
-    end
-
-    return final_vec
 end
 
 # TODO: blursed type piracy 🚢
@@ -351,31 +329,14 @@ function Base.in(point::Point{N}, rect::Rect{N}) where N
     return all((rect.origin[i] ≤ point[i] ≤ rect.widths[i] + rect.origin[i] for i in 1:N))
 end
 
-function geospine_frame(transform_func, finallimits, ga)
+function geospine_frame(finallimits)
     xmin, ymin = minimum(finallimits)
     xmax, ymax = maximum(finallimits)
-
-    # transformed_spine
-
-    # for point in transformed_spine_curve
-
-    # end
-
     return Point2f[(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax), (xmin, ymin)]
 end
 
-function geospine_geo(transform_func, pxarea, finallimits, ga)
-    xs, ys, finite_mask = get_finite_mask_of_projection(ga.scene, transform_func, pxarea, finallimits; padding = 10, density = 2)
-    # if padding != 0
-    #     # bottom
-    #     finite_mask[1:padding, :] .= false
-    #     # top
-    #     finite_mask[(end-padding):end, :] .= false
-    #     # left
-    #     finite_mask[:, 1:padding] .= false
-    #     # right
-    #     finite_mask[:, (end-padding):end] .= false
-    # end
+function geospine_geo(transform_func, pxarea, ga)
+    xs, ys, finite_mask = get_finite_mask_of_projection(ga.scene, transform_func, pxarea; padding = 10, density = 2)
 
     spineline = Point2f[]
 
@@ -386,15 +347,12 @@ function geospine_geo(transform_func, pxarea, finallimits, ga)
     # we can skip that and iterate only through the first.
     for element in Makie.Contours.lines(first(Makie.Contours.levels(spine_contour)))
         append!(
-            spineline, 
+            spineline,
             Point2f.(element.vertices)
         )
         push!(spineline, Point2f(NaN))
     end
     return spineline
-end
-
-function get_geo_ticks(ga::GeoAxis)
 end
 
 function create_transform(dest::String, source::String)
@@ -407,46 +365,23 @@ function create_transform(dest::Observable, source::Observable)
 end
 
 # This is where we override the stuff to make it our stuff.
-
-function Makie.plot!(
-    axis::GeoAxis, P::Makie.PlotFunc,
-    attributes::Makie.Attributes, args...; kw_attributes...)
-    allattrs = merge(attributes, Attributes(kw_attributes))
-    # get the source projection and pass it backend
-    source = pop!(allattrs, :source_projection, axis.source_projection)
-    transformfunc = create_transform(axis.target_projection, source)
-    # TODO: get this to automatically figure the projection out based on
-    # GeoInterface.crs or similar.
-    # ALSO TODO: get Rasters.jl hooked up to GeoInterface.crs.
-
-    # Now, we construct a transformation, knowing the previous kwargs and the new transform.
-    trans = Transformation(transformfunc; get(allattrs, :transformation, Attributes())...)
-    allattrs[:transformation] = trans
-    # Plot using the altered keyword arguments
-    plt = Makie.plot!(axis.scene, P, allattrs, args...)
-    
+function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
+    source = pop!(plot.kw, :source_projection, axis.source_projection)
+    transformfunc = lift(create_transform, axis.target_projection, source)
+    trans = Transformation(transformfunc; get(plot.kw, :transformation, Attributes())...)
+    plot.kw[:transformation] = trans
+    Makie.plot!(axis.scene, plot)
+    # some area-like plots basically always look better if they cover the whole plot area.
+    # adjust the limit margins in those cases automatically.
+    Makie.needs_tight_limits(plot) && Makie.tightlimits!(axis)
     if Makie.is_open_or_any_parent(axis.scene)
-        reset_limits!(axis)
+        Makie.reset_limits!(axis)
     end
-    return plt
+    return plot
 end
 
-function Makie.plot!(P::Type{<:Poly}, axis::GeoAxis, args...; kw_attributes...)
-    attributes = Makie.Attributes(kw_attributes)
-    source = pop!(attributes, :source, axis.source_projection)
-    transformfunc = create_transform(axis.target_projection, source)
-    arg = geomakie_transform(transformfunc, convert.(Observable, args)...)
-    plt = Makie.plot!(axis.scene, P, attributes, arg)
-    if Makie.is_open_or_any_parent(axis.scene)
-        reset_limits!(axis)
-    end
-    return plt
-end
-
-function Makie.plot!(P::Makie.PlotFunc, axis::GeoAxis, args...; kw_attributes...)
-    attributes = Makie.Attributes(kw_attributes)
-    Makie.plot!(axis, P, attributes, args...)
-end
+# TODO implement
+Makie.tightlimits!(axis::GeoAxis) = nothing
 
 function geomakie_transform(trans, points::AbstractVector{<: Point2})
     return Makie.apply_transform(trans, points)
@@ -474,7 +409,6 @@ end
 function geomakie_transform(trans, polygon::MultiPolygon)
     return MultiPolygon(geomakie_transform.((trans,), polygon.polygons))
 end
-
 
 function geomakie_transform(trans::Observable, obs...)
     return map((args...) -> geomakie_transform(args...), trans, obs...)

@@ -5,7 +5,7 @@ using Makie, CairoMakie, GeoMakie
 import Downloads
 using GeoMakie.GeoJSON
 using GeometryBasics
-using GeoInterface
+using GeoMakie.GeoInterface
 
 # https://datahub.io/core/geo-countries#curl # download data from here
 worldCountries = GeoJSON.read(read(Downloads.download("https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json"), String))
@@ -14,16 +14,16 @@ lons = -180:180
 lats = -90:90
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
-fig = Figure(resolution = (1200,800), fontsize = 22)
+fig = Figure(size = (1200,800), fontsize = 22)
 
 ax = GeoAxis(
     fig[1,1];
-    dest = "+proj=wintri",
+    target_projection="+proj=wintri",
     title = "World Countries",
     tellheight = true,
 )
 
-hm1 = surface!(ax, lons, lats, field; shading = false)
+hm1 = surface!(ax, lons, lats, field; shading = NoShading)
 translate!(hm1, 0, 0, -10)
 
 hm2 = poly!(
