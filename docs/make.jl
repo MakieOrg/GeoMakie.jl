@@ -18,7 +18,10 @@ end
 
 # use Literate for examples
 examples = readdir(joinpath(dirname(@__DIR__), "examples"); join = true)
-deleteat!(examples, collect(axes(examples, 1))[(!).(isfile.(examples))])
+exclude = Set(["geodesy.jl", "makiecon_examples.jl", "multiple_crs.jl"])
+filter!(examples) do file
+    isfile(file) && !(basename(file) in exclude) && endswith(file, ".jl")
+end
 for example in examples
     Literate.markdown(example, joinpath(@__DIR__, "src"); documenter = true)
 end
@@ -36,11 +39,11 @@ makedocs(;
             "Orthographic projection" => "orthographic.md",
             "Geostationary satellite image" => "geostationary_image.md",
             "Contourf" => "contourf.md",
-            "Multiple CRS" => "multiple_crs.md",
+            # "Multiple CRS" => "multiple_crs.md",
             "World Population centers" => "world_population.md",
             "Field and countries" => "field_and_countries.md",
             "Mesh image recipe" => "meshimage.md",
-            "Geodetic transformation to the sphere" => "geodesy.md",
+            # "Geodetic transformation to the sphere" => "geodesy.md",
             "Axis configuration" => "axis_config.md",
             # "Italy's states" => "italy.md",
             "Most Projections" => "most_projections.md",
@@ -53,7 +56,6 @@ makedocs(;
         ],
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
-    strict=false
 )
 
 deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true)

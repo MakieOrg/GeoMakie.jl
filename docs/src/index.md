@@ -15,11 +15,8 @@ You can install it from the REPL like so:
 ## GeoAxis
 Using GeoMakie.jl is straightforward, although it does assume basic knowledge of the Makie.jl ecosystem.
 
-GeoMakie.jl provides an axis for plotting geospatial data, [`GeoAxis`](@ref). Both are showcased in the examples below.
+GeoMakie.jl provides an axis for plotting geospatial data, `GeoAxis`. Both are showcased in the examples below.
 
-```@docs
-GeoAxis
-```
 
 ## Gotchas
 
@@ -107,7 +104,7 @@ sf = surface!(ax, lons, lats, field; shading = NoShading)
 cb1 = Colorbar(fig[1,2], sf; label = "field", height = Relative(0.65))
 
 using GeoMakie.GeoJSON
-countries_file = download("https://datahub.io/core/geo-countries/r/countries.geojson")
+countries_file = GeoMakie.assetpath("vector", "countries.geo.json")
 countries = GeoJSON.read(read(countries_file, String))
 
 n = length(countries)
@@ -134,4 +131,8 @@ To plot a scalar field, simply use `surface!(ga, lonmin..lonmax, latmin..latmax,
 
 ```@docs
 GeoMakie.geoformat_ticklabels
+Makie.reset_limits!
+GeoMakie.interset_spine_and_rect
+GeoMakie.geo2basic
+GeoMakie.meshimage
 ```

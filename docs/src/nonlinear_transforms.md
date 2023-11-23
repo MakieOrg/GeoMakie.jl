@@ -31,8 +31,8 @@ Here, I mean separable in the sense that systems of ODEs can be separable.  Spec
 
 ```@example nonlinear-transformations
 meshimage(
-    1..size(Makie.logo(), 2), 1..size(Makie.logo(), 1), 
-    rotr90(Makie.logo()); 
+    1..size(Makie.logo(), 2), 1..size(Makie.logo(), 1),
+    rotr90(Makie.logo());
     axis = (; xscale = log, yscale = log10)
 )
 ```
@@ -48,8 +48,8 @@ Geographic projections are prime examples of this.  The `x`-coordinate in transf
 meshimage(
     -180..180,
     -90..90,
-    rotr90(Makie.logo()); 
-    axis = (; type = GeoAxis, target_projection = "+proj=igh")
+    Makie.logo();
+    axis = (; type = GeoAxis, dest = "+proj=igh")
 )
 ```
 
@@ -69,7 +69,7 @@ However, in input space, this is not necessarily the case.  Consider the followi
 
 ```@example nonlinear-transformations
 fig = Figure()
-ga = GeoAxis(fig[1, 1]; target_projection = "+proj=ortho +lon_0=19 +lat_0=50")
+ga = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=19 +lat_0=50")
 lines!(ga, GeoMakie.coastlines())
 fig
 ```
@@ -83,7 +83,7 @@ lats = LinRange(-90, 90, 500)
 valid_points = [isfinite(Makie.apply_transform(ga.transform_func[], Point2f(lon, lat))) for lon in lons, lat in lats]
 
 f, a, p = heatmap(
-    lons, lats, valid_points; 
+    lons, lats, valid_points;
     axis = (; aspect = DataAspect(), xlabel = "Longitudes", ylabel = "Latitudes")
 )
 Legend(f[2, 1], [PolyElement(color = first(to_colormap(p.colormap[]))), PolyElement(color = last(to_colormap(p.colormap[])))], ["Invalid (invisible)", "Valid (visible)"], tellheight = true, tellwidth = false)

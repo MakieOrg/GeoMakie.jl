@@ -21,6 +21,6 @@ fig
 # The coastlines function returns points in the (lon, lat) coordinate reference system.
 
 # We will now plot our image, from the geostationary coordinate system:
-surface!(ga, new_worldclim; shading = NoShading, source_projection = convert(GeoFormatTypes.ProjString, Rasters.crs(new_worldclim)).val)
+surface!(ga, new_worldclim; shading = NoShading, source = convert(GeoFormatTypes.ProjString, Rasters.crs(new_worldclim)).val)
 fig
 # Success!  You can clearly see how the raster was adapted here.

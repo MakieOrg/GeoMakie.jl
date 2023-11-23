@@ -5,7 +5,7 @@ destnode = Observable("+proj=ortho")
 fig = Figure()
 ga = GeoAxis(
     fig[1, 1],
-    target_projection = destnode,
+    dest = destnode,
 )
 surface!(ga, -180 .. 180, -90 .. 90, zeros(128, 128); color=rotr90(GeoMakie.earth()), interpolate = false)
 fig

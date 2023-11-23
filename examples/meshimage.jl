@@ -1,4 +1,4 @@
-using Makie, GeoMakie, CairoMakie
+using GeoMakie, CairoMakie
 # Note that this uses CairoMakie, whose mesh UV support is not great.
 # [W]GLMakie meshes have better UV support and will result in a sharper
 # image.
@@ -18,7 +18,7 @@ fig
 # `save("log_scaling.png", fig)`
 # ## Nonlinear and non-separable (geographic transformation)
 fig = Figure()
-ax1 = GeoAxis(fig[1, 1]; target_projection = "+proj=igh")
+ax1 = GeoAxis(fig[1, 1]; dest = "+proj=igh")
 mi = meshimage!(ax1, -180..180, -90..90, (Makie.logo()))
 fig
 # This is peak graphic art right here!

@@ -51,7 +51,7 @@ fig
 
 # zs = randn(length(xs), length(ys))
 
-# msh = CairoMakie.surface2mesh(xs, ys, zs)
+# msh = Makie.surface2mesh(xs, ys, zs)
 
 # CairoMakie.nan_aware_decompose_normals(msh)
 

@@ -28,9 +28,10 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         tellheight::Bool = true
         "The align mode of the block in its parent GridLayout."
         alignmode = Makie.Inside()
-        "The xlabel string."
-        source_projection = "+proj=longlat +datum=WGS84"
-        target_projection = "+proj=eqearth"
+        "Projection of the source data. This is the value plots will default to, but can be overwritten via `plot(...; source=...)`"
+        source = "+proj=longlat +datum=WGS84"
+        "Projection that the axis uses to display the data."
+        dest = "+proj=eqearth"
 
         "Controls if the y axis goes upwards (false) or downwards (true)"
         yreversed::Bool = false
@@ -170,8 +171,8 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         xtickcolor::RGBAf = RGBf(0, 0, 0)
         "The color of the ytick marks."
         ytickcolor::RGBAf = RGBf(0, 0, 0)
-        "The width of the axis spines."
-        spinewidth::Float64 = 1f0
+        # "The width of the axis spines."
+        # spinewidth::Float64 = 1f0
         "Controls if the x grid lines are visible."
         xgridvisible::Bool = true
         "Controls if the y grid lines are visible."
@@ -228,11 +229,11 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         xminorgridstyle = nothing
         "The linestyle of the y minor grid lines."
         yminorgridstyle = nothing
-        "Controls if the axis spine is visible."
-        spinevisible::Bool = true
-        "The color of the axis spine."
-        spinecolor::RGBAf = :black
-        spinetype::Symbol = :geospine
+        # "Controls if the axis spine is visible."
+        # spinevisible::Bool = true
+        # "The color of the axis spine."
+        # spinecolor::RGBAf = :black
+        # spinetype::Symbol = :geospine
         "The button for panning."
         panbutton::Makie.Mouse.Button = Makie.Mouse.right
         "The key for limiting panning to the x direction."
@@ -267,7 +268,7 @@ function Makie.initialize_block!(axis::GeoAxis)
 
     transform_obs = Observable{Any}(nothing; ignore_equal_values = true)
 
-    onany(scene, axis.target_projection, axis.source_projection; update=true) do tp, sp
+    onany(scene, axis.dest, axis.source; update=true) do tp, sp
         transform_obs[] = create_transform(tp, sp)
     end
 
@@ -295,64 +296,17 @@ function Makie.initialize_block!(axis::GeoAxis)
         latticks_line_obs[] = final_lat_vec
     end
 
-    longridplot = lines!(grid_scene, lonticks_line_obs; color = :gray20, linewidth = 0.5)
+    longridplot = lines!(grid_scene, lonticks_line_obs; color=axis.xgridcolor, linewidth=axis.xgridwidth, visible=axis.xgridvisible, linestyle=axis.xgridstyle)
     translate!(longridplot, 0, 0, 100)
-    latgridplot = lines!(grid_scene, latticks_line_obs; color = :gray20, linewidth = 0.5)
+    latgridplot = lines!(grid_scene, latticks_line_obs; color=axis.ygridcolor, linewidth=axis.ygridwidth,
+                         visible=axis.ygridvisible, linestyle=axis.ygridstyle)
     translate!(latgridplot, 0, 0, 100)
 
-    # now, find the spine!
-    spine_line_obs = get_geospine(axis.transform_func, axis.scene.viewport, axis.finallimits, axis.spinetype, axis)
-    spine_plot = lines!(grid_scene, spine_line_obs; color = axis.spinecolor, linewidth = axis.spinewidth, visible = axis.spinevisible)
-    translate!(spine_plot, 0, 0, 100)
     elements = Dict{Symbol,Any}()
     setfield!(axis, :elements, elements)
     elements[:xgrid] = longridplot
     elements[:ygrid] = latgridplot
-    elements[:spine] = spine_plot
     return axis
-end
-
-function get_geospine(transform_func, pxarea, finallimits, spinetype::Observable{Symbol}, ga::GeoAxis,)
-    # TODO: kludge
-    if spinetype[] == :frame
-        return lift(geospine_frame, ga.scene, finallimits)
-    elseif spinetype[] == :geospine
-        return lift(geospine_geo, ga.scene, transform_func, pxarea, ga)
-    else
-        error("spinetype needs to be :frame or :geospine. Found: $(spinetype[])")
-    end
-end
-
-# TODO: blursed type piracy 🚢
-
-function Base.in(point::Point{N}, rect::Rect{N}) where N
-    return all((rect.origin[i] ≤ point[i] ≤ rect.widths[i] + rect.origin[i] for i in 1:N))
-end
-
-function geospine_frame(finallimits)
-    xmin, ymin = minimum(finallimits)
-    xmax, ymax = maximum(finallimits)
-    return Point2f[(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax), (xmin, ymin)]
-end
-
-function geospine_geo(transform_func, pxarea, ga)
-    xs, ys, finite_mask = get_finite_mask_of_projection(ga.scene, transform_func, pxarea; padding = 10, density = 2)
-
-    spineline = Point2f[]
-
-    # there are only two possible values in the finite mask.
-    # so, we can compute the correct spine contour.
-    spine_contour = Makie.Contours.contours(xs, ys, Float32.(finite_mask), [0.5f0])
-    # since we know there's only one level, instead of iterating through all levels,
-    # we can skip that and iterate only through the first.
-    for element in Makie.Contours.lines(first(Makie.Contours.levels(spine_contour)))
-        append!(
-            spineline,
-            Point2f.(element.vertices)
-        )
-        push!(spineline, Point2f(NaN))
-    end
-    return spineline
 end
 
 function create_transform(dest::String, source::String)
@@ -366,8 +320,8 @@ end
 
 # This is where we override the stuff to make it our stuff.
 function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
-    source = pop!(plot.kw, :source_projection, axis.source_projection)
-    transformfunc = lift(create_transform, axis.target_projection, source)
+    source = pop!(plot.kw, :source, axis.source)
+    transformfunc = lift(create_transform, axis.dest, source)
     trans = Transformation(transformfunc; get(plot.kw, :transformation, Attributes())...)
     plot.kw[:transformation] = trans
     Makie.plot!(axis.scene, plot)

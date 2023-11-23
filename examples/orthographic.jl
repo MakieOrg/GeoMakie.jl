@@ -7,7 +7,7 @@ field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 fig = Figure()
 ga = GeoAxis(
     fig[1, 1],
-    target_projection="+proj=ortho",
+    dest="+proj=ortho",
     title = "Orthographic projection"
 )
 # hidedecorations!(ga)

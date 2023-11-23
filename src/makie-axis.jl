@@ -330,5 +330,46 @@ function Makie.process_interaction(s::Makie.ScrollZoom, event::Makie.ScrollEvent
     return Consume(true)
 end
 
-
 Makie.transformation(ax::GeoAxis) = Makie.transformation(ax.scene)
+
+function Makie.xlims!(ax::GeoAxis, xlims)
+    if length(xlims) != 2
+        error("Invalid xlims length of $(length(xlims)), must be 2.")
+    elseif xlims[1] == xlims[2] && xlims[1] !== nothing
+        error("Can't set x limits to the same value $(xlims[1]).")
+    elseif all(x -> x isa Real, xlims) && xlims[1] > xlims[2]
+        xlims = reverse(xlims)
+        ax.xreversed[] = true
+    else
+        ax.xreversed[] = false
+    end
+    mlims = Makie.convert_limit_attribute(ax.limits[])
+
+    ax.limits.val = (xlims, mlims[2])
+    Makie.reset_limits!(ax; yauto=false)
+    return nothing
+end
+
+function Makie.ylims!(ax::GeoAxis, ylims)
+    if length(ylims) != 2
+        error("Invalid ylims length of $(length(ylims)), must be 2.")
+    elseif ylims[1] == ylims[2] && ylims[1] !== nothing
+        error("Can't set y limits to the same value $(ylims[1]).")
+    elseif all(x -> x isa Real, ylims) && ylims[1] > ylims[2]
+        ylims = reverse(ylims)
+        ax.yreversed[] = true
+    else
+        ax.yreversed[] = false
+    end
+    mlims = Makie.convert_limit_attribute(ax.limits[])
+
+    ax.limits.val = (mlims[1], ylims)
+    Makie.reset_limits!(ax; xauto=false)
+    return nothing
+end
+
+function Makie.limits!(ax::GeoAxis, xlims, ylims)
+    Makie.xlims!(ax, xlims)
+    Makie.ylims!(ax, ylims)
+    return
+end

@@ -8,7 +8,9 @@ using GeometryBasics
 using GeoMakie.GeoInterface
 
 # https://datahub.io/core/geo-countries#curl # download data from here
-worldCountries = GeoJSON.read(read(Downloads.download("https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json"), String))
+path = GeoMakie.assetpath("vector", "countries.geo.json")
+json_str = read(path, String)
+worldCountries = GeoJSON.read(json_str)
 n = length(worldCountries)
 lons = -180:180
 lats = -90:90
@@ -18,7 +20,7 @@ fig = Figure(size = (1200,800), fontsize = 22)
 
 ax = GeoAxis(
     fig[1,1];
-    target_projection="+proj=wintri",
+    dest="+proj=wintri",
     title = "World Countries",
     tellheight = true,
 )

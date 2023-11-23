@@ -4,7 +4,7 @@ using Makie, GeoMakie # add your preferred backend here
 
 # You can insert it into a figure in the same way, or specify it when plotting as `plot(...; axis = (; type = GeoAxis, geoaxis_kwargs...))`.
 fig = Figure()
-ga = GeoAxis(fig[1, 1]; target_projection = "+proj=ortho +lon_0=19 +lat_0=50")
+ga = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=19 +lat_0=50")
 lines!(ga, GeoMakie.coastlines())
 # This is an orthographic projection, note how it shows the pole as well!
 surface!(ga, -180..180, -90..90, rand(100, 100))

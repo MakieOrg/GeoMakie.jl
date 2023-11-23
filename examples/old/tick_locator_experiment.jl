@@ -1,22 +1,9 @@
-using Pkg
-Pkg.activate()
-using Revise
-
 # using GLMakie
 
 using GeoMakie
-using CairoMakie
 using GeoMakie.Proj, GeoMakie.GeoJSON
 using Shapefile
 using Downloads
-
-# countries_geo = GeoMakie.GeoJSON.read(read(download("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_0_countries.geojson"), String))
-
-# TODO define this in geomakie
-Makie.convert_arguments(::Type{<:Combined{Makie.poly}}, geom::GeoInterface.AbstractGeometry) = (geo2basic(geom),)
-
-table = Shapefile.Table("/Users/anshul/Downloads/ne_10m_admin_0_countries/ne_10m_admin_0_countries.shp")
-shapes = Shapefile.shapes(table)
 
 relev_inds = [
     findfirst(==("CAN"), table.ADM0_A3),
@@ -100,12 +87,7 @@ function test_tickpad()
     plot_directional_pads!.(gas, decs)
 
     save("ticklabel_directions.png", fig; px_per_unit=4)
-
 end
-
-GLMakie.activate!()
-display(lines(rand(10)))
-
 
 
 # Direction finder - find how to displace the tick so that it is out of the axis

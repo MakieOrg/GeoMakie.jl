@@ -1,6 +1,5 @@
 using Makie, CairoMakie
 using GeoMakie
-
 projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=aea +lat_1=29.5 +lat_2=42.5", "+proj=aeqd", "+proj=airy", "+proj=aitoff",
 "+proj=apian", "+proj=august", "+proj=bacon", "+proj=bertin1953", "+proj=bipc +ns",
@@ -29,46 +28,23 @@ projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=vitk1 +lat_1=45 +lat_2=55", "+proj=wag1", "+proj=wag2", "+proj=wag3", "+proj=wag4",
 "+proj=wag5", "+proj=wag6", "+proj=wag7", "+proj=webmerc +datum=WGS84", "+proj=weren",
 "+proj=wink1", "+proj=wink2", "+proj=wintri"]
-fig = Figure(resolution=(1500, 9000))
-geoaxes = []
-k = 1
-@time for i in 1:39, j in 1:3
-    try
-        Label(
-            fig[i*2-1, j];
-            text = projections[k],
-            fontsize = 20,
-            tellwidth = false, tellheight = true
-        )
-
-        ga = GeoAxis(
-            fig[i*2, j];
-            target_projection=projections[k],
-            spinecolor = :red,
-            spinewidth = 3,
-            ## title=projections[k],
-            ## xticklabelsvisible = false,
-            ## yticklabelsvisible = false,
-            ## tellheight = true, tellwidth = true
-        )
-        lines!(ga, GeoMakie.coastlines())
-
-        ## lines!(ga.blockscene, GeoMakie.geospine_obs(ga); linewidth = 1.5, color = :blue)
-
-        push!(geoaxes, ga)
-        ## hidedecorations!(ga)
-        ## hidespines!(ga)
-
-        ## Makie.update_state_before_display()
-
-    catch ex
-        println(projections[k])
-        println(ex)
-    finally
-        ## save(joinpath(@__DIR__, "images", "$k.png"), fig; update = true)
+let k = 1
+    CairoMakie.activate!()
+    fig = Figure(size=(1500, 9000))
+    @time for i in 1:39, j in 1:3
+        try
+            ga = GeoAxis(
+                fig[i, j];
+                aspect=nothing,
+                dest=projections[k],
+                title="$(projections[k])"
+            )
+            lines!(ga, GeoMakie.coastlines())
+        catch ex
+            println(projections[k])
+            println(ex)
+        end
+        k += 1
     end
-    k += 1
+    fig
 end
-
-fig
-# If you are curious, run `@time save("most_projections.png", fig; px_per_unit = 2)`.
