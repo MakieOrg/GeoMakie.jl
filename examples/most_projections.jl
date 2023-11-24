@@ -29,9 +29,9 @@ projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=wag5", "+proj=wag6", "+proj=wag7", "+proj=webmerc +datum=WGS84", "+proj=weren",
 "+proj=wink1", "+proj=wink2", "+proj=wintri"]
 let k = 1
-    CairoMakie.activate!()
-    fig = Figure(size=(1500, 9000))
-    @time for i in 1:39, j in 1:3
+    GLMakie.activate!()
+    fig = Figure(size=(1500, 1500))
+    @time for i in 1:10, j in 1:3
         try
             ga = GeoAxis(
                 fig[i, j];
@@ -46,5 +46,5 @@ let k = 1
         end
         k += 1
     end
-    fig
+    display(fig)
 end

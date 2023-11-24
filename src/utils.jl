@@ -30,7 +30,6 @@ function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecType
         #     println("Caught a 90° latitude")
         #     return Point(t(Vec(pt[1], 90.0f0)) ./ PROJ_RESCALE_FACTOR)
         # end
-        println("Invalid point for transformation: $(pt)")
         return V(NaN)
     end
 end

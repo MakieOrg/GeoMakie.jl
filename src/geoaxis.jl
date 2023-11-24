@@ -262,9 +262,183 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
     end
 end
 
+const SpinePoint = NamedTuple{(:input, :projected, :dir),Tuple{Point2f,Point2f,Point2f}}
+
+struct Spines
+    top::Vector{SpinePoint}
+    bottom::Vector{SpinePoint}
+    left::Vector{SpinePoint}
+    right::Vector{SpinePoint}
+end
+
+Spines() = Spines(SpinePoint[], SpinePoint[], SpinePoint[], SpinePoint[])
+
+function interset_rect!(intersections, rect::Rect2, line_start::Point2, line_end::Point2)
+    mini, maxi = extrema(rect)
+    line = Line(line_start, line_end)
+    side1 = Line(Point2{Float64}(mini[1], mini[2]), Point2{Float64}(maxi[1], mini[2]))
+    intersected, p = intersects(side1, line)
+    intersected && push!(intersections, p)
+    side2 = Line(Point2{Float64}(maxi[1], mini[2]), Point2{Float64}(maxi[1], maxi[2]))
+    intersected, p = intersects(side2, line)
+    intersected && push!(intersections, p)
+    side3 = Line(Point2{Float64}(maxi[1], maxi[2]), Point2{Float64}(mini[1], maxi[2]))
+    intersected, p = intersects(side3, line)
+    intersected && push!(intersections, p)
+    side4 = Line(Point2{Float64}(mini[1], maxi[2]), Point2{Float64}(mini[1], mini[2]))
+    intersected, p = intersects(side4, line)
+    intersected && push!(intersections, p)
+    return intersections
+end
+
+
+function intersect_transformed(trans, rect, point_start, point_stop, n=100)
+    xrange = LinRange(point_start[1], point_stop[1], n)
+    yrange = LinRange(point_start[2], point_stop[2], n)
+    intersections = Point2f[]
+    for i in 1:n-1
+        pointa = Point2f(xrange[i], yrange[i])
+        pointb = Point2f(xrange[i+1], yrange[i+1])
+        pointa_t = Makie.apply_transform(trans, pointa)
+        pointb_t = Makie.apply_transform(trans, pointb)
+        interset_rect!(intersections, rect, pointa_t, pointb_t)
+    end
+    return intersections
+end
+
+
+function find_first_valid(create_point, range)
+    for (i, r) in enumerate(range)
+        point = create_point(r)
+        if all(isfinite, point)
+            return point, i
+        end
+    end
+    return nothing, 0
+end
+
+function closest(target, points)
+    sort!(points, by=p-> norm(p .- target))
+    return first(points)
+end
+
+function project_tick_points!(result, trans, trans_inverse, range, coordinate, dim, limit_rect, spine_start, spine_end)
+    point_fun(tick) = dim === 1 ? Point2(coordinate, tick) : Point2(tick, coordinate)
+
+    valid_start_t, istart = find_first_valid(range) do lat
+        return Makie.apply_transform(trans, point_fun(lat))
+    end
+    rev_range = reverse(range)
+
+    valid_stop_t, istop = find_first_valid(rev_range) do lat
+        return Makie.apply_transform(trans, point_fun(lat))
+    end
+
+    if valid_start_t == valid_stop_t # either both nothing, or nothing inbetween
+        return
+    end
+
+    valid_start = point_fun(range[istart])
+    valid_stop = point_fun(rev_range[istop])
+
+    intersections = intersect_transformed(trans, limit_rect, valid_start, valid_stop)
+
+    if length(intersections) == 1
+        point = closest(intersections[1], [valid_start_t, valid_stop_t])
+        if point == valid_start_t
+            valid_start_t = intersections[1]
+        else
+            valid_stop_t = intersections[1]
+        end
+    elseif length(intersections) == 2
+        valid_start_t = closest(valid_start_t, intersections)
+        valid_start = Makie.apply_transform(trans_inverse, valid_start_t)
+        valid_stop_t = closest(valid_stop_t, intersections)
+        valid_stop = Makie.apply_transform(trans_inverse, valid_stop_t)
+    end
+
+    xrange = LinRange(valid_start[1], valid_stop[1], 100)
+    yrange = LinRange(valid_start[2], valid_stop[2], 100)
+
+    transformed = Makie.apply_transform.((trans,), Point2f.(xrange, yrange))
+    append!(result, transformed)
+    push!(result, Point2f(NaN))
+    # Grow limit rect by 1% to make sure we don't miss the start and end points
+    minp, maxp = extrema(limit_rect)
+    minp = minp .- (widths(limit_rect) .* 0.01)
+    maxp = maxp .+ (widths(limit_rect) .* 0.01)
+    bigger_rect = Rect(minp, maxp .- minp)
+    if valid_start_t in bigger_rect
+        dir = normalize(transformed[1] .- transformed[2])
+        if !isempty(spine_start)
+            lp = last(spine_start).projected
+            dp = lp .- valid_start_t
+            sign = dim == 1 ? -1 : 1
+            dir2 = sign * normalize(Point2f(dp[2], -dp[1]))
+            dir = (dir .+ dir2) ./ 2f0
+        end
+        push!(spine_start, (input=valid_start, projected=valid_start_t, dir=dir))
+    end
+    if valid_stop_t in bigger_rect
+        dir = normalize(transformed[end] .- transformed[end-1])
+        if !isempty(spine_end)
+            lp = last(spine_end).projected
+            dp = lp .- valid_stop_t
+            sign = dim == 1 ? -1 : 1
+            dir2 = sign * normalize(Point2f(-dp[2], dp[1]))
+            dir = (dir .+ dir2) ./ 2f0
+        end
+        push!(spine_end, (input=valid_stop, projected=valid_stop_t, dir=dir))
+    end
+    return
+end
+
+function mean_distances(points)
+    dists = Float32[]
+    last_px = points[1].projected
+    for px in @view points[2:end]
+        push!(dists, norm(last_px .- px.projected))
+        last_px = px.projected
+    end
+    return mean(dists)
+end
+
+function choose_side(a, b)
+    isempty(a) && return b
+    isempty(b) && return a
+    distsa = mean_distances(a)
+    distsb = mean_distances(b)
+    distsa - distsb < 3 && return a
+    return distsb <= distsa ? a : b
+end
+
+function vis_spine!(points, text, points_px, d, mindist, labeloffset)
+    last_point = nothing
+    for p in points
+        p_px = p.projected
+        if !isnothing(last_point)
+            dist = norm(last_point .- p_px)
+            dist < mindist && continue
+        else
+            last_point = p_px
+        end
+        if norm(p.dir) < 0.1
+            continue
+        end
+        !isfinite(p.input) && continue
+        last_point = p_px
+        # TODO use xticklabelspace
+        # TODO use xticklabelpad
+        p_offset = p_px .+ (p.dir .* labeloffset)
+        push!(points_px, p_offset)
+        push!(text, string(round(Int, p.input[d]), "°"))
+    end
+end
+
 function Makie.initialize_block!(axis::GeoAxis)
     scene = axis_setup!(axis)
     grid_scene = scene
+    Obs(x) = Observable(x; ignore_equal_values=true)
 
     transform_obs = Observable{Any}(nothing; ignore_equal_values = true)
 
@@ -274,38 +448,138 @@ function Makie.initialize_block!(axis::GeoAxis)
 
     setfield!(axis, :transform_func, transform_obs)
 
-    lonticks_line_obs = Observable{Vector{Point2f}}(Point2f[]; ignore_equal_values = true)
-    latticks_line_obs = Observable{Vector{Point2f}}(Point2f[]; ignore_equal_values = true)
-    onany(scene, axis.xticks, axis.yticks; update=true) do lonticks, latticks
-        final_lon_vec = Point2f[]
-        for lon in lonticks
-            coords = Makie.to_ndim.(Point2f, Makie.apply_transform(transform_obs[], [Point2f(lon, l) for l in range(latticks[begin], latticks[end]; length=100)]), 0f0)
-            # append transformed coords to a nan vec
-            append!(final_lon_vec, coords)
-            push!(final_lon_vec, Point2f(NaN))
-        end
-        lonticks_line_obs[] = final_lon_vec
+    lonticks_line_obs = Obs(Point2f[])
+    latticks_line_obs = Obs(Point2f[])
 
-        final_lat_vec = Point2f[]
-        for lat in latticks
-            coords = Makie.to_ndim.(Point2f, Makie.apply_transform(transform_obs[], [Point2f(l, lat) for l in range(lonticks[begin], lonticks[end]; length=100)]), 0f0)
-            # append transformed coords to a nan vec
-            append!(final_lat_vec, coords)
-            push!(final_lat_vec, Point2f(NaN))
+    spines_obs = Obs(Spines())
+    finallimits = Makie.Observables.throttle(0.1, axis.finallimits)
+    onany(scene, axis.xticks, axis.yticks, transform_obs, finallimits;
+          update=true) do lonticks, latticks, trans, fl
+
+        lon_transformed = Point2f[]
+        lat_transformed = Point2f[]
+        limit_rect = axis.finallimits[]
+        trans_inverse = Makie.inverse_transform(trans)
+        spines = spines_obs[]
+        foreach(empty!, [spines.left, spines.right, spines.bottom, spines.top])
+        for lon in lonticks
+            range = LinRange(latticks[1], latticks[end], 100)
+            project_tick_points!(lon_transformed, trans, trans_inverse, range, lon, 1, limit_rect, spines.bottom, spines.top)
         end
-        latticks_line_obs[] = final_lat_vec
+
+        for lat in latticks
+            range = LinRange(lonticks[1], lonticks[end], 100)
+            project_tick_points!(lat_transformed, trans, trans_inverse, range, lat, 2, limit_rect,
+                                 spines.left, spines.right)
+        end
+        lonticks_line_obs[] = lon_transformed
+        latticks_line_obs[] = lat_transformed
+        notify(spines_obs)
+        return
     end
 
-    longridplot = lines!(grid_scene, lonticks_line_obs; color=axis.xgridcolor, linewidth=axis.xgridwidth, visible=axis.xgridvisible, linestyle=axis.xgridstyle)
+    longridplot = lines!(grid_scene, lonticks_line_obs; color=axis.xgridcolor, linewidth=axis.xgridwidth,
+                         visible=axis.xgridvisible, linestyle=axis.xgridstyle, transparency=true)
     translate!(longridplot, 0, 0, 100)
     latgridplot = lines!(grid_scene, latticks_line_obs; color=axis.ygridcolor, linewidth=axis.ygridwidth,
-                         visible=axis.ygridvisible, linestyle=axis.ygridstyle)
+                         visible=axis.ygridvisible, linestyle=axis.ygridstyle, transparency=true)
     translate!(latgridplot, 0, 0, 100)
+
+    # TODO implement spines
+    # spine_left = Observable(Point2f[])
+    # spine_right = Observable(Point2f[])
+    # spine_top = Observable(Point2f[])
+    # spine_bottom = Observable(Point2f[])
+
+    # onany(grid_scene, spines_obs, transform_obs, finallimits; update=true) do spines, trans, _
+    #     rect = axis.finallimits[]
+    #     function project_spine(points)
+    #         res = Point2f[]
+    #         length(points) < 2 && return res
+    #         pstart = points[1].input
+    #         for p in points[2:end]
+    #             x = LinRange(pstart[1], p.input[1], 20)
+    #             y = LinRange(pstart[2], p.input[2], 20)
+    #             for px in zip(x, y)
+    #                 point = Makie.apply_transform.((trans,), Point2f.(x, y))
+    #                 rect
+    #             append!(res, )
+    #             pstart = p.input
+    #         end
+    #         return res
+    #     end
+    #     spine_left[] = project_spine(spines.left)
+    #     spine_right[] = project_spine(spines.right)
+    #     spine_top[] = project_spine(spines.top)
+    #     spine_bottom[] = project_spine(spines.bottom)
+    #     return
+    # end
+    # lines!(grid_scene, spine_left; color=:red, transparency=true)
+    # lines!(grid_scene, spine_right; color=:black, transparency=true)
+    # lines!(grid_scene, spine_top; color=:green, transparency=true)
+    # lines!(grid_scene, spine_bottom; color=:blue, transparency=true)
+
+    cam = grid_scene.camera
+    lon_spine = Obs(SpinePoint[])
+    lon_text = Obs([""])
+    lon_points_px = Obs(Point2f[])
+
+    lat_spine = Obs(SpinePoint[])
+    lat_text = Observable([""])
+    lat_points_px = Obs(Point2f[])
+
+
+    onany(grid_scene, spines_obs, cam.projectionview, grid_scene.viewport) do spines, pv, area
+        poffset = minimum(area)
+        project_px(p) = to_ndim(Point2f, Makie.project(cam, :data, :pixel, p), 0.0f0) .+ poffset
+        project_p(p) = (input=p.input, projected=project_px(p.projected), dir=p.dir)
+
+        left = project_p.(spines.left)
+        right = project_p.(spines.right)
+        bottom = project_p.(spines.bottom)
+        top = project_p.(spines.top)
+
+        lon_spine[] = choose_side(bottom, top)
+        lat_spine[] = choose_side(left, right)
+        return
+    end
+
+    onany(lat_spine, axis.xlabelpadding, axis.xticklabelsize) do spine, offset, size
+        empty!(lon_points_px[])
+        empty!(lon_text[])
+        vis_spine!(spine, lon_text[], lon_points_px[], 1, size * 3, offset)
+        notify(lon_text)
+        return
+    end
+
+    onany(lon_spine, axis.ylabelpadding, axis.yticklabelsize) do spine, offset, size
+        empty!(lat_points_px[])
+        empty!(lat_text[])
+        vis_spine!(spine, lat_text[], lat_points_px[], 1, size * 3, offset)
+        notify(lat_text)
+        return
+    end
+
+
+    lontex = text!(axis.blockscene, lon_points_px;
+        text=lon_text, space=:pixel, align=(:right, :center),
+
+        font=axis.xticklabelfont, color=axis.xticklabelcolor,
+        fontsize=axis.xticklabelsize, visible=axis.xticklabelsvisible,
+
+    )
+    lattex = text!(axis.blockscene, lat_points_px;
+        text=lat_text, space=:pixel, align=(:center, :top),
+        font=axis.yticklabelfont,
+        color=axis.yticklabelcolor,
+        fontsize=axis.yticklabelsize, visible=axis.yticklabelsvisible,)
 
     elements = Dict{Symbol,Any}()
     setfield!(axis, :elements, elements)
     elements[:xgrid] = longridplot
     elements[:ygrid] = latgridplot
+    elements[:xticklabels] = lontex
+    elements[:yticklabels] = lattex
     return axis
 end
 
