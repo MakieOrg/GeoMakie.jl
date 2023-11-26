@@ -460,7 +460,7 @@ function Makie.initialize_block!(axis::GeoAxis)
         lat_transformed = Point2f[]
         limit_rect = axis.finallimits[]
         trans_inverse = Makie.inverse_transform(trans)
-        spines = spines_obs[]
+                spines = spines_obs[]
         foreach(empty!, [spines.left, spines.right, spines.bottom, spines.top])
         for lon in lonticks
             range = LinRange(latticks[1], latticks[end], 100)
@@ -547,7 +547,7 @@ function Makie.initialize_block!(axis::GeoAxis)
     onany(lat_spine, axis.xlabelpadding, axis.xticklabelsize) do spine, offset, size
         empty!(lon_points_px[])
         empty!(lon_text[])
-        vis_spine!(spine, lon_text[], lon_points_px[], 1, size * 3, offset)
+        vis_spine!(spine, lon_text[], lon_points_px[], 2, size * 3, offset)
         notify(lon_text)
         return
     end
