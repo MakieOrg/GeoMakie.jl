@@ -115,7 +115,7 @@ xautolimits(axis::GeoAxis) = autolimits(axis, 1)
 yautolimits(axis::GeoAxis) = autolimits(axis, 2)
 
 function iterate_transformed(plot)
-    points = decompose(Point, Makie.data_limits(plot))
+    points = filter(isfinite, Makie.point_iterator(plot))
     t = Makie.transformation(plot)
     model = Makie.model_transform(t)
     trans_func = Makie.transform_func(t)
