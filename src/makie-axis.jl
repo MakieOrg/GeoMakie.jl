@@ -114,6 +114,10 @@ end
 xautolimits(axis::GeoAxis) = autolimits(axis, 1)
 yautolimits(axis::GeoAxis) = autolimits(axis, 2)
 
+function Makie.point_iterator(plot::Plot)
+    return Makie.point_iterator(plot.plots)
+end
+
 function iterate_transformed(plot)
     points = filter(isfinite, Makie.point_iterator(plot))
     t = Makie.transformation(plot)
