@@ -40,5 +40,5 @@ let k = 1
 
         k += 1
     end
-    display(fig)
+    fig
 end
