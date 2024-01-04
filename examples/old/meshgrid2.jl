@@ -21,7 +21,7 @@ ys = [lat for lat in lats, lon in lons]
 
 Proj4.transform!(source, dest, vec(xs), vec(ys))
 
-scene = surface(xs, ys, zeros(size(xs)); color = img, shading = false, show_axis = false)
+scene = surface(xs, ys, zeros(size(xs)); color = img, shading = NoShading, show_axis = false)
 
 geoaxis!(scene, -180, 180, -90, 90; crs = (src = src, dest = dest,));
 

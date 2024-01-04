@@ -28,7 +28,7 @@ gpos = Dict(
 g = complete_graph(length(keys(gpos)))
 positions = Point2f.(collect(keys(gpos)))
 
-fig = Figure(resolution = (1200, 800), fontsize = 22)
+fig = Figure(size = (1200, 800), fontsize = 22)
 ga = GeoAxis(
     fig[1, 1],
     source = "+proj=longlat +datum=WGS84",
