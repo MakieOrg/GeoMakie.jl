@@ -14,7 +14,6 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         # unused - only for compat with Makie AbstractAxis functions
         xscale = identity
         yscale = identity
-
         # Layout observables for Block
         "The horizontal alignment of the block in its suggested bounding box."
         halign = :center
@@ -116,9 +115,10 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         ylabelrotation = Makie.automatic
 
         "The x (longitude) ticks - can be a vector or a Makie tick finding algorithm."
-        xticks = -180:30:180
+        xticks = Makie.automatic
         "The y (latitude) ticks - can be a vector or a Makie tick finding algorithm."
-        yticks = -90:30:90
+        yticks = Makie.automatic
+
         "Format for x (longitude) ticks."
         xtickformat = Makie.automatic
         "Format for y (latitude) ticks."
@@ -268,7 +268,7 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
     end
 end
 
-const SpinePoint = NamedTuple{(:input, :projected, :dir),Tuple{Point2f,Point2f,Point2f}}
+const SpinePoint = NamedTuple{(:input, :projected, :dir, :intersect_dir),Tuple{Point2f,Point2f,Point2f,Point2f}}
 
 struct Spines
     top::Vector{SpinePoint}
@@ -390,12 +390,6 @@ function valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n
     return lines_inside, lines_inside_t, intersections
 end
 
-#     lp = last(spine_start).projected
-#     dp = lp .- v1_t
-#     sign = dim == 1 ? -1 : 1
-#     dir2 = sign * normalize(Point2f(dp[2], -dp[1]))
-#     dir = (dir .+ dir2) ./ 2f0
-# end
 function add_to_lines!(result, valid_line, line_transformed, intersections, spine_start, spine_end, dim)
     idx = sortperm(valid_line, by=x -> x[dim == 1 ? 2 : 1])
     line_transformed = line_transformed[idx]
@@ -411,20 +405,22 @@ function add_to_lines!(result, valid_line, line_transformed, intersections, spin
         v1_t, v2_t = line_transformed[1], line_transformed[2]
         dir = normalize(v1_t .- v2_t)
         if !isnothing(i_start)
-            diff = i_start[1] .- i_start[2]
-            dir = normalize(Point2f(-diff[2], diff[1]))
+            intersect_dir = i_start[1] .- i_start[2]
+        else
+            intersect_dir = Point2f(NaN)
         end
-        push!(spine_start, (input=valid_line[1], projected=v1_t, dir=dir))
+        push!(spine_start, (input=valid_line[1], projected=v1_t, dir=dir, intersect_dir=intersect_dir))
     end
 
     if !isnothing(spine_end)
         s_1_t, s_2_t = line_transformed[end], line_transformed[end-1]
         dir = normalize(s_1_t .- s_2_t)
         if !isnothing(i_end)
-            diff = i_end[1] .- i_end[2]
-            dir = normalize(Point2f(-diff[2], diff[1]))
+            intersect_dir = i_end[1] .- i_end[2]
+        else
+            intersect_dir = Point2f(NaN)
         end
-        push!(spine_end, (input=valid_line[end], projected=s_1_t, dir=dir))
+        push!(spine_end, (input=valid_line[end], projected=s_1_t, dir=dir, intersect_dir=intersect_dir))
     end
 end
 
@@ -469,6 +465,13 @@ function choose_side(a, b)
     return distsb <= distsa ? a : b
 end
 
+function angle_between(v1::Point, v2::Point)
+    dot_product = dot(v1, v2)
+    norms = norm(v1) * norm(v2)
+    angle = acos(dot_product / norms)
+    return angle
+end
+
 function vis_spine!(points, text, points_px, d, mindist, labeloffset)
     last_point = nothing
     for p in points
@@ -483,6 +486,12 @@ function vis_spine!(points, text, points_px, d, mindist, labeloffset)
             continue
         end
         !isfinite(p.input) && continue
+        if isfinite(p.intersect_dir)
+            line_dir = p.intersect_dir
+            dir = normalize(Point2f(-line_dir[2], line_dir[1]))
+        else
+            dir = p.dir
+        end
         last_point = p_px
         # TODO use xticklabelspace
         # TODO use xticklabelpad
@@ -492,41 +501,91 @@ function vis_spine!(points, text, points_px, d, mindist, labeloffset)
     end
 end
 
+function closest_multiple(M, N)
+    # Step 1: Find the quotient
+    quotient = N ÷ M
+
+    # Step 2: Get the multiple of M just less than or equal to N
+    lower_multiple = N ÷ quotient
+
+    # Step 3: Check if the next multiple is closer
+    upper_multiple = N ÷ (quotient + 1)
+
+    # Determine which multiple is closer to N
+    if abs(N - lower_multiple) <= abs(N - upper_multiple)
+        return lower_multiple
+    else
+        return upper_multiple
+    end
+end
+
+function default_ticks(dmini, dmaxi, mini, maxi)
+    if isfinite(mini) && isfinite(maxi)
+        mini, maxi = min(maxi, mini), max(maxi, mini)
+        step = max(1, closest_multiple((maxi - mini) / 12, dmaxi))
+        return dmini:step:dmaxi
+    else
+        return dmini:30:dmaxi
+    end
+end
+
+function filter_too_close(point, all_points)
+    a = point.projected
+    for p in all_points
+        b = p.projected
+        if norm(a .- b) < 30
+            return false
+        end
+    end
+    return true
+end
+
 function Makie.initialize_block!(axis::GeoAxis)
     scene = axis_setup!(axis)
-    grid_scene = scene
     Obs(x) = Observable(x; ignore_equal_values=true)
 
-    transform_obs = Observable{Any}(nothing; ignore_equal_values = true)
+    transform_obs = Observable{Any}(nothing; ignore_equal_values=true)
+    transform_inv_obs = Observable{Any}(nothing; ignore_equal_values=true)
 
     onany(scene, axis.dest, axis.source; update=true) do tp, sp
-        transform_obs[] = create_transform(tp, sp)
+        trans = create_transform(tp, sp)
+        transform_obs[] = trans
+        transform_inv_obs[] = Makie.inverse_transform(trans)
     end
 
     setfield!(axis, :transform_func, transform_obs)
 
     lonticks_line_obs = Obs(Point2f[])
     latticks_line_obs = Obs(Point2f[])
+
     spines_obs = Obs(Spines())
-    finallimits = Makie.Observables.throttle(0.1, axis.finallimits)
-    vp_unchanged = map(identity, grid_scene, grid_scene.viewport; ignore_equal_values=true)
+    finallimits = map(identity, scene, axis.finallimits; ignore_equal_values=true)
+    vp_unchanged = map(identity, scene, scene.viewport; ignore_equal_values=true)
 
     onany(scene, axis.xticks, axis.yticks, transform_obs, finallimits, vp_unchanged;
-        update=true) do lonticks, latticks, trans, fl, vp
+        update=true) do user_xticks, user_yticks, trans, fl, vp
 
         lon_transformed = Point2f[]
         lat_transformed = Point2f[]
         limit_rect = axis.finallimits[]
-        trans_inverse = Makie.inverse_transform(trans)
+        trans_inverse = transform_inv_obs[]
+
+        limits_t = Makie.apply_transform(trans_inverse, limit_rect)
+        xlims = Makie.xlimits(limits_t)
+        ylims = Makie.ylimits(limits_t)
+
+        xticks = user_xticks isa Makie.Automatic ? default_ticks(-180, 180, xlims...) : user_xticks
+        yticks = user_yticks isa Makie.Automatic ? default_ticks(-90, 90, ylims...) : user_yticks
+
         spines = spines_obs[]
         foreach(empty!, [spines.left, spines.right, spines.bottom, spines.top])
-        for lon in lonticks
-            range = LinRange(latticks[1], latticks[end], 100)
+        for lon in xticks
+            range = LinRange(yticks[1], yticks[end], 100)
             project_tick_points!(lon_transformed, trans, trans_inverse, range, lon, 1, limit_rect, spines.bottom, spines.top)
         end
 
-        for lat in latticks
-            range = LinRange(lonticks[1], lonticks[end], 100)
+        for lat in yticks
+            range = LinRange(xticks[1], xticks[end], 100)
             project_tick_points!(lat_transformed, trans, trans_inverse, range, lat, 2, limit_rect,
                                  spines.left, spines.right)
         end
@@ -536,90 +595,79 @@ function Makie.initialize_block!(axis::GeoAxis)
         return
     end
 
-    longridplot = lines!(grid_scene, lonticks_line_obs; color=axis.xgridcolor, linewidth=axis.xgridwidth,
+    longridplot = lines!(scene, lonticks_line_obs; color=axis.xgridcolor, linewidth=axis.xgridwidth,
         visible=axis.xgridvisible, linestyle=axis.xgridstyle, transparency=true)
     translate!(longridplot, 0, 0, 100)
-    latgridplot = lines!(grid_scene, latticks_line_obs; color=axis.ygridcolor, linewidth=axis.ygridwidth,
+    latgridplot = lines!(scene, latticks_line_obs; color=axis.ygridcolor, linewidth=axis.ygridwidth,
         visible=axis.ygridvisible, linestyle=axis.ygridstyle, transparency=true)
     translate!(latgridplot, 0, 0, 100)
 
 
-    # TODO implement spines
-    # spine_left = Observable(Point2f[])
-    # spine_right = Observable(Point2f[])
-    # spine_top = Observable(Point2f[])
-    # spine_bottom = Observable(Point2f[])
-
-    # onany(grid_scene, spines_obs, transform_obs, finallimits; update=true) do spines, trans, _
-    #     rect = axis.finallimits[]
-    #     function project_spine(points)
-    #         res = Point2f[]
-    #         length(points) < 2 && return res
-    #         pstart = points[1].input
-    #         for p in points[2:end]
-    #             x = LinRange(pstart[1], p.input[1], 20)
-    #             y = LinRange(pstart[2], p.input[2], 20)
-    #             for px in zip(x, y)
-    #                 point = Makie.apply_transform.((trans,), Point2f.(x, y))
-    #                 rect
-    #             append!(res, )
-    #             pstart = p.input
-    #         end
-    #         return res
-    #     end
-    #     spine_left[] = project_spine(spines.left)
-    #     spine_right[] = project_spine(spines.right)
-    #     spine_top[] = project_spine(spines.top)
-    #     spine_bottom[] = project_spine(spines.bottom)
-    #     return
-    # end
-    # lines!(grid_scene, spine_left; color=:red, transparency=true)
-    # lines!(grid_scene, spine_right; color=:black, transparency=true)
-    # lines!(grid_scene, spine_top; color=:green, transparency=true)
-    # lines!(grid_scene, spine_bottom; color=:blue, transparency=true)
-
-    cam = grid_scene.camera
+    cam = scene.camera
     lon_spine = Obs(SpinePoint[])
     lon_text = Obs([""])
     lon_points_px = Obs(Point2f[])
 
     lat_spine = Obs(SpinePoint[])
-    lat_text = Observable([""])
+    lat_text = Obs([""])
     lat_points_px = Obs(Point2f[])
 
-    onany(grid_scene, spines_obs, cam.projectionview, vp_unchanged) do spines, pv, area
+    onany(scene, spines_obs, cam.projectionview, vp_unchanged) do spines, pv, area
         poffset = minimum(area)
         project_px(p) = to_ndim(Point2f, Makie.project(cam, :data, :pixel, p), 0.0f0) .+ poffset
-        project_p(p) = (input=p.input, projected=project_px(p.projected), dir=p.dir)
+        project_p(p) = (input=p.input, projected=project_px(p.projected), dir=p.dir, intersect_dir=p.intersect_dir)
 
         left = project_p.(spines.left)
         right = project_p.(spines.right)
         bottom = project_p.(spines.bottom)
         top = project_p.(spines.top)
 
-        lon_spine[] = choose_side(left, right)
-        lat_spine[] = choose_side(bottom, top)
+        lonspine = choose_side(left, right)
+        latspine = choose_side(bottom, top)
+
+        # Filter out ticks that go almost parallel to boundingbox
+        function too_narrow(p)
+            if isfinite(p.intersect_dir)
+                line_dir = p.intersect_dir
+                a = abs(angle_between(p.dir, line_dir))
+                (a < 0.2 || abs(pi - a) < 0.2) && return false
+            end
+            return true
+        end
+
+        filter!(too_narrow, lonspine)
+        filter!(too_narrow, latspine)
+
+        filter!(p -> filter_too_close(p, latspine), lonspine)
+        filter!(p -> filter_too_close(p, lonspine), latspine)
+        lon_spine[] = lonspine
+        lat_spine[] = latspine
         return
     end
 
-    notify_points = Observable(true)
-    onany(lat_spine, axis.xlabelpadding, axis.xticklabelsize, notify_points) do spine, offset, size, _
+    onany(lat_spine, axis.xlabelpadding, axis.xticklabelsize) do spine, offset, size
         empty!(lat_points_px[])
         empty!(lat_text[])
-        vis_spine!(spine, lat_text[], lat_points_px[], 1, size * 3, offset)
+        vis_spine!(spine, lat_text[], lat_points_px[], 1, size * 2, offset)
         notify(lat_text)
         notify(lat_points_px)
         return
     end
 
-    onany(lon_spine, axis.ylabelpadding, axis.yticklabelsize, notify_points) do spine, offset, size, _
+    onany(lon_spine, axis.ylabelpadding, axis.yticklabelsize) do spine, offset, size
         empty!(lon_points_px[])
         empty!(lon_text[])
-        vis_spine!(spine, lon_text[], lon_points_px[], 2, size * 3, offset)
+        vis_spine!(spine, lon_text[], lon_points_px[], 2, size * 2, offset)
         notify(lon_text)
         notify(lon_points_px)
         return
     end
+
+    # lonpoints = map(x-> map(x-> x.projected, x), lon_spine)
+    # scatter!(axis.blockscene, lonpoints, markersize=5, color=:red)
+
+    # latpoints = map(x -> map(x -> x.projected, x), lat_spine)
+    # scatter!(axis.blockscene, latpoints, markersize=7, color=(:blue, 0.5))
 
     lattex = text!(axis.blockscene, lat_points_px;
         text=lat_text, space=:pixel, align=(:center, :center),
@@ -635,18 +683,18 @@ function Makie.initialize_block!(axis::GeoAxis)
 
     fonts = theme(axis.blockscene, :fonts)
 
-    approx_x_protrusion = map(lat_text, axis.yticklabelfont, axis.yticklabelsize) do text, font, size
+    approx_x_protrusion = map(axis.blockscene, axis.yticklabelfont, axis.yticklabelsize, lat_text) do font, size, lat_text
         max_height = 0.0f0
-        for str in text
+        for str in lat_text
             bb = Makie.text_bb(str, to_font(fonts, font), size)
             max_height = max(max_height, widths(bb)[2])
         end
         return max_height
     end
 
-    approx_y_protrusion = map(lon_text, axis.yticklabelfont, axis.yticklabelsize) do text, font, size
+    approx_y_protrusion = map(axis.blockscene, axis.yticklabelfont, axis.yticklabelsize, lon_text) do font, size, lon_text
         max_width = 0.0f0
-        for str in text
+        for str in lon_text
             bb = Makie.text_bb(str, to_font(fonts, font), size)
             max_width = max(max_width, widths(bb)[1])
         end
@@ -711,6 +759,12 @@ function Makie.initialize_block!(axis::GeoAxis)
         axis.subtitle, axis.subtitlevisible, axis.subtitlesize, axis.subtitlegap,
         axis.titlelineheight, axis.subtitlelineheight, subtitlet, titlet)
 
+    fl = axis.finallimits[]
+    notify(axis.limits)
+    if fl == axis.finallimits[]
+        notify(axis.finallimits)
+    end
+
     return axis
 end
 
@@ -749,7 +803,6 @@ function compute_protrusions(title, titlesize, titlegap, titlevisible,
     return GridLayoutBase.RectSides{Float32}(left, right, bottom, top)
 end
 
-
 function create_transform(dest::String, source::String)
     return Proj.Transformation(source, dest; always_xy=true)
 end
@@ -777,34 +830,3 @@ end
 
 # TODO implement
 Makie.tightlimits!(axis::GeoAxis) = nothing
-
-function geomakie_transform(trans, points::AbstractVector{<: Point2})
-    return Makie.apply_transform(trans, points)
-end
-
-function geomakie_transform(trans, vec::AbstractVector)
-    return map(x-> geomakie_transform(trans, x), vec)
-end
-
-function geomakie_transform(trans, geom::GeoJSON.FeatureCollection)
-    return geomakie_transform(trans, convert_arguments(Poly, geom)[1])
-end
-
-function geomakie_transform(trans, geom)
-    return geomakie_transform(trans, convert_arguments(Poly, geom)[1])
-end
-
-function geomakie_transform(trans, polygon::Polygon)
-    return Polygon(
-        geomakie_transform(trans, GeometryBasics.coordinates(polygon.exterior)),
-        geomakie_transform.((trans,), GeometryBasics.coordinates.(polygon.interiors)),
-    )
-end
-
-function geomakie_transform(trans, polygon::MultiPolygon)
-    return MultiPolygon(geomakie_transform.((trans,), polygon.polygons))
-end
-
-function geomakie_transform(trans::Observable, obs...)
-    return map((args...) -> geomakie_transform(args...), trans, obs...)
-end

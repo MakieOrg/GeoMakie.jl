@@ -83,7 +83,6 @@ function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie.
     try
 
         (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
-        @show umin umax vmin vmax
 
         if !isfinite(umin) || abs(umin) > 1e8
             umin = -180.0

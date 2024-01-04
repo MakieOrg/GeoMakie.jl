@@ -1,5 +1,4 @@
-using Makie, CairoMakie
-using GeoMakie
+using GeoMakie, CairoMakie
 projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=aea +lat_1=29.5 +lat_2=42.5", "+proj=aeqd", "+proj=airy", "+proj=aitoff",
 "+proj=apian", "+proj=august", "+proj=bacon", "+proj=bertin1953", "+proj=bipc +ns",
@@ -29,21 +28,16 @@ projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=wag5", "+proj=wag6", "+proj=wag7", "+proj=webmerc +datum=WGS84", "+proj=weren",
 "+proj=wink1", "+proj=wink2", "+proj=wintri"]
 let k = 1
-    GLMakie.activate!()
     fig = Figure(size=(1500, 1500))
     @time for i in 1:10, j in 1:3
-        try
-            ga = GeoAxis(
-                fig[i, j];
-                aspect=nothing,
-                dest=projections[k],
-                title="$(projections[k])"
-            )
-            lines!(ga, GeoMakie.coastlines())
-        catch ex
-            println(projections[k])
-            println(ex)
-        end
+        ga = GeoAxis(
+            fig[i, j];
+            aspect=nothing,
+            dest=projections[k],
+            title="$(projections[k])"
+        )
+        lines!(ga, GeoMakie.coastlines())
+
         k += 1
     end
     display(fig)

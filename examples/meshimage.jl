@@ -13,7 +13,7 @@ fig
 fig = Figure()
 ax1 = Axis(fig[1, 1]; xscale = log, yscale = log10)
 lg = (Makie.logo())
-mi = meshimage!(ax1, 1..size(lg, 1), 1..size(lg, 2), lg)
+mi = meshimage!(ax1, 1 .. size(lg, 1), 1 .. size(lg, 2), lg)
 fig
 # `save("log_scaling.png", fig)`
 # ## Nonlinear and non-separable (geographic transformation)

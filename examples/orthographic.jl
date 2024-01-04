@@ -9,6 +9,7 @@ ga = GeoAxis(
     fig[1, 1],
     dest="+proj=ortho",
     title = "Orthographic projection",
+    xticklabelcolor=:red, xgridcolor=:red,
     aspect=nothing,
 )
 lp = lines!(ga, GeoMakie.coastlines(); transformation = (; translation = (0, 0, 1)))

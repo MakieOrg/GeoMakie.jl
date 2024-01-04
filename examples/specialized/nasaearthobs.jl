@@ -1,4 +1,4 @@
-using GeoMakie, GLMakie
+using GeoMakie, CairoMakie
 using ProgressMeter # for recording
 
 # acquire data

@@ -10,6 +10,7 @@ function axis_setup!(axis::GeoAxis)
     # initialize either with user limits, or pick defaults based on scales
     # so that we don't immediately error
     targetlimits = Observable{Rect2d}(Makie.defaultlimits(axis.limits[], identity, identity))
+
     finallimits = Observable{Rect2d}(targetlimits[]; ignore_equal_values=true)
     setfield!(axis, :targetlimits, targetlimits)
     setfield!(axis, :finallimits, finallimits)
@@ -20,16 +21,11 @@ function axis_setup!(axis::GeoAxis)
     onany(Makie.update_axis_camera, camera(scene), scene.transformation.transform_func, finallimits, axis.xreversed, axis.yreversed)
     notify(axis.layoutobservables.suggestedbbox)
     Makie.register_events!(axis, scene)
-    on(axis.limits) do mlims
+    on(scene, axis.limits) do _
         reset_limits!(axis)
     end
-    onany(scene, scene.viewport, targetlimits) do pxa, lims
+    onany(scene, scene.viewport, targetlimits) do _, _
         Makie.adjustlimits!(axis)
-    end
-    fl = finallimits[]
-    notify(axis.limits)
-    if fl == finallimits[]
-        notify(finallimits)
     end
 
     return scene
@@ -45,41 +41,65 @@ that value is either copied from the targetlimits if `xauto` or `yauto` is false
 respectively, or it is determined automatically from the plots in the axis.
 If one of the components is a tuple of two numbers, those are used directly.
 """
-function Makie.reset_limits!(axis::GeoAxis; xauto = true, yauto = true, zauto = true)
+function Makie.reset_limits!(axis::GeoAxis; xauto = true, yauto = true)
     mlims = Makie.convert_limit_attribute(axis.limits[])
 
     mxlims, mylims = mlims::Tuple{Any, Any}
 
+    targetlims = axis.targetlimits[]
+    needs_transform = [false, false, false, false] # xmin, xmax, ymin, ymax
     xlims = if isnothing(mxlims) || mxlims[1] === nothing || mxlims[2] === nothing
         l = if xauto
             xautolimits(axis)
         else
-            minimum(axis.targetlimits[])[1], maximum(axis.targetlimits[])[1]
+            minimum(targetlims)[1], maximum(targetlims)[1]
         end
         if mxlims === nothing
             l
         else
-            lo = mxlims[1] === nothing ? l[1] : mxlims[1]
-            hi = mxlims[2] === nothing ? l[2] : mxlims[2]
+            lo = if mxlims[1] === nothing
+                l[1]
+            else
+                needs_transform[1] = true
+                mxlims[1]
+            end
+            hi = if mxlims[2] === nothing
+                l[2]
+            else
+                needs_transform[2] = true
+                mxlims[2]
+            end
             (lo, hi)
         end
     else
+        needs_transform[1:2] .= true
         convert(Tuple{Float64, Float64}, tuple(mxlims...))
     end
     ylims = if isnothing(mylims) || mylims[1] === nothing || mylims[2] === nothing
         l = if yauto
             yautolimits(axis)
         else
-            minimum(axis.targetlimits[])[2], maximum(axis.targetlimits[])[2]
+            minimum(targetlims)[2], maximum(targetlims)[2]
         end
         if mylims === nothing
             l
         else
-            lo = mylims[1] === nothing ? l[1] : mylims[1]
-            hi = mylims[2] === nothing ? l[2] : mylims[2]
+            lo = if mylims[1] === nothing
+                l[1]
+            else
+                needs_transform[3] = true
+                mylims[1]
+            end
+            hi = if mylims[2] === nothing
+                l[2]
+            else
+                needs_transform[4] = true
+                mylims[2]
+            end
             (lo, hi)
         end
     else
+        needs_transform[3:4] .= true
         convert(Tuple{Float64, Float64}, tuple(mylims...))
     end
 
@@ -89,13 +109,36 @@ function Makie.reset_limits!(axis::GeoAxis; xauto = true, yauto = true, zauto = 
     if !(ylims[1] <= ylims[2])
         error("Invalid y-limits as ylims[1] <= ylims[2] is not met for $ylims.")
     end
+    # Limits set by the user are always in the source input space, so we need to transform them
+    # This is a bit complicated, since the transform function needs x + y, but you may e.g.
+    # do `xlimits!(axis, 1, 10)`, so that we don't have y values
+    if any(needs_transform)
+        trans = axis.transform_func[]
+        # Fallback to untransformed data limits
+        # TODO, is this always correct?
+        rect = data_limits(axis.scene)
+        fxlim, fylim = Makie.limits(rect)
+        fallback_lims = [fxlim..., fylim...]
+        new_lims = [xlims..., ylims...]
+        # Replace values that are already transformed with untransformed values
+        untrans = map(needs_transform, fallback_lims, new_lims) do needs, fallback, new
+            needs ? new : fallback
+        end
+        # Now that all values are in source input space, we can transform them again
+        mini, maxi = Makie.apply_transform(trans, [Point2f(untrans[1], untrans[3]), Point2f(untrans[2], untrans[4])])
+        trans_lims = [mini[1], maxi[1], mini[2], maxi[2]]
+        untrans = map(needs_transform, trans_lims, new_lims) do needs, tlim, new
+            needs ? tlim : new
+        end
+        xlims = (untrans[1], untrans[2])
+        ylims = (untrans[3], untrans[4])
+    end
 
     axis.targetlimits[] = Makie.BBox(xlims..., ylims...)
-
     nothing
 end
 
-function autolimits(axis::GeoAxis, dim::Integer)
+function Makie.autolimits(axis::GeoAxis, dim::Integer)
     # try getting x limits for the axis and then union them with linked axes
     lims = Makie.getlimits(axis, dim)
     dimsym = dim == 1 ? :x : :y
@@ -103,7 +146,6 @@ function autolimits(axis::GeoAxis, dim::Integer)
     if !isnothing(lims)
         lims = Makie.expandlimits(lims, margin[1], margin[2], identity)
     end
-
     # if no limits have been found, use the targetlimits directly
     if isnothing(lims)
         lims = Makie.limits(axis.targetlimits[], dim)
@@ -114,12 +156,65 @@ end
 xautolimits(axis::GeoAxis) = autolimits(axis, 1)
 yautolimits(axis::GeoAxis) = autolimits(axis, 2)
 
-function Makie.point_iterator(plot::Plot)
-    return Makie.point_iterator(plot.plots)
+function br_getindex(vector::AbstractVector, idx::CartesianIndex, dim::Int)
+    return vector[Tuple(idx)[dim]]
 end
 
-function iterate_transformed(plot)
-    points = filter(isfinite, Makie.point_iterator(plot))
+function br_getindex(matrix::AbstractMatrix, idx::CartesianIndex, dim::Int)
+    return matrix[idx]
+end
+
+function get_point_xyz(linear_indx::Int, indices, X, Y, Z)
+    idx = indices[linear_indx]
+    x = br_getindex(X, idx, 1)
+    y = br_getindex(Y, idx, 2)
+    z = Z[linear_indx]
+    if z isa Number
+        return Point3f(x, y, z)
+    else
+        return Point3f(x, y, 0)
+    end
+end
+
+function get_point_xyz(linear_indx::Int, indices, X, Y)
+    idx = indices[linear_indx]
+    x = br_getindex(X, idx, 1)
+    y = br_getindex(Y, idx, 2)
+    return Point3f(x, y, 0.0)
+end
+
+function _point_iterator(plot::Union{Image,Heatmap,Surface})
+    Z = plot[3][]
+    X = to_vector(plot[1][], size(Z, 1), Float32)
+    Y = to_vector(plot[2][], size(Z, 2), Float32)
+    indices = CartesianIndices(Z)
+    return Point3f[get_point_xyz(idx, indices, X, Y, Z) for idx in 1:length(Z)]
+end
+
+function _point_iterator(list::AbstractVector)
+    if length(list) == 1
+        # save a copy!
+        return _point_iterator(list[1])
+    else
+        points = Point3f[]
+        for elem in list
+            for point in _point_iterator(elem)
+                push!(points, to_ndim(Point3f, point, 0))
+            end
+        end
+        return points
+    end
+end
+
+function _point_iterator(plot::Plot)
+    if isempty(plot.plots)
+        return Makie.point_iterator(plot)
+    end
+    return _point_iterator(plot.plots)
+end
+
+function iterate_transformed(plot::Plot)
+    points = _point_iterator(plot)
     t = Makie.transformation(plot)
     model = Makie.model_transform(t)
     trans_func = Makie.transform_func(t)
@@ -137,15 +232,16 @@ function transformed_limits(scenelike, exclude=(p) -> false)
     return bb_ref[]
 end
 
-
 function getlimits(la::GeoAxis, dim)
     # find all plots that don't have exclusion attributes set
     # for this dimension
     if !(dim in (1, 2))
         error("Dimension $dim not allowed. Only 1 or 2.")
     end
-
+    axis_plots = Set(values(la.elements))
     function exclude(plot)
+        # dont use axis decorations!
+        plot in axis_plots && return true
         # only use plots with autolimits = true
         to_value(get(plot, dim == 1 ? :xautolimits : :yautolimits, true)) || return true
         # only if they use data coordinates
@@ -347,7 +443,7 @@ function Makie.xlims!(ax::GeoAxis, xlims)
     else
         ax.xreversed[] = false
     end
-    mlims = Makie.convert_limit_attribute(ax.limits[])
+    mlims = Makie.convert_limit_attribute(ax.finallimits[])
 
     ax.limits.val = (xlims, mlims[2])
     Makie.reset_limits!(ax; yauto=false)
@@ -366,7 +462,6 @@ function Makie.ylims!(ax::GeoAxis, ylims)
         ax.yreversed[] = false
     end
     mlims = Makie.convert_limit_attribute(ax.limits[])
-
     ax.limits.val = (mlims[1], ylims)
     Makie.reset_limits!(ax; xauto=false)
     return nothing
