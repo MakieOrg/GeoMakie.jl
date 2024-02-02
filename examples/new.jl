@@ -6,6 +6,7 @@ using Makie, GeoMakie # add your preferred backend here
 fig = Figure()
 ga = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=19 +lat_0=50")
 lines!(ga, GeoMakie.coastlines())
+fig
 # This is an orthographic projection, note how it shows the pole as well!
 surface!(ga, -180..180, -90..90, rand(100, 100))
 fig
