@@ -1,3 +1,4 @@
+# # New API
 # Example of the new API
 using Makie, GeoMakie # add your preferred backend here
 using CairoMakie # hide

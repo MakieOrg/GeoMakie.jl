@@ -1,3 +1,5 @@
+# # Graphs on maps
+
 # This example was adapted from code in https://discourse.julialang.org/t/combine-makie-with-gmt-jl/74347
 using GeoMakie, CairoMakie
 CairoMakie.activate!(px_per_unit = 4) # hide

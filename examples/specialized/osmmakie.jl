@@ -1,3 +1,5 @@
+# # OSMMakie + GeoMakie
+
 using LightOSM, OSMMakie
 using GeoMakie, CairoMakie
 CairoMakie.activate!(px_per_unit = 4) # hide
