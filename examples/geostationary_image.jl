@@ -1,4 +1,5 @@
 using Makie, GeoMakie, CairoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
 using Downloads, FileIO
 # Download a geostationary satellite image
 img = rotr90(FileIO.load(Downloads.download("https://gist.github.com/pelson/5871263/raw/EIDA50_201211061300_clip2.png")))

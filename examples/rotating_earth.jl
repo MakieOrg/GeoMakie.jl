@@ -1,4 +1,5 @@
 using Makie, CairoMakie, GeoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
 
 destnode = Observable("+proj=ortho")
 

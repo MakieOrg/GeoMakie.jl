@@ -3,6 +3,7 @@
 #     This was written for the old API and doesn't work for the new one!
 
 using Makie, CairoMakie, GeoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
 
 fig = Figure(size = (500,1000))
 

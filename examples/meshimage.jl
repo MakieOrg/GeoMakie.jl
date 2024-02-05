@@ -1,5 +1,7 @@
-using GeoMakie, CairoMakie
-# Note that this uses CairoMakie, whose mesh UV support is not great.
+using GeoMakie, GLMakie
+GLMakie.activate!(px_per_unit = 4)
+
+# Note that CairoMakie not have great mesh UV support.
 # [W]GLMakie meshes have better UV support and will result in a sharper
 # image.
 
