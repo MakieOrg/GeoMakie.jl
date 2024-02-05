@@ -2,7 +2,7 @@ using Documenter, Literate
 using GeoMakie, CairoMakie, Makie
 # Set some global settings
 # Good quality CairoMakie with PNG
-CairoMakie.activate!(px_per_unit = 2, type = :png)
+CairoMakie.activate!(px_per_unit = 4, type = :png)
 # Rasters should download into the artifacts folder (so they can be cached :D)
 ENV["RASTERDATASOURCES_PATH"] = joinpath(first(Base.DEPOT_PATH), "artifacts")
 
