@@ -16,6 +16,8 @@ using Makie.GridLayoutBase: Side
 using GeoJSON
 using GeoInterface: GeoInterface, coordinates, getfeature
 using GeometryBasics: Polygon, MultiPolygon
+using Geodesy
+
 export GeoInterface
 
 
