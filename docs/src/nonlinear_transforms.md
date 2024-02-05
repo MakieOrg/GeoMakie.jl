@@ -91,3 +91,7 @@ f
 You can see that if we were to try to find a bounding box, it would either be too small (excluding the bulge at the middle) or too large (including some invalid regions).
 
 ## Coordinate singularities
+
+This ties in a bit with the previous section.  In that particular projection, the pole was shown as a single point.
+
+This is a singularity in the inverse transform, since it becomes many-to-one on that line in input space.
