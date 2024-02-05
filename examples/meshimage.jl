@@ -30,7 +30,21 @@ fig
 # ## Nonlinear and non-separable (geographic transformation)
 fig = Figure()
 ax1 = GeoAxis(fig[1, 1]; dest = "+proj=igh")
-mi = meshimage!(ax1, -180..180, -90..90, (Makie.logo()))
+mi = meshimage!(ax1, -169..169, -90..90, (Makie.logo()); npoints = 400)
 fig
 # This is peak graphic art right here!
 # `save("geo_scaling.png", fig)`
+# ## Logo!
+# Finally, we create a kludged together GeoMakie logo
+# with the Earth in the background, and the Makie logo at the fore!
+fig = Figure()
+ax1 = GeoAxis(fig[1, 1]; dest = "+proj=igh")
+s1 = surface!(ax1, (-180f0)..(180f0), -90f0..90f0, zeros(size(GeoMakie.earth() |> rotr90)); shading = NoShading, color = GeoMakie.earth() |> rotr90)
+fig
+#
+
+# m1 = meshimage!(ax1, -100..100, -40..40, (Makie.logo()); npoints = 300)
+m1 = meshimage!(ax1, -166..169, -90..90, (Makie.logo()); npoints = 400)
+fig
+
+hidedecorations!(ax1; )
