@@ -1,9 +1,18 @@
+# # The `meshimage` recipe
+
+# GeoMakie presents a `meshimage` recipe to render images in
+# projected spaces, without having to reproject.  
+
+# You can generally think of these as discretized versions of the 
+# true continuous reprojection.
+
+# `meshimage` works best with the GL-backends (GLMakie/WGLMakie) 
+# because they have the best inbuilt support for meshes.  CairoMakie
+# also supports `meshimage`, but the quality of the image will be worse
+# unless your mesh is very fine (`npoints > 1000` usually).
+
 using GeoMakie, GLMakie
 GLMakie.activate!(px_per_unit = 4)
-
-# Note that CairoMakie not have great mesh UV support.
-# [W]GLMakie meshes have better UV support and will result in a sharper
-# image.
 
 # ## Affine transform (no nonlinearity)
 fig = Figure()

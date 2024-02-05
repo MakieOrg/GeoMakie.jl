@@ -1,4 +1,5 @@
 [deps]
+ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
@@ -14,6 +15,7 @@ ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+RasterDataSources = "3cb90ccd-e1b6-4867-9617-4276c8b2ca36"
 Rasters = "a3a2b9e3-a471-40c9-b274-f788e487c689"
 
 [compat]

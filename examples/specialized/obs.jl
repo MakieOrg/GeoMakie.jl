@@ -1,3 +1,5 @@
+# # Animations with Observables
+
 using NetCDF, GeoMakie
 const Node = Observable
 using CairoMakie # hide

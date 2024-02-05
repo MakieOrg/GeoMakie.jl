@@ -1,3 +1,5 @@
+# # NASA Black Marble
+
 using GeoMakie, CairoMakie, Makie
 CairoMakie.activate!(px_per_unit = 4) # hide
 

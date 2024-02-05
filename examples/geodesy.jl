@@ -1,3 +1,5 @@
+# # Geodesy
+
 # GeoMakie integrates Makie's transformation interface and Geodesy.jl.
 # Let's get a Raster and set our data up:
 using Makie, GeoMakie, CairoMakie

@@ -1,7 +1,8 @@
 # # Multiple CRS in one axis
 
 # This is an example of how you can use multiple CRS in one plot.
-using CairoMakie, GeoMakie, Rasters
+using CairoMakie, GeoMakie
+using Rasters, RasterDataSources, ArchGDAL
 CairoMakie.activate!(px_per_unit = 4) # hide
 
 worldclim_temp = Raster(WorldClim{Climate}, :tmax; month = 1)
