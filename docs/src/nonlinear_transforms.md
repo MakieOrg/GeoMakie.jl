@@ -23,7 +23,7 @@ Any affine transform is not actually nonlinear, but a simple combination of tran
 We don't really consider affine transforms nonlinear here, since they are more or less linear.  But these are the transformations which you generate when you call `translate!`, `rotate!`, or `scale!`.  In these transformations, a straight line is still straight.
 
 ```@example nonlinear-transformations
-meshimage(rotr90(Makie.logo()))
+meshimage(Makie.logo())
 ```
 
 ### Nonlinear but separable
@@ -33,13 +33,10 @@ Here, I mean separable in the sense that systems of ODEs can be separable.  Spec
 ```@example nonlinear-transformations
 meshimage(
     1..size(Makie.logo(), 2), 1..size(Makie.logo(), 1),
-    rotr90(Makie.logo());
+    Makie.logo();
     axis = (; xscale = log, yscale = log10)
 )
 ```
-
-##### Examples
-
 
 ### Nonlinear and inseparable
 
