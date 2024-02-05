@@ -443,7 +443,7 @@ function Makie.xlims!(ax::GeoAxis, xlims)
     else
         ax.xreversed[] = false
     end
-    mlims = Makie.convert_limit_attribute(ax.finallimits[])
+    mlims = Makie.convert_limit_attribute(ax.limits[])
 
     ax.limits.val = (xlims, mlims[2])
     Makie.reset_limits!(ax; yauto=false)
