@@ -1,7 +1,9 @@
 # # Multiple CRS in one axis
 
 # This is an example of how you can use multiple CRS in one plot.
-using Makie, GeoMakie, Rasters
+using CairoMakie, GeoMakie, Rasters
+CairoMakie.activate!(px_per_unit = 4) # hide
+
 worldclim_temp = Raster(WorldClim{Climate}, :tmax; month = 1)
 # Let's simulate a new CRS, assuming this was an image taken from a satellite:
 new_worldclim = Rasters.warp(

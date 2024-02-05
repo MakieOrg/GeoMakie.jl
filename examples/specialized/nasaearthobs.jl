@@ -1,4 +1,5 @@
 using GeoMakie, CairoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
 using ProgressMeter # for recording
 
 # acquire data

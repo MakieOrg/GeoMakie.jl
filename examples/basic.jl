@@ -7,7 +7,7 @@ lats = -90:90
 # time it takes to plot scales with the grid size!
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 using GLMakie
-GLMakie.activate!(float=true)
+GLMakie.activate!(float=true, px_per_unit = 4)
 # Surface example
 fig = Figure()
 ax = GeoAxis(fig[1,1])
