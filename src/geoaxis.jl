@@ -830,3 +830,5 @@ end
 
 # TODO implement
 Makie.tightlimits!(axis::GeoAxis) = nothing
+
+Makie.get_scene(ga::GeoAxis) = ga.scene
