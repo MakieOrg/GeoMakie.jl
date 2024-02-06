@@ -37,6 +37,7 @@ makedocs(;
             "Basic examples" => "examples/basic.md",
             "New API" => "examples/new.md",
             "Orthographic projection" => "examples/orthographic.md",
+            "German Lakes" => "examples/german_lakes.md",
             "Geostationary satellite image" => "examples/geostationary_image.md",
             "Contourf" => "examples/contourf.md",
             # "Multiple CRS" => "examples/multiple_crs.md",

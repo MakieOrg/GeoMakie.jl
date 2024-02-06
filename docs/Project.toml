@@ -1,4 +1,5 @@
 [deps]
+Animations = "27a7e980-b3e6-11e9-2bcd-0b925532e340"
 ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 CoordinateTransformations = "150eb455-5306-5404-9cee-2592286d6298"
