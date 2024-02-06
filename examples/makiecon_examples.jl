@@ -1,4 +1,5 @@
 using Makie, GeoMakie, CairoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
 
 using Rasters # deliver Rasters unto this world
 

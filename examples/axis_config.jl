@@ -1,15 +1,16 @@
-# How to mess with GeoAxis
+# # Axis configuration
+
 # !!! warning
 #     This was written for the old API and doesn't work for the new one!
 
 using Makie, CairoMakie, GeoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
 
 fig = Figure(size = (500,1000))
-
-# GeoAxis defaults to DataAspect()
-# Set source projection and destination projection
-# source can be overwritten per plot
-ax1 = GeoAxis(fig[1, 1]; aspect=nothing, source="+proj=latlong", dest="+proj=ortho")
+## GeoAxis defaults to DataAspect()
+## Set source projection and destination projection
+## source can be overwritten per plot
+ax1 = GeoAxis(fig[1, 1]; source="+proj=latlong", dest="+proj=ortho")
 xlims!(ax1, -90, 90) # xlims!, ylims! and limits! are supported
 
 # But supports any other Makie aspect ratio

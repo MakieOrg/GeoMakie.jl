@@ -27,8 +27,12 @@ $(Makie.ATTRIBUTES)
 end
 
 # this inherits all conversions for `Image`,
-# if no specialized conversion for `MeshImage` is found
+# if no specialized conversion for `MeshImage` is found.
 Makie.conversion_trait(::Type{<: MeshImage}) = Image
+# There really is no difference between this and Image, 
+# except the implementation under the hood.  As such
+# I chose not to use the conversion trait in case someone
+# implemented a convert for images only...
 
 # This is the recipe implementation.
 
@@ -88,7 +92,14 @@ function Makie.plot!(plot::MeshImage)
     end
 
     # Finally, we plot the mesh.
-    mesh!(plot, final_mesh; color = plot[3], transformation = Transformation(), shading = NoShading)
+    mesh!(
+        plot, 
+        final_mesh; 
+        color = plot[3], 
+        shading = NoShading, 
+        transformation = Transformation() # since the points are pre transformed, we don't need to transform them again
+    )
+    # TODO: get a `:transformed` space out so we don't need this `transformation` hack
 end
 
 # This is an efficient implementation for data_limits,

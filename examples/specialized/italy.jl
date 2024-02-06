@@ -1,5 +1,8 @@
+# # States of Italy
+
 using Pkg
 using CairoMakie, GeoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
 using GeoMakie.GeoJSON
 using Downloads
 using GeometryBasics

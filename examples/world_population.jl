@@ -1,5 +1,9 @@
+# # World population
+
 # This example was contributed by Martijn Visser (@visr)
 using Makie, CairoMakie, GeoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
+
 using GeoMakie: GeoJSON
 using GeometryBasics
 using Downloads
