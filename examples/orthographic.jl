@@ -1,4 +1,7 @@
+# # Orthographic projection
+
 using GeoMakie, CairoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
 
 lons = -180:180
 lats = -90:90
@@ -10,7 +13,6 @@ ga = GeoAxis(
     dest="+proj=ortho",
     title = "Orthographic projection",
     xticklabelcolor=:red, xgridcolor=:red,
-    aspect=nothing,
 )
 lp = lines!(ga, GeoMakie.coastlines(); transformation = (; translation = (0, 0, 1)))
 sp = surface!(ga, lons, lats, zeros(size(field)); color=field, shading = NoShading, colormap=:rainbow_bgyrm_35_85_c69_n256)

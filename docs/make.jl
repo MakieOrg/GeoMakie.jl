@@ -2,7 +2,7 @@ using Documenter, Literate
 using GeoMakie, CairoMakie, Makie
 # Set some global settings
 # Good quality CairoMakie with PNG
-CairoMakie.activate!(px_per_unit = 2, type = :png)
+CairoMakie.activate!(px_per_unit = 4, type = :png)
 # Rasters should download into the artifacts folder (so they can be cached :D)
 ENV["RASTERDATASOURCES_PATH"] = joinpath(first(Base.DEPOT_PATH), "artifacts")
 
@@ -23,7 +23,7 @@ filter!(examples) do file
     isfile(file) && !(basename(file) in exclude) && endswith(file, ".jl")
 end
 for example in examples
-    Literate.markdown(example, joinpath(@__DIR__, "src"); documenter = true)
+    Literate.markdown(example, joinpath(@__DIR__, "src", "examples"); documenter = true)
 end
 
 makedocs(;
@@ -34,21 +34,21 @@ makedocs(;
         "GeoMakie.jl" => "index.md",
         "Nonlinear transforms" => "nonlinear_transforms.md",
         "Examples" => [
-            "Basic examples" => "basic.md",
-            "New API" => "new.md",
-            "Orthographic projection" => "orthographic.md",
-            "Geostationary satellite image" => "geostationary_image.md",
-            "Contourf" => "contourf.md",
-            # "Multiple CRS" => "multiple_crs.md",
-            "World Population centers" => "world_population.md",
-            "Field and countries" => "field_and_countries.md",
-            "Mesh image recipe" => "meshimage.md",
-            # "Geodetic transformation to the sphere" => "geodesy.md",
-            "Axis configuration" => "axis_config.md",
-            # "Italy's states" => "italy.md",
-            "Most Projections" => "most_projections.md",
-            "Projections" => "projections.md",
-            # "GraphMakie with GeoMakie" => "graph_on_usa.md",
+            "Basic examples" => "examples/basic.md",
+            "New API" => "examples/new.md",
+            "Orthographic projection" => "examples/orthographic.md",
+            "Geostationary satellite image" => "examples/geostationary_image.md",
+            "Contourf" => "examples/contourf.md",
+            # "Multiple CRS" => "examples/multiple_crs.md",
+            "World Population centers" => "examples/world_population.md",
+            "Field and countries" => "examples/field_and_countries.md",
+            "Mesh image recipe" => "examples/meshimage.md",
+            # "Geodetic transformation to the sphere" => "examples/geodesy.md",
+            "Axis configuration" => "examples/axis_config.md",
+            # "Italy's states" => "examples/italy.md",
+            "Most Projections" => "examples/most_projections.md",
+            "Projections" => "examples/projections.md",
+            # "GraphMakie with GeoMakie" => "examples/graph_on_usa.md",
         ],
         "Developer documentation" => [
             "Architecture" => "architecture.md",

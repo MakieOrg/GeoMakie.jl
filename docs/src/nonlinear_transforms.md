@@ -1,6 +1,7 @@
 ```@setup nonlinear-transformations
-using Makie, CairoMakie, GeoMakie
+using Makie, GLMakie, GeoMakie
 using Makie.FileIO
+GLMakie.activate!(px_per_unit = 4)
 ```
 # Nonlinear transformations
 
@@ -22,7 +23,7 @@ Any affine transform is not actually nonlinear, but a simple combination of tran
 We don't really consider affine transforms nonlinear here, since they are more or less linear.  But these are the transformations which you generate when you call `translate!`, `rotate!`, or `scale!`.  In these transformations, a straight line is still straight.
 
 ```@example nonlinear-transformations
-meshimage(rotr90(Makie.logo()))
+meshimage(Makie.logo())
 ```
 
 ### Nonlinear but separable
@@ -32,13 +33,10 @@ Here, I mean separable in the sense that systems of ODEs can be separable.  Spec
 ```@example nonlinear-transformations
 meshimage(
     1..size(Makie.logo(), 2), 1..size(Makie.logo(), 1),
-    rotr90(Makie.logo());
+    Makie.logo();
     axis = (; xscale = log, yscale = log10)
 )
 ```
-
-##### Examples
-
 
 ### Nonlinear and inseparable
 
@@ -93,3 +91,7 @@ f
 You can see that if we were to try to find a bounding box, it would either be too small (excluding the bulge at the middle) or too large (including some invalid regions).
 
 ## Coordinate singularities
+
+This ties in a bit with the previous section.  In that particular projection, the pole was shown as a single point.
+
+This is a singularity in the inverse transform, since it becomes many-to-one on that line in input space.

@@ -1,4 +1,8 @@
+# # Most projections
+
 using GeoMakie, CairoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
+
 projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=aea +lat_1=29.5 +lat_2=42.5", "+proj=aeqd", "+proj=airy", "+proj=aitoff",
 "+proj=apian", "+proj=august", "+proj=bacon", "+proj=bertin1953", "+proj=bipc +ns",
@@ -30,13 +34,17 @@ projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 let k = 1
     fig = Figure(size=(1500, 1500))
     @time for i in 1:10, j in 1:3
-        ga = GeoAxis(
-            fig[i, j];
-            aspect=nothing,
-            dest=projections[k],
-            title="$(projections[k])"
-        )
-        lines!(ga, GeoMakie.coastlines())
+        try
+            ga = GeoAxis(
+                fig[i, j];
+                dest=projections[k],
+                title="$(projections[k])",
+            )
+            lines!(ga, GeoMakie.coastlines())
+        catch error
+            println("Error at iteration $k")
+            break
+        end
 
         k += 1
     end
