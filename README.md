@@ -29,8 +29,9 @@ fig = Figure()
 ga = GeoAxis(
     fig[1, 1]; # any cell of the figure's layout
     dest = "+proj=wintri", # the CRS in which you want to plot
-    coastlines = true # plot coastlines from Natural Earth, as a reference.
 )
+lines!(ga, GeoMakie.coastlines()) # plot coastlines from Natural Earth as a reference
+# You can plot your data the same way you would in Makie
 scatter!(ga, -120:15:120, -60:7.5:60; color = -60:7.5:60, strokecolor = (:black, 0.2))
 fig
 ```
@@ -50,9 +51,9 @@ land = GeoMakie.land()
 
 fig = Figure(size = (1000, 1000))
 
-ga1 = GeoAxis(fig[1, 1]; dest = "+proj=ortho", coastlines = true, lonlims = (-90, 90), title = "Orthographic\n ")
+ga1 = GeoAxis(fig[1, 1]; dest = "+proj=ortho", lonlims = (-90, 90), title = "Orthographic\n "); lines!(ga1, GeoMakie.coastlines())
 ga2 = GeoAxis(fig[1, 2]; dest = "+proj=moll", title = "Image of Earth\n ")
-ga3 = GeoAxis(fig[2, 1]; coastlines = false, title = "Plotting polygons")
+ga3 = GeoAxis(fig[2, 1]; title = "Plotting polygons")
 ga4 = GeoAxis(fig[2, 2]; dest = "+proj=natearth", title = "Auto limits") # you can plot geodata on regular axes too
 
 surface!(ga1, fieldlons, fieldlats, field; colormap = :rainbow_bgyrm_35_85_c69_n256, shading = NoShading)
@@ -64,15 +65,4 @@ fig
 ```
 ![geoaxes](https://user-images.githubusercontent.com/32143268/165358447-ab1aa721-d457-4710-979c-d361080eae52.svg)
 
-
-# Instructions for the `as/geoaxis` branch
-In the REPL, run `]add GeoMakie#as/geoaxis Makie#master CairoMakie#master MakieCore#master`
-
-To clean up, run the following in Julia:
-```julia
-using Pkg
-Pkg.rm.(["GeoMakie", "Makie", "CairoMakie", "MakieCore"])
-Pkg.add.(["Makie", "CairoMakie", "MakieCore"])
-```
-
-Please see the documentation for examples and basic usage.
+See the documentation for examples and basic usage!
