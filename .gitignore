@@ -18,3 +18,6 @@ src/experimental
 docs/src/images
 docs/src/examples
 test_images/
+
+node_modules
+docs/node_modules/

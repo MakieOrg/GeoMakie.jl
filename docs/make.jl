@@ -1,4 +1,5 @@
 using Documenter, Literate
+using DocumenterVitepress
 using GeoMakie, CairoMakie, Makie
 # Set some global settings
 # Good quality CairoMakie with PNG
@@ -29,7 +30,8 @@ end
 makedocs(;
     modules=[GeoMakie],
     doctest=false,
-    format=Documenter.HTML(; prettyurls=deploy, collapselevel=3),
+    # format=Documenter.HTML(; prettyurls=deploy, collapselevel=3),
+    format=DocumenterVitepress.MarkdownVitepress(; repo = "github.com/MakieOrg/GeoMakie.jl", devbranch = "master", devurl = "dev", deploy_url = "geo.makie.org", build_vitepress = false,),
     pages=[
         "GeoMakie.jl" => "index.md",
         "Nonlinear transforms" => "nonlinear_transforms.md",
@@ -57,6 +59,7 @@ makedocs(;
         ],
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
+    warnonly = true,
 )
 
 deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true)

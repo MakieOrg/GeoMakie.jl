@@ -25,7 +25,7 @@ When plotting a projection which has a limited domain (in either longitude or la
 ## Examples
 
 ### Surface example
-```@example MAIN
+```@examplefigure MAIN
 using GeoMakie, CairoMakie
 
 lons = -180:180
@@ -39,7 +39,7 @@ fig
 ```
 
 ### Scatter example
-```@example MAIN
+```@examplefigure MAIN; type=svg
 using GeoMakie, CairoMakie
 
 lons = -180:180
@@ -56,7 +56,7 @@ fig
 
 ### Map projections
 The default projection is given by the arguments `source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth"`, so that if a different one is needed, for example a `wintri` projection one can do it as follows:
-```@example MAIN
+```@examplefigure MAIN
 using GeoMakie, CairoMakie
 
 lons = -180:180
@@ -75,7 +75,7 @@ However, when using `surface` or `contour` plots this can lead to errors when th
 
 E.g., if the data have the dimensions
 
-```@example MAIN
+```@examplefigure MAIN
 lons = 0.5:359.5
 lats = -90:90
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats];
@@ -90,7 +90,7 @@ ax = GeoAxis(fig[1,1]; dest = "+proj=eqearth +lon_0=180")
 _or_ (2), circshift your data appropriately so that the central longitude you want coincides with the center of the longitude dimension of the data.
 
 ### Countries loaded with GeoJSON
-```@example MAIN
+```@examplefigure MAIN
 using GeoMakie, CairoMakie
 
 # First, make a surface plot
