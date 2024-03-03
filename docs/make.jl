@@ -1,4 +1,4 @@
-using Documenter, Literate
+using Documenter, DocumenterVitepress, Literate
 using GeoMakie, CairoMakie, Makie
 # Set some global settings
 # Good quality CairoMakie with PNG
@@ -29,9 +29,12 @@ end
 makedocs(;
     modules=[GeoMakie],
     doctest=false,
-    format=Documenter.HTML(; prettyurls=deploy, collapselevel=3),
+    format=DocumenterVitepress.MarkdownVitepress(; 
+        repo = "https://github.com/MakieOrg/GeoMakie.jl", 
+        deploy_url = "https://geo.makie.org"
+    ),
     pages=[
-        "GeoMakie.jl" => "index.md",
+        "Introduction" => "introduction.md",
         "Nonlinear transforms" => "nonlinear_transforms.md",
         "Examples" => [
             "Basic examples" => "examples/basic.md",
@@ -47,7 +50,7 @@ makedocs(;
             # "Geodetic transformation to the sphere" => "examples/geodesy.md",
             "Axis configuration" => "examples/axis_config.md",
             # "Italy's states" => "examples/italy.md",
-            "Most Projections" => "examples/most_projections.md",
+            # "Most Projections" => "examples/most_projections.md",
             "Projections" => "examples/projections.md",
             # "GraphMakie with GeoMakie" => "examples/graph_on_usa.md",
         ],
@@ -57,6 +60,9 @@ makedocs(;
         ],
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
+    warnonly = true,
 )
+
+rm.(readdir(joinpath(@__DIR__, "src", "examples"); join = true); force = true)
 
 deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true)
