@@ -33,6 +33,7 @@ makedocs(;
         repo = "https://github.com/MakieOrg/GeoMakie.jl", 
         deploy_url = "https://geo.makie.org",
         devbranch = "master",
+        devurl = "dev",
     ),
     pages=[
         "Introduction" => "introduction.md",
