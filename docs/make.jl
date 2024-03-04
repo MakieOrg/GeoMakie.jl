@@ -31,7 +31,8 @@ makedocs(;
     doctest=false,
     format=DocumenterVitepress.MarkdownVitepress(; 
         repo = "https://github.com/MakieOrg/GeoMakie.jl", 
-        deploy_url = "https://geo.makie.org"
+        deploy_url = "https://geo.makie.org",
+        devbranch = "master",
     ),
     pages=[
         "Introduction" => "introduction.md",
