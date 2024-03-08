@@ -35,6 +35,7 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v1
+      - run: julia --project=. -e 'using Pkg; Pkg.add([(; name="MakieCore", rev="breaking-0.21"), (; name="Makie", rev="breaking-0.21"), (; name="CairoMakie", rev="breaking-0.21"), ]);'
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: actions/upload-artifact@v4
@@ -58,8 +59,15 @@ jobs:
       - run: |
           julia --project=docs -e '
             using Pkg
-            Pkg.develop(PackageSpec(path=pwd()))
-            Pkg.instantiate()'
+            Pkg.add([
+              (; name="MakieCore", rev="breaking-0.21"),
+              (; name="Makie", rev="breaking-0.21"), 
+              (; name="CairoMakie", rev="breaking-0.21"), 
+              (; name="GLMakie", rev="breaking-0.21"),
+              (; path = pwd())
+            ]);
+            Pkg.instantiate()
+            '
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
