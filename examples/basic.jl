@@ -1,6 +1,6 @@
 # # Basic examples
-using GeoMakie, GLMakie
-GLMakie.activate!(px_per_unit = 4) # hide
+using GeoMakie, CairoMakie # you can use GLMakie too
+CairoMakie.activate!(px_per_unit = 4) # hide
 
 lons = -180:180
 lats = -90:90

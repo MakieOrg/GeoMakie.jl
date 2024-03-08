@@ -18,7 +18,10 @@ function axis_setup!(axis::GeoAxis)
     scenearea = Makie.sceneareanode!(axis.layoutobservables.computedbbox, finallimits, axis.aspect)
     scene = Scene(topscene, viewport=scenearea)
     axis.scene = scene
-    onany(Makie.update_axis_camera, camera(scene), scene.transformation.transform_func, finallimits, axis.xreversed, axis.yreversed)
+    setfield!(scene, :float32convert, Makie.Float32Convert())
+    onany(scene, scene.transformation.transform_func, finallimits, axis.xreversed, axis.yreversed) do transform_func, finallimits, xreversed, yreversed
+        Makie.update_axis_camera(scene, transform_func, finallimits, xreversed, yreversed)
+    end
     notify(axis.layoutobservables.suggestedbbox)
     Makie.register_events!(axis, scene)
     on(scene, axis.limits) do _
@@ -125,7 +128,7 @@ function Makie.reset_limits!(axis::GeoAxis; xauto = true, yauto = true)
             needs ? new : fallback
         end
         # Now that all values are in source input space, we can transform them again
-        mini, maxi = Makie.apply_transform(trans, [Point2f(untrans[1], untrans[3]), Point2f(untrans[2], untrans[4])])
+        mini, maxi = Makie.apply_transform(trans, [Point2d(untrans[1], untrans[3]), Point2d(untrans[2], untrans[4])])
         trans_lims = [mini[1], maxi[1], mini[2], maxi[2]]
         untrans = map(needs_transform, trans_lims, new_lims) do needs, tlim, new
             needs ? tlim : new
@@ -170,9 +173,9 @@ function get_point_xyz(linear_indx::Int, indices, X, Y, Z)
     y = br_getindex(Y, idx, 2)
     z = Z[linear_indx]
     if z isa Number
-        return Point3f(x, y, z)
+        return Point3d(x, y, z)
     else
-        return Point3f(x, y, 0)
+        return Point3d(x, y, 0)
     end
 end
 
@@ -180,15 +183,15 @@ function get_point_xyz(linear_indx::Int, indices, X, Y)
     idx = indices[linear_indx]
     x = br_getindex(X, idx, 1)
     y = br_getindex(Y, idx, 2)
-    return Point3f(x, y, 0.0)
+    return Point3d(x, y, 0.0)
 end
 
 function _point_iterator(plot::Union{Image,Heatmap,Surface})
     Z = plot[3][]
-    X = to_vector(plot[1][], size(Z, 1), Float32)
-    Y = to_vector(plot[2][], size(Z, 2), Float32)
+    X = to_vector(plot[1][], size(Z, 1), Float64)
+    Y = to_vector(plot[2][], size(Z, 2), Float64)
     indices = CartesianIndices(Z)
-    return Point3f[get_point_xyz(idx, indices, X, Y, Z) for idx in 1:length(Z)]
+    return Point3d[get_point_xyz(idx, indices, X, Y, Z) for idx in 1:length(Z)]
 end
 
 function _point_iterator(list::AbstractVector)
@@ -196,10 +199,10 @@ function _point_iterator(list::AbstractVector)
         # save a copy!
         return _point_iterator(list[1])
     else
-        points = Point3f[]
+        points = Point3d[]
         for elem in list
             for point in _point_iterator(elem)
-                push!(points, to_ndim(Point3f, point, 0))
+                push!(points, to_ndim(Point33d, point, 0))
             end
         end
         return points
@@ -213,19 +216,43 @@ function _point_iterator(plot::Plot)
     return _point_iterator(plot.plots)
 end
 
-function iterate_transformed(plot::Plot)
-    points = _point_iterator(plot)
-    t = Makie.transformation(plot)
-    model = Makie.model_transform(t)
-    trans_func = Makie.transform_func(t)
-    return Makie.iterate_transformed(points, model, to_value(get(plot, :space, :data)), trans_func)
+# function iterate_transformed(plot::Plot)
+#     points = _point_iterator(plot)
+#     t = Makie.transformation(plot)
+#     model = Makie.model_transform(t)
+#     trans_func = Makie.transform_func(t)
+#     return Makie.iterate_transformed(points, model, to_value(get(plot, :space, :data)), trans_func)
+# end
+
+
+function limits_from_transformed_points(points_iterator)
+    isempty(points_iterator) && return Rect3d()
+    first, rest = Iterators.peel(points_iterator)
+    bb = foldl(Makie._update_rect, rest, init = Rect3{Float64}(first, zero(first)))
+    return bb
+end
+
+# include bbox from scaled markers
+function limits_from_transformed_points(positions, scales, rotations, element_bbox)
+    isempty(positions) && return Rect3d()
+
+    first_scale = attr_broadcast_getindex(scales, 1)
+    first_rot = attr_broadcast_getindex(rotations, 1)
+    full_bbox = Ref(first_rot * (element_bbox * first_scale) + first(positions))
+    for (i, pos) in enumerate(positions)
+        scale, rot = attr_broadcast_getindex(scales, i), attr_broadcast_getindex(rotations, i)
+        transformed_bbox = rot * (element_bbox * scale) + pos
+        update_boundingbox!(full_bbox, transformed_bbox)
+    end
+
+    return full_bbox[]
 end
 
 function transformed_limits(scenelike, exclude=(p) -> false)
-    bb_ref = Base.RefValue(Rect3f())
+    bb_ref = Base.RefValue(Rect3d())
     Makie.foreach_plot(scenelike) do plot
         if !exclude(plot)
-            box = Makie.limits_from_transformed_points(iterate_transformed(plot))
+            box = limits_from_transformed_points(Makie.iterate_transformed(plot))
             Makie.update_boundingbox!(bb_ref, box)
         end
     end

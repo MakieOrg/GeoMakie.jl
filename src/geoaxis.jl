@@ -268,7 +268,7 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
     end
 end
 
-const SpinePoint = NamedTuple{(:input, :projected, :dir, :intersect_dir),Tuple{Point2f,Point2f,Point2f,Point2f}}
+const SpinePoint = NamedTuple{(:input, :projected, :dir, :intersect_dir),Tuple{Point2d,Point2d,Point2d,Point2d}}
 
 struct Spines
     top::Vector{SpinePoint}
@@ -308,19 +308,19 @@ end
 function valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n=100)
     xrange = LinRange(point_start[1], point_stop[1], n)
     yrange = LinRange(point_start[2], point_stop[2], n)
-    lines = Vector{Point2f}[]
-    lines_t = Vector{Point2f}[]
+    lines = Vector{Point2d}[]
+    lines_t = Vector{Point2d}[]
 
     # With non linear transforms, we need to check points inbetween for intersections
     # So we transform all points first and filter out non finite results
     was_finite = false
     for i in 1:n
-        point = Point2f(xrange[i], yrange[i])
+        point = Point2d(xrange[i], yrange[i])
         point_t = Makie.apply_transform(trans, point)
         if isfinite(point_t)
             if !was_finite
-                push!(lines, Point2f[])
-                push!(lines_t, Point2f[])
+                push!(lines, Point2d[])
+                push!(lines_t, Point2d[])
             end
             push!(lines[end], point)
             push!(lines_t[end], point_t)
@@ -330,9 +330,9 @@ function valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n
         end
     end
 
-    lines_inside = Vector{Point2f}[]
-    lines_inside_t = Vector{Point2f}[]
-    lines_inside_t = Vector{Point2f}[]
+    lines_inside = Vector{Point2d}[]
+    lines_inside_t = Vector{Point2d}[]
+    lines_inside_t = Vector{Point2d}[]
     intersections = Vector{Union{Line{2,Float64},Nothing}}[]
     for (points, points_t) in zip(lines, lines_t)
         was_inside = false
@@ -341,8 +341,8 @@ function valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n
             a_in = a_t in rect
             b_in = b_t in rect
             if !was_inside && (a_in || b_in)
-                push!(lines_inside, Point2f[])
-                push!(lines_inside_t, Point2f[])
+                push!(lines_inside, Point2d[])
+                push!(lines_inside_t, Point2d[])
                 push!(intersections, Union{Line{2,Float64},Nothing}[nothing, nothing])
             end
             if a_in && b_in
@@ -396,7 +396,7 @@ function add_to_lines!(result, valid_line, line_transformed, intersections, spin
     valid_line = valid_line[idx]
 
     append!(result, line_transformed)
-    push!(result, Point2f(NaN))
+    push!(result, Point2d(NaN))
 
     # Add normal vector for ticks
     i_start, i_end = intersections
@@ -407,7 +407,7 @@ function add_to_lines!(result, valid_line, line_transformed, intersections, spin
         if !isnothing(i_start)
             intersect_dir = i_start[1] .- i_start[2]
         else
-            intersect_dir = Point2f(NaN)
+            intersect_dir = Point2d(NaN)
         end
         push!(spine_start, (input=valid_line[1], projected=v1_t, dir=dir, intersect_dir=intersect_dir))
     end
@@ -418,7 +418,7 @@ function add_to_lines!(result, valid_line, line_transformed, intersections, spin
         if !isnothing(i_end)
             intersect_dir = i_end[1] .- i_end[2]
         else
-            intersect_dir = Point2f(NaN)
+            intersect_dir = Point2d(NaN)
         end
         push!(spine_end, (input=valid_line[end], projected=s_1_t, dir=dir, intersect_dir=intersect_dir))
     end
@@ -446,7 +446,7 @@ function project_tick_points!(result, trans, trans_inverse, range, coordinate, d
 end
 
 function mean_distances(points)
-    dists = Float32[]
+    dists = Float64[]
     last_px = points[1].projected
     for px in @view points[2:end]
         push!(dists, norm(last_px .- px.projected))
@@ -488,7 +488,7 @@ function vis_spine!(points, text, points_px, d, mindist, labeloffset)
         !isfinite(p.input) && continue
         if isfinite(p.intersect_dir)
             line_dir = p.intersect_dir
-            dir = normalize(Point2f(-line_dir[2], line_dir[1]))
+            dir = normalize(Point2d(-line_dir[2], line_dir[1]))
         else
             dir = p.dir
         end
@@ -555,8 +555,8 @@ function Makie.initialize_block!(axis::GeoAxis)
 
     setfield!(axis, :transform_func, transform_obs)
 
-    lonticks_line_obs = Obs(Point2f[])
-    latticks_line_obs = Obs(Point2f[])
+    lonticks_line_obs = Obs(Point2d[])
+    latticks_line_obs = Obs(Point2d[])
 
     spines_obs = Obs(Spines())
     finallimits = map(identity, scene, axis.finallimits; ignore_equal_values=true)
@@ -565,8 +565,8 @@ function Makie.initialize_block!(axis::GeoAxis)
     onany(scene, axis.xticks, axis.yticks, transform_obs, finallimits, vp_unchanged;
         update=true) do user_xticks, user_yticks, trans, fl, vp
 
-        lon_transformed = Point2f[]
-        lat_transformed = Point2f[]
+        lon_transformed = Point2d[]
+        lat_transformed = Point2d[]
         limit_rect = axis.finallimits[]
         trans_inverse = transform_inv_obs[]
 
@@ -574,8 +574,8 @@ function Makie.initialize_block!(axis::GeoAxis)
         xlims = Makie.xlimits(limits_t)
         ylims = Makie.ylimits(limits_t)
 
-        xticks = user_xticks isa Makie.Automatic ? default_ticks(-180, 180, xlims...) : user_xticks
-        yticks = user_yticks isa Makie.Automatic ? default_ticks(-90, 90, ylims...) : user_yticks
+        xticks = user_xticks isa Makie.Automatic ? default_ticks(-180, 180, xlims...) : Makie.get_tickvalues(user_xticks, xlims...)
+        yticks = user_yticks isa Makie.Automatic ? default_ticks(-90, 90, ylims...) : Makie.get_tickvalues(user_yticks, ylims...)
 
         spines = spines_obs[]
         foreach(empty!, [spines.left, spines.right, spines.bottom, spines.top])
@@ -606,15 +606,15 @@ function Makie.initialize_block!(axis::GeoAxis)
     cam = scene.camera
     lon_spine = Obs(SpinePoint[])
     lon_text = Obs([""])
-    lon_points_px = Obs(Point2f[])
+    lon_points_px = Obs(Point2d[])
 
     lat_spine = Obs(SpinePoint[])
     lat_text = Obs([""])
-    lat_points_px = Obs(Point2f[])
+    lat_points_px = Obs(Point2d[])
 
     onany(scene, spines_obs, cam.projectionview, vp_unchanged) do spines, pv, area
         poffset = minimum(area)
-        project_px(p) = to_ndim(Point2f, Makie.project(cam, :data, :pixel, p), 0.0f0) .+ poffset
+        project_px(p) = to_ndim(Point2d, Makie.project(cam, :data, :pixel, p), 0.0f0) .+ poffset
         project_p(p) = (input=p.input, projected=project_px(p.projected), dir=p.dir, intersect_dir=p.intersect_dir)
 
         left = project_p.(spines.left)
@@ -717,7 +717,7 @@ function Makie.initialize_block!(axis::GeoAxis)
 
         yoffset = Makie.top(a) + titlegap + (xaxisposition === (:top) ? xaxisprotrusion : 0.0f0)
 
-        return Point2f(x, yoffset)
+        return Point2d(x, yoffset)
     end
 
     titlealignnode = lift(axis.blockscene, axis.titlealign; ignore_equal_values=true) do align
@@ -781,8 +781,8 @@ function compute_protrusions(title, titlesize, titlegap, titlevisible,
     bottom = xaxisprotrusion
     top = xaxisprotrusion
 
-    titleheight = boundingbox(titlet).widths[2] + titlegap
-    subtitleheight = boundingbox(subtitlet).widths[2] + subtitlegap
+    titleheight = Makie.text_boundingbox(titlet).widths[2] + titlegap
+    subtitleheight = Makie.text_boundingbox(subtitlet).widths[2] + subtitlegap
 
     titlespace = if !titlevisible || Makie.iswhitespace(title)
         0.0f0
