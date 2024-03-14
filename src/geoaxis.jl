@@ -546,11 +546,20 @@ function Makie.initialize_block!(axis::GeoAxis)
 
     transform_obs = Observable{Any}(nothing; ignore_equal_values=true)
     transform_inv_obs = Observable{Any}(nothing; ignore_equal_values=true)
+    transform_ticks_obs = Observable{Any}(nothing; ignore_equal_values=true)
+    transform_ticks_inv_obs = Observable{Any}(nothing; ignore_equal_values=true)
 
     onany(scene, axis.dest, axis.source; update=true) do tp, sp
         trans = create_transform(tp, sp)
         transform_obs[] = trans
         transform_inv_obs[] = Makie.inverse_transform(trans)
+        if sp == "+proj=longlat +datum=WGS84"
+            transform_ticks_obs[] = trans
+            transform_ticks_inv_obs = transform_inv_obs[]
+        else
+            transform_ticks_obs[] = create_transform(tp, "+proj=longlat +datum=WGS84")
+            transform_ticks_inv_obs[] = create_transform("+proj=longlat +datum=WGS84", tp)
+        end
     end
 
     setfield!(axis, :transform_func, transform_obs)
@@ -562,13 +571,13 @@ function Makie.initialize_block!(axis::GeoAxis)
     finallimits = map(identity, scene, axis.finallimits; ignore_equal_values=true)
     vp_unchanged = map(identity, scene, scene.viewport; ignore_equal_values=true)
 
-    onany(scene, axis.xticks, axis.yticks, transform_obs, finallimits, vp_unchanged;
+    onany(scene, axis.xticks, axis.yticks, transform_ticks_obs, finallimits, vp_unchanged;
         update=true) do user_xticks, user_yticks, trans, fl, vp
 
         lon_transformed = Point2d[]
         lat_transformed = Point2d[]
         limit_rect = axis.finallimits[]
-        trans_inverse = transform_inv_obs[]
+        trans_inverse = transform_ticks_inv_obs[]
 
         limits_t = Makie.apply_transform(trans_inverse, limit_rect)
         xlims = Makie.xlimits(limits_t)
