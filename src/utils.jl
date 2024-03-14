@@ -69,61 +69,10 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect3{T}) where {T}
     return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
 end
 
-_apply_inverse(itrans, p) = Makie.apply_transform(itrans, p)
-
 function Makie.inverse_transform(trans::Proj.Transformation)
-    itrans = Base.inv(trans)
-    return Makie.PointTrans{2}(Base.Fix1(_apply_inverse, itrans))
+    return Base.inv(trans; always_xy = true)
 end
 
-function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie._apply_inverse), Proj.Transformation}}, r::Rect2{T}) where T
-    f = t.f.x
-    xmin, ymin = minimum(r)
-    xmax, ymax = maximum(r)
-    try
-
-        (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
-
-        if !isfinite(umin) || abs(umin) > 1e8
-            umin = -180.0
-        end
-        if !isfinite(umax) || abs(umax) > 1e8
-            umax = 180.0
-        end
-
-        if !isfinite(vmin) || abs(vmin) > 1e8
-            vmin = -90.0
-        end
-        if !isfinite(vmax) || abs(vmax) > 1e8
-            vmax = 90.0
-        end
-
-        if isapprox(umin, -180, rtol = 1e-4)
-            umin - -180e0
-        end
-        if isapprox(umax, 180; rtol = 1e-4)
-            umax = 180e0
-        end
-        if isapprox(vmin, -90; rtol = 1e-4)
-            vmin = -90e0
-        end
-        if isapprox(vmax, 90; rtol = 1e-4)
-            vmax = 90e0
-        end
-
-        return Rect(Vec2(T(umin), T(vmin)),
-                    Vec2(T(umax-umin), T(vmax-vmin)))
-    catch e
-        @show r
-        rethrow(e)
-    end
-end
-
-function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie._apply_inverse), Proj.Transformation}}, r::Rect3{T}) where {T}
-    r2 = Rect2{T}(r)
-    tr2 = Makie.apply_transform(t, r2)
-    return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
-end
 
 Base.isfinite(x::Union{GeometryBasics.AbstractPoint, GeometryBasics.Vec}) = all(isfinite, x)
 # Some minor type piracy
