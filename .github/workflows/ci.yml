@@ -35,7 +35,15 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v1
-      - run: julia --project=test -e 'using Pkg; Pkg.add([(; name = "GeometryBasics", rev="sd/aliases"), (; name="MakieCore", rev="breaking-0.21"), (; name="Makie", rev="breaking-0.21"), (; name="CairoMakie", rev="breaking-0.21"), ]);'
+      - run: julia --project=test -e '
+          using Pkg; 
+          Pkg.add([
+            (; name = "GeometryBasics", rev="sd/aliases"), 
+            (; name="MakieCore", rev="float64-rebased"), 
+            (; name="Makie", rev="float64-rebased"), 
+            (; name="CairoMakie", rev="float64-rebased"), 
+            (; name="GLMakie", rev="float64-rebased"), 
+          ]);'
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - uses: actions/upload-artifact@v4
@@ -60,10 +68,10 @@ jobs:
           julia --project=docs -e '
             using Pkg
             Pkg.add([
-              (; name="MakieCore", rev="breaking-0.21"),
-              (; name="Makie", rev="breaking-0.21"), 
-              (; name="CairoMakie", rev="breaking-0.21"), 
-              (; name="GLMakie", rev="breaking-0.21"),
+              (; name="MakieCore", rev="float64-rebased"),
+              (; name="Makie", rev="float64-rebased"), 
+              (; name="CairoMakie", rev="float64-rebased"), 
+              (; name="GLMakie", rev="float64-rebased"),
               (; name = "GeometryBasics", rev="sd/aliases"),
               (; path = pwd())
             ]);
