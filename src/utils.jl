@@ -23,7 +23,7 @@ function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecType
     # this is to catch errors - show the point which was invalid
     # and then catch it.
     try
-        return V(t(Vec(pt)) ./ PROJ_RESCALE_FACTOR)
+        return V(t(Vec(pt)))
     catch e
         # catch this annoying edge case
         # if pt[2] ≈ 90.0f0 || pt[2] ≈ -90.0f0
@@ -55,8 +55,8 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
 
     (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
 
-    return Rect(Vec2(T(umin), T(vmin)) ./ PROJ_RESCALE_FACTOR,
-                Vec2(T(umax-umin), T(vmax-vmin)) ./ PROJ_RESCALE_FACTOR)
+    return Rect(Vec2(T(umin), T(vmin)),
+                Vec2(T(umax-umin), T(vmax-vmin)))
     catch e
         @show r
         rethrow(e)
@@ -69,7 +69,7 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect3{T}) where {T}
     return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
 end
 
-_apply_inverse(itrans, p) = Makie.apply_transform(itrans, p .* PROJ_RESCALE_FACTOR) .* PROJ_RESCALE_FACTOR
+_apply_inverse(itrans, p) = Makie.apply_transform(itrans, p)
 
 function Makie.inverse_transform(trans::Proj.Transformation)
     itrans = Base.inv(trans)
@@ -78,8 +78,8 @@ end
 
 function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie._apply_inverse), Proj.Transformation}}, r::Rect2{T}) where T
     f = t.f.x
-    xmin, ymin = minimum(r) .* PROJ_RESCALE_FACTOR
-    xmax, ymax = maximum(r) .* PROJ_RESCALE_FACTOR
+    xmin, ymin = minimum(r)
+    xmax, ymax = maximum(r)
     try
 
         (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
