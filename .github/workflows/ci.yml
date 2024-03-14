@@ -35,7 +35,7 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v1
-      - run: julia --project=test -e '
+      - run: julia --project=. -e '
           using Pkg; 
           Pkg.add([
             (; name = "GeometryBasics", rev="sd/aliases"), 
