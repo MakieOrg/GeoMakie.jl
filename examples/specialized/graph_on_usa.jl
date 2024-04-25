@@ -37,8 +37,7 @@ ga = GeoAxis(
     source = "+proj=longlat +datum=WGS84",
     dest = "+proj=lcc +lon_0=-100 +lat_1=33 +lat_2=45",
     title = "Projection: lcc +lon_0=-100 +lat_1=33 +lat_2=45",
-    coastlines = false,
-    lonlims = automatic, latlims = automatic,
+    coastlines = false
 )
 
 poly!(
