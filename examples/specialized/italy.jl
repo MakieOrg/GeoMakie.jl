@@ -13,7 +13,8 @@ all_states = Downloads.download("") # TODO: get a better Italy file!!
 geo = GeoJSON.read(read(all_states))
 
 fig = Figure()
-ga = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=12.5 +lat_0=42", lonlims=(12, 13), latlims = GeoMakie.automatic)
+ga = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=12.5 +lat_0=42")
+xlims!(ga, 12, 13)
 poly!(ga, geo; strokecolor = :blue, strokewidth = 1, color = (:blue, 0.5), shading = NoShading);
 autolimits!(ga)
 
