@@ -26,7 +26,7 @@ fig = Figure()
 ga = GeoAxis(fig[1, 1]; dest="+proj=eqearth +lon_0=25")
 
 osmplot!(ga, osm)
-datalims!(ga)
+
 fig
 
 download_osm_buildings(:bbox;
@@ -48,5 +48,5 @@ buildings = buildings_from_file("london_buildings.osm");
 fig = Figure();
 ga = GeoAxis(fig[1, 1]; dest="+proj=ortho +lon_0=0 +lat_0=51.5", limits = ((0, 1), (50, 51)) )
 plot = osmplot!(ga, osm; buildings)
-datalims!(ga)
+
 fig
