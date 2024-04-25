@@ -53,8 +53,4 @@ graphplot!(
     node_color = cgrad(:plasma)[LinRange(0, 1, length(keys(gpos)))]
 )
 
-# Set the limits to the extrema of the data
-# (this is why we removed Alaska)
-datalims!(ga)
-
 fig
