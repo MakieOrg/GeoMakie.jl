@@ -53,6 +53,6 @@ include("makie-axis.jl")
 # some basic recipes
 include("mesh_image.jl")
 
-export GeoAxis, datalims, datalims!, automatic
+export GeoAxis, automatic
 
 end # module
