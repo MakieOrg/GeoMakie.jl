@@ -68,6 +68,8 @@ export Proj
 export FileIO
 
 export GeoAxis, datalims, datalims!, automatic
+@deprecate datalims autolimits
+@deprecate datalims! autolimits
 
 function __init__()
     @eval Makie.MakieCore begin
