@@ -576,8 +576,8 @@ function Makie.initialize_block!(axis::GeoAxis)
 
         lon_transformed = Point2d[]
         lat_transformed = Point2d[]
-        limit_rect = axis.finallimits[]
-        trans_inverse = transform_ticks_inv_obs[]
+        limit_rect = Makie.to_value(axis.finallimits)
+        trans_inverse = Makie.to_value(transform_ticks_inv_obs)
 
         limits_t = Makie.apply_transform(trans_inverse, limit_rect)
         xlims = Makie.xlimits(limits_t)
@@ -790,8 +790,8 @@ function compute_protrusions(title, titlesize, titlegap, titlevisible,
     bottom = xaxisprotrusion
     top = xaxisprotrusion
 
-    titleheight = Makie.text_boundingbox(titlet).widths[2] + titlegap
-    subtitleheight = Makie.text_boundingbox(subtitlet).widths[2] + subtitlegap
+    titleheight = Makie.boundingbox(titlet).widths[2] + titlegap
+    subtitleheight = Makie.boundingbox(subtitlet).widths[2] + subtitlegap
 
     titlespace = if !titlevisible || Makie.iswhitespace(title)
         0.0f0
