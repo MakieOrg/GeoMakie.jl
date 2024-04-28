@@ -88,10 +88,12 @@ end
 
 
 
-to_multipoly(poly::Polygon) = GeometryBasics.MultiPolygon([poly])
-to_multipoly(poly::Vector{Polygon}) = GeometryBasics.MultiPolygon(poly)
-to_multipoly(mp::MultiPolygon) = mp
-to_multipoly(any) = GeometryBasics.MultiPolygon(any)
+to_multipoly(poly::GeometryBasics.Polygon) = GeometryBasics.MultiPolygon([poly])
+to_multipoly(poly::Vector{GeometryBasics.Polygon}) = GeometryBasics.MultiPolygon(poly)
+to_multipoly(mp::GeometryBasics.MultiPolygon) = mp
+to_multipoly(geom) = to_multipoly(GeoInterface.trait(geom), geom)
+to_multipoly(::GeoInterface.PolygonTrait, geom) = GeometryBasics.MultiPolygon([GeoInterface.convert(GeometryBasics, geom)])
+to_multipoly(::GeoInterface.MultiPolygonTrait, geom) = GeoInterface.convert(GeometryBasics, geom)
 
 
 # GeoJSON-specific overrides for clarity
