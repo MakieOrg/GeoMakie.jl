@@ -22,6 +22,13 @@ GeoMakie.jl provides an axis for plotting geospatial data, `GeoAxis`. Both are s
 
 When plotting a projection which has a limited domain (in either longitude or latitude), if your limits are not inside that domain, the axis will appear blank.  To fix this, simply correct the limits - you can even do it on the fly, using the `xlims!(ax, low, high)` or `ylims!(ax, low, high)` functions.
 
+## Useful data sources
+
+- [NaturalEarth.jl](https://github.com/JuliaGeo/NaturalEarth.jl) provides access to all of the Natural Earth datasets, like coastlines, land polygons, country borders, rivers, and so on.
+- [GADM.jl](https://github.com/JuliaGeo/GADM.jl) provides access to the GADM cultural data, including the borders of all countries and their sub-divisions,from the GADM dataset (https://gadm.org/)..
+- [GeoDatasets.jl](https://github.com/JuliaGeo/GeoDatasets.jl) provides access to the GSHHG dataset.
+- [RasterDataSources.jl](https://github.com/EcoJulia/RasterDataSources.jl) 
+
 ## Examples
 
 ### Surface example
