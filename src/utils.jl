@@ -73,8 +73,6 @@ function Makie.inverse_transform(trans::Proj.Transformation)
     return Base.inv(trans; always_xy = true)
 end
 
-
-Base.isfinite(x::Union{GeometryBasics.AbstractPoint, GeometryBasics.Vec}) = all(isfinite, x)
 # Some minor type piracy
 
 function (transformation::Proj.Transformation)(coord::Point{N, T}) where {N, T <: Real}
