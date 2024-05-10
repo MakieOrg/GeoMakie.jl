@@ -18,7 +18,7 @@ function axis_setup!(axis::GeoAxis)
     scenearea = Makie.sceneareanode!(axis.layoutobservables.computedbbox, finallimits, axis.aspect)
     scene = Scene(topscene, viewport=scenearea)
     axis.scene = scene
-    onany(Makie.update_axis_camera, scene, scene.transformation.transform_func, finallimits, axis.xreversed, axis.yreversed)
+    onany(Makie.update_axis_camera, scene, scene, scene.transformation.transform_func, finallimits, axis.xreversed, axis.yreversed)
     notify(axis.layoutobservables.suggestedbbox)
     Makie.register_events!(axis, scene)
     on(scene, axis.limits) do _
