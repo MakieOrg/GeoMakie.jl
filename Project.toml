@@ -37,10 +37,9 @@ julia = "1.6"
 [extras]
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
-GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 LightOSM = "d1922b25-af4e-4ba3-84af-fe9bea896051"
 OSMMakie = "76b6901f-8821-46bb-9129-841bc9cfe677"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Downloads", "GLMakie", "CairoMakie"]
+test = ["Test", "Downloads", "CairoMakie"]
