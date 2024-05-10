@@ -125,7 +125,6 @@ function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie.
     return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
 end
 
-Base.isfinite(x::Union{GeometryBasics.AbstractPoint, GeometryBasics.Vec}) = all(isfinite, x)
 # Some minor type piracy
 
 function (transformation::Proj.Transformation)(coord::Point{N, T}) where {N, T <: Real}
