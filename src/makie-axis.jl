@@ -127,8 +127,9 @@ function Makie.reset_limits!(axis::GeoAxis; xauto = true, yauto = true)
         untrans = map(needs_transform, fallback_lims, new_lims) do needs, fallback, new
             needs ? new : fallback
         end
-        # Now that all values are in source input space, we can transform them again
-        mini, maxi = Makie.apply_transform(trans, [Point2d(untrans[1], untrans[3]), Point2d(untrans[2], untrans[4])])
+        # Now that all values are in source input space, we can transform them again.
+        # We use a rectangle to transform, since that allows us to use Proj's densification.
+        mini, maxi = Makie.apply_transform(trans, Rect2d(Vec2d(untrans[1], untrans[3]), Vec2d(untrans[2] - untrans[1], untrans[4] - untrans[3]))) |> extrema
         trans_lims = [mini[1], maxi[1], mini[2], maxi[2]]
         untrans = map(needs_transform, trans_lims, new_lims) do needs, tlim, new
             needs ? tlim : new
@@ -277,7 +278,7 @@ function getlimits(la::GeoAxis, dim)
         return !to_value(get(plot, :visible, true))
     end
     # get all data limits, minus the excluded plots
-    boundingbox = transformed_limits(la.scene, exclude)
+    boundingbox = Makie.boundingbox(la.scene, exclude)
     # if there are no bboxes remaining, `nothing` signals that no limits could be determined
     Makie.isfinite_rect(boundingbox) || return nothing
 
