@@ -2,12 +2,20 @@ assetpath(files...) =  joinpath(dirname(@__DIR__), "assets", files...)
 
 const LOAD_CACHE = Dict{String, Any}()
 
+# Docstring consts
+const NATURALEARTH_ATTRIBUTION = "Made with Natural Earth. Free vector and raster map data at [naturalearthdata.com](https://www.naturalearth.com)."
+const NATURALEARTH_SCALE = """
+By default, a scale of 110m is used, for which data is shipped with GeoMakie.
+To use other scales, NaturalEarth.jl requires an Internet connection to download
+the relevant data.
+"""
+
 """
     earth()
 
-Loads the Natural Earth [^1] 50m raster illustration of Earth as an image.
+Loads the Natural Earth [^1] 50m raster illustration of Earth as an image.  Doesn't support `scale` as of yet, but that's coming soon!
 
-[^1]: Made with Natural Earth. Free vector and raster map data at [naturalearthdata.com](https://www.naturalearth.com).
+[^1]: $NATURALEARTH_ATTRIBUTION
 """
 function earth()
     return get!(LOAD_CACHE, "earth") do
@@ -21,10 +29,9 @@ end
 Loads Natural Earth [^1] coastline data as GeometryBasics.jl
 geometries.  `scale` may be one of `110`, `50`, or `10`.
 
-By default, a scale of 110m is used, for which data is shipped with GeoMakie.
-To use other scales, NaturalEarth.jl uses an Internet connection.
+$NATURALEARTH_SCALE
 
-[^1]: Made with Natural Earth. Free vector and raster map data at [naturalearthdata.com](https://www.naturalearth.com).
+[^1]: $NATURALEARTH_ATTRIBUTION
 """
 coastlines(scale::Int) = geo2basic(NaturalEarth.naturalearth("coastline", scale))
 function coastlines()
@@ -41,10 +48,9 @@ end
 Loads Natural Earth [^1] land polygon data as GeometryBasics.jl geometries.
 `scale` may be one of `110`, `50`, or `10`.
 
-By default, a scale of 110m is used, for which data is shipped with GeoMakie.
-To use other scales, NaturalEarth.jl uses an Internet connection.
+$NATURALEARTH_SCALE
 
-[^1]: Made with Natural Earth. Free vector and raster map data at [naturalearthdata.com](https://www.naturalearth.com).
+[^1]: $NATURALEARTH_ATTRIBUTION
 """
 land(scale::Int) = geo2basic(NaturalEarth.naturalearth("land", scale))
 function land()
