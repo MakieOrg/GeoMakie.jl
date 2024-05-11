@@ -1,7 +1,11 @@
 module GeoMakie
 
-__precompile__(false) # don't precompile.  This increases TTFX but is necessary for the
-# override of the MakieCore approval list to work.
+# Because we override a MakieCore method here, we can't precompile.
+# However, what we can do is potentially eval the method into Makie 
+# at `__init__`, but that would also invalidate lots of Makie caches.
+# One way might be to define a const array in MakieCore which can be 
+# pushed to by different packages...
+__precompile__(false)
 
 using Statistics, LinearAlgebra
 
