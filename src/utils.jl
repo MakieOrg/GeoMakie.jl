@@ -52,11 +52,8 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     end
 
     try
-
-    (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
-
-    return Rect(Vec2(T(umin), T(vmin)),
-                Vec2(T(umax-umin), T(vmax-vmin)))
+        (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
+        return Rect(Vec2(T(umin), T(vmin)), Vec2(T(umax-umin), T(vmax-vmin)))
     catch e
         @show r
         rethrow(e)

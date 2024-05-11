@@ -25,7 +25,7 @@ function axis_setup!(axis::GeoAxis)
     notify(axis.layoutobservables.suggestedbbox)
     Makie.register_events!(axis, scene)
     on(scene, axis.limits) do _
-        reset_limits!(axis)
+        Makie.reset_limits!(axis)
     end
     onany(scene, scene.viewport, targetlimits) do _, _
         Makie.adjustlimits!(axis)
@@ -319,7 +319,7 @@ Makie.timed_ticklabelspace_reset(ax::GeoAxis, reset_timer::Ref,
     prev_xticklabelspace::Ref, prev_yticklabelspace::Ref, threshold_sec::Real) = nothing
 
 function Makie.update_state_before_display!(ax::GeoAxis)
-    reset_limits!(ax)
+    Makie.reset_limits!(ax)
     return
 end
 
