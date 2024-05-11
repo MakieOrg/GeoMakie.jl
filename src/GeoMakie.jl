@@ -13,7 +13,7 @@ using Makie, Makie.FileIO, Makie.GridLayoutBase, Makie.DocStringExtensions
 using Makie: Format
 using Makie.GridLayoutBase: Side
 
-using GeoJSON
+using GeoJSON, NaturalEarth # for data
 using GeoInterface: GeoInterface, coordinates, getfeature
 using GeometryBasics: Polygon, MultiPolygon
 using Geodesy
