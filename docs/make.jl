@@ -22,9 +22,9 @@ exclude = Set(["geodesy.jl", "makiecon_examples.jl", "multiple_crs.jl"])
 filter!(examples) do file
     isfile(file) && !(basename(file) in exclude) && endswith(file, ".jl")
 end
-for example in examples
-    Literate.markdown(example, joinpath(@__DIR__, "src", "examples"); documenter = true)
-end
+# for example in examples
+#     Literate.markdown(example, joinpath(@__DIR__, "src", "examples"); documenter = true)
+# end
 
 makedocs(;
     modules=[GeoMakie],
@@ -38,24 +38,24 @@ makedocs(;
     pages=[
         "Introduction" => "introduction.md",
         "Nonlinear transforms" => "nonlinear_transforms.md",
-        "Examples" => [
-            "Basic examples" => "examples/basic.md",
-            "New API" => "examples/new.md",
-            "Orthographic projection" => "examples/orthographic.md",
-            "German Lakes" => "examples/german_lakes.md",
-            "Geostationary satellite image" => "examples/geostationary_image.md",
-            "Contourf" => "examples/contourf.md",
-            # "Multiple CRS" => "examples/multiple_crs.md",
-            "World Population centers" => "examples/world_population.md",
-            "Field and countries" => "examples/field_and_countries.md",
-            "Mesh image recipe" => "examples/meshimage.md",
-            # "Geodetic transformation to the sphere" => "examples/geodesy.md",
-            "Axis configuration" => "examples/axis_config.md",
-            # "Italy's states" => "examples/italy.md",
-            # "Most Projections" => "examples/most_projections.md",
-            "Projections" => "examples/projections.md",
-            # "GraphMakie with GeoMakie" => "examples/graph_on_usa.md",
-        ],
+        # "Examples" => [
+        #     "Basic examples" => "examples/basic.md",
+        #     "New API" => "examples/new.md",
+        #     "Orthographic projection" => "examples/orthographic.md",
+        #     "German Lakes" => "examples/german_lakes.md",
+        #     "Geostationary satellite image" => "examples/geostationary_image.md",
+        #     "Contourf" => "examples/contourf.md",
+        #     # "Multiple CRS" => "examples/multiple_crs.md",
+        #     "World Population centers" => "examples/world_population.md",
+        #     "Field and countries" => "examples/field_and_countries.md",
+        #     "Mesh image recipe" => "examples/meshimage.md",
+        #     # "Geodetic transformation to the sphere" => "examples/geodesy.md",
+        #     "Axis configuration" => "examples/axis_config.md",
+        #     # "Italy's states" => "examples/italy.md",
+        #     # "Most Projections" => "examples/most_projections.md",
+        #     "Projections" => "examples/projections.md",
+        #     # "GraphMakie with GeoMakie" => "examples/graph_on_usa.md",
+        # ],
         "Developer documentation" => [
             "Architecture" => "architecture.md",
         ]

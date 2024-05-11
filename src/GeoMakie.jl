@@ -1,5 +1,8 @@
 module GeoMakie
 
+__precompile__(false) # don't precompile.  This increases TTFX but is necessary for the
+# override of the MakieCore approval list to work.
+
 using Statistics, LinearAlgebra
 
 using Reexport
