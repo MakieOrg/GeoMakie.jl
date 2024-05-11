@@ -33,3 +33,5 @@ Rasters = "a3a2b9e3-a471-40c9-b274-f788e487c689"
 
 [compat]
 Documenter = "1"
+MakieThemes = "0.1.1"
+Makie = "0.21"
