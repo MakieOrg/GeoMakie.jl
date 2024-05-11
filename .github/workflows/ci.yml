@@ -30,20 +30,11 @@ jobs:
 
       # Do tests
       - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v1
+      - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
-      # - run: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=. -e '
-      #     using Pkg; 
-      #     Pkg.add([
-      #       (; name = "GeometryBasics", rev="master"), 
-      #       (; name="MakieCore", rev="float64-rebased"), 
-      #       (; name="Makie", rev="float64-rebased"), 
-      #       (; name="CairoMakie", rev="float64-rebased"), 
-      #       (; name="GLMakie", rev="float64-rebased"), 
-      #     ]);'
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         with: 
@@ -68,19 +59,11 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v2
-      # - run: |
-      #     DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs -e '
-      #       using Pkg
-      #       Pkg.add([
-      #         (; name="MakieCore", rev="float64-rebased"),
-      #         (; name="Makie", rev="float64-rebased"), 
-      #         (; name="CairoMakie", rev="float64-rebased"), 
-      #         (; name="GLMakie", rev="float64-rebased"),
-      #         (; name = "GeometryBasics", rev="master"),
-      #         (; path = pwd())
-      #       ]);
-      #       Pkg.instantiate()
-      #       '
+      - run: |
+          julia --project=docs -e '
+            using Pkg
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
