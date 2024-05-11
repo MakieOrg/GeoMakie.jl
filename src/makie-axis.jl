@@ -499,3 +499,54 @@ function Makie.limits!(ax::GeoAxis, xlims, ylims)
     Makie.ylims!(ax, ylims)
     return
 end
+
+function Makie.hidexdecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true,
+    grid = true,#= minorgrid = true, minorticks = true=#)
+    if label
+        ax.xticklabelsvisible[] = false
+    end
+    if ticklabels
+        ax.xticklabelsvisible[] = false
+    end
+    if ticks
+        ax.xticksvisible[] = false
+    end
+    if grid
+        ax.xgridvisible[] = false
+    end
+    #=if minorgrid
+        ax.xminorgridvisible[] = false
+    end
+    if minorticks
+        ax.xminorticksvisible[] = false
+    end=#
+    return
+end
+
+function Makie.hideydecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true,
+    grid = true,#= minorgrid = true, minorticks = true=#)
+    if label
+        ax.yticklabelsvisible[] = false
+    end
+    if ticklabels
+        ax.yticklabelsvisible[] = false
+    end
+    if ticks
+        ax.yticksvisible[] = false
+    end
+    if grid
+        ax.ygridvisible[] = false
+    end
+    #=if minorgrid
+        ax.yminorgridvisible[] = false
+    end
+    if minorticks
+        ax.yminorticksvisible[] = false
+    end=#
+    return
+end
+
+Makie.hidedecorations!(ax::GeoAxis; kw...) = begin
+    hidexdecorations!(ax; kw...)
+    hideydecorations!(ax; kw...)
+end
