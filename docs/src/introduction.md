@@ -110,12 +110,11 @@ ax = GeoAxis(fig[1,1])
 sf = surface!(ax, lons, lats, field; shading = NoShading)
 cb1 = Colorbar(fig[1,2], sf; label = "field", height = Relative(0.65))
 
-using GeoMakie.GeoJSON
-countries_file = GeoMakie.assetpath("vector", "countries.geo.json")
-countries = GeoJSON.read(read(countries_file, String))
+using NaturalEarth
+countries = naturalearth("admin_0_countries", 110)
 
 n = length(countries)
-hm = poly!(ax, countries; color= 1:n, colormap = :dense,
+hm = poly!(ax, GeoMakie.to_multipoly(countries.geometry); color= 1:n, colormap = :dense,
     strokecolor = :black, strokewidth = 0.5,
 )
 translate!(hm, 0, 0, 100) # move above surface plot
@@ -138,8 +137,8 @@ To plot a scalar field, simply use `surface!(ga, lonmin..lonmax, latmin..latmax,
 
 ```@docs
 GeoMakie.geoformat_ticklabels
-Makie.reset_limits!
-GeoMakie.interset_spine_and_rect
+GeoMakie.GeoAxis
+GeoMakie.to_multipoly
 GeoMakie.geo2basic
 GeoMakie.meshimage
 ```
