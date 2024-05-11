@@ -37,10 +37,10 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        env: 
+          DISPLAY: ':0'
         with: 
           prefix: xvfb-run -s '-screen 0 1024x768x24'
-          env: 
-            DISPLAY: ':0'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
