@@ -1,5 +1,5 @@
 using Documenter, DocumenterVitepress, Literate
-using GeoMakie, CairoMakie, Makie
+using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
 # Set some global settings
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 4, type = :png)
@@ -65,6 +65,6 @@ makedocs(;
     warnonly = true,
 )
 
-rm.(readdir(joinpath(@__DIR__, "src", "examples"); join = true); force = true)
+isdir(joinpath(@__DIR__, "src", "examples")) && rm.(readdir(joinpath(@__DIR__, "src", "examples"); join = true); force = true)
 
 deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true)
