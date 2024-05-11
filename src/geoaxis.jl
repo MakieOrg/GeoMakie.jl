@@ -541,13 +541,18 @@ function filter_too_close(point, all_points)
 end
 
 function Makie.initialize_block!(axis::GeoAxis)
+
+    # Set up transformations first, so that the scene can be set up
+    # and linked to those.
+    transform_obs = Observable{Any}(identity; ignore_equal_values=true)
+    transform_inv_obs = Observable{Any}(identity; ignore_equal_values=true)
+    transform_ticks_obs = Observable{Any}(identity; ignore_equal_values=true)
+    transform_ticks_inv_obs = Observable{Any}(identity; ignore_equal_values=true)
+    setfield!(axis, :transform_func, transform_obs)
+
+
     scene = axis_setup!(axis)
     Obs(x) = Observable(x; ignore_equal_values=true)
-
-    transform_obs = Observable{Any}(nothing; ignore_equal_values=true)
-    transform_inv_obs = Observable{Any}(nothing; ignore_equal_values=true)
-    transform_ticks_obs = Observable{Any}(nothing; ignore_equal_values=true)
-    transform_ticks_inv_obs = Observable{Any}(nothing; ignore_equal_values=true)
 
     onany(scene, axis.dest, axis.source; update=true) do tp, sp
         trans = create_transform(tp, sp)
@@ -562,7 +567,6 @@ function Makie.initialize_block!(axis::GeoAxis)
         end
     end
 
-    setfield!(axis, :transform_func, transform_obs)
 
     lonticks_line_obs = Obs(Point2d[])
     latticks_line_obs = Obs(Point2d[])
