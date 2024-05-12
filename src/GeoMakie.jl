@@ -25,6 +25,7 @@ using GeoInterface: GeoInterface, coordinates, getfeature
 using GeometryBasics: Polygon, MultiPolygon
 using Geodesy
 using Proj
+import GeoFormatTypes
 
 export GeoInterface
 
@@ -47,6 +48,8 @@ Makie.to_colormap(::Nothing) = nothing
 function Makie.MakieCore.attribute_name_allowlist()
     (:xautolimits, :yautolimits, :zautolimits, :label, :rasterize, :model, :transformation, :dest, :source, :specular, :matcap, :backlight, :shininess, :interpolate, :diffuse, :dim_conversions)
 end
+# Quick fix for GeometryBasics
+Base.convert(::Type{Rect{N, Float64}}, x::Rect{N}) where N = Rect{N, Float64}(x)
 
 include("geojson.jl") # GeoJSON/GeoInterface support
 include("conversions.jl")

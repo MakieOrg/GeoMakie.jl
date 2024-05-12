@@ -3,9 +3,6 @@
 
 import Makie: xautolimits, yautolimits, autolimits, getxlimits, getylimits, getlimits
 
-# Lol, really GeometryBasics?
-Base.convert(::Type{Rect2d}, x::Rect2) = Rect2d(x)
-
 function axis_setup!(axis::GeoAxis)
     # initialize either with user limits, or pick defaults based on scales
     # so that we don't immediately error

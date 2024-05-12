@@ -73,43 +73,21 @@ function geoformat_ticklabels(nums)
     return labels
 end
 
-function longitude_format(nums)
-    labels = fill("", length(nums))
-    for i in 1:length(nums)
-        east_or_west = if nums[i] < 0
-            'W'
-        elseif nums[i] > 0
-            'E'
-        else
-            ' '
-        end
+function side_degree_format(nums, negative_char, positive_char, delim)
+    labels = fill("", axes(nums))
+    for i in eachindex(nums)
+        east_or_west = nums[i] < 0 ? negative_char : nums[i] > 0 ? positive_char : ' '
         labels[i] = if round(nums[i]) == nums[i]
-            string(Int(abs(nums[i])), "ᵒ $east_or_west")
+            string(Int(abs(nums[i])), delim * east_or_west)
         else
-            string(abs(nums[i]), "ᵒ $east_or_west")
+            string(abs(nums[i]), delim * east_or_west)
         end
     end
     return labels
 end
 
-function latitude_format(nums)
-    labels = fill("", length(nums))
-    for i in 1:length(nums)
-        north_or_south = if nums[i] < 0
-            'S'
-        elseif nums[i] > 0
-            'N'
-        else
-            ' '
-        end
-        labels[i] = if round(nums[i]) == nums[i]
-            string(Int(abs(nums[i])), "ᵒ $north_or_south")
-        else
-            string(abs(nums[i]), "ᵒ $north_or_south")
-        end
-    end
-    return labels
-end
+longitude_format(nums) = side_degree_format(nums, 'W', 'E', 'ᵒ')
+latitude_format(nums) = side_degree_format(nums, 'S', 'N', 'ᵒ')
 
 function _replace_if_automatic(typ::Type{T}, attribute::Symbol, auto) where T
     default_attr_vals = Makie.default_attribute_values(T, nothing)
