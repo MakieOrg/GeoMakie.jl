@@ -550,15 +550,27 @@ function Makie.initialize_block!(axis::GeoAxis)
     transform_ticks_inv_obs = Observable{Any}(identity; ignore_equal_values=true)
     setfield!(axis, :transform_func, transform_obs)
 
-
+    # Set up the axis for the Scene, mostly using Makie's existing functionality
     scene = axis_setup!(axis)
+
+    # Shorthand for what you see below - ONLY ACCESSIBLE WITHIN THIS FUNCTION!!
     Obs(x) = Observable(x; ignore_equal_values=true)
 
+    # Keep the transformations up to date.
     onany(scene, axis.dest, axis.source; update=true) do tp, sp
+        # First we perform the transformation for the axis,
         trans = create_transform(tp, sp)
         transform_obs[] = trans
         transform_inv_obs[] = Makie.inverse_transform(trans)
-        if sp == "+proj=longlat +datum=WGS84"
+        # and next for the ticks - this assumes an input CRS in 
+        # PROJ-string format, which is not necessarily the case, but suffices for now.
+        # What this should do, is check using Proj whether the input CRS is equivalent 
+        # to EPSG 4326, which is actually quite doable - especially using a cache of some kind.
+        # What this is actually doing, is creating a transformation that takes the input CRS
+        # and transforms it to the WGS84 CRS, which is how we display the ticks.
+        # If you wanted ticks in the input CRS, you'd have to wait until a generic `NonlinearAxis`
+        # is implemented, which would then not have any special treatment for geographic stuff.
+        if sp == "+proj=longlat +datum=WGS84" || sp == "+proj=latlong +datum=WGS84 +type=crs"
             transform_ticks_obs[] = trans
             transform_ticks_inv_obs = transform_inv_obs[]
         else
@@ -574,7 +586,13 @@ function Makie.initialize_block!(axis::GeoAxis)
     spines_obs = Obs(Spines())
     finallimits = map(identity, scene, axis.finallimits; ignore_equal_values=true)
     vp_unchanged = map(identity, scene, scene.viewport; ignore_equal_values=true)
-
+    # This is kind of the main redrawing loop for the axis.  This should really be
+    # factored out into a sync and async function, so that zooming is fluid, but 
+    # we can figure that out later.
+    # What this does is first calculate limits and ticks, then create spines and 
+    # project them.  Those are stored in Observables which are used to produce
+    # lineplots later on that form the grid.
+    # TODO: implement a minor grid.
     onany(scene, axis.xticks, axis.yticks, transform_ticks_obs, finallimits, vp_unchanged;
         update=true) do user_xticks, user_yticks, trans, fl, vp
 
@@ -607,7 +625,7 @@ function Makie.initialize_block!(axis::GeoAxis)
         notify(spines_obs)
         return
     end
-
+    # These are the grid plots from earlier.  
     longridplot = lines!(scene, lonticks_line_obs; color=axis.xgridcolor, linewidth=axis.xgridwidth,
         visible=axis.xgridvisible, linestyle=axis.xgridstyle, transparency=true)
     translate!(longridplot, 0, 0, 100)
@@ -615,7 +633,7 @@ function Makie.initialize_block!(axis::GeoAxis)
         visible=axis.ygridvisible, linestyle=axis.ygridstyle, transparency=true)
     translate!(latgridplot, 0, 0, 100)
 
-
+    # This creates the spines and ticklabels plots for the grid.
     cam = scene.camera
     lon_spine = Obs(SpinePoint[])
     lon_text = Obs([""])
@@ -695,7 +713,8 @@ function Makie.initialize_block!(axis::GeoAxis)
         fontsize=axis.yticklabelsize, visible=axis.yticklabelsvisible,)
 
     fonts = theme(axis.blockscene, :fonts)
-
+    # Finally calculate protrusions and report all bounding boxes
+    # to the layout system.
     approx_x_protrusion = map(axis.blockscene, axis.yticklabelfont, axis.yticklabelsize, lat_text) do font, size, lat_text
         max_height = 0.0f0
         for str in lat_text
