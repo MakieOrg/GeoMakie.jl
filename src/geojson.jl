@@ -102,6 +102,14 @@ to_multipoly(geom::AbstractVector) = to_multipoly.(GeoInterface.trait.(geom), ge
 to_multipoly(::GeoInterface.PolygonTrait, geom) = GeometryBasics.MultiPolygon([GeoInterface.convert(GeometryBasics, geom)])
 to_multipoly(::GeoInterface.MultiPolygonTrait, geom) = GeoInterface.convert(GeometryBasics, geom)
 
+to_multilinestring(poly::GeometryBasics.LineString) = GeometryBasics.MultiLineString([poly])
+to_multilinestring(poly::Vector{GeometryBasics.Polygon}) = GeometryBasics.MultiLineString(poly)
+to_multilinestring(mp::GeometryBasics.MultiLineString) = mp
+to_multilinestring(geom) = to_multilinestring(GeoInterface.trait(geom), geom)
+to_multilinestring(geom::AbstractVector) = to_multilinestring.(GeoInterface.trait.(geom), geom)
+to_multilinestring(::GeoInterface.LineStringTrait, geom) = GeometryBasics.MultiLineString([GeoInterface.convert(GeometryBasics, geom)])
+to_multilinestring(::GeoInterface.MultiLineStringTrait, geom) = GeoInterface.convert(GeometryBasics, geom)
+
 
 # GeoJSON-specific overrides for clarity
 # Only converts polygons and multipolygons

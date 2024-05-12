@@ -41,7 +41,7 @@ $NATURALEARTH_SCALE
 
 [^1]: $NATURALEARTH_ATTRIBUTION
 """
-coastlines(scale::Int) = geo2basic(NaturalEarth.naturalearth("coastline", scale))
+coastlines(scale::Int) = to_multilinestring(geo2basic(NaturalEarth.naturalearth("coastline", scale)))
 function coastlines()
     return get!(LOAD_CACHE, "coastlines") do
         geometry = GeoJSON.read(read(assetpath("vector", "110m_coastline.geojson"), String))
@@ -60,7 +60,7 @@ $NATURALEARTH_SCALE
 
 [^1]: $NATURALEARTH_ATTRIBUTION
 """
-land(scale::Int) = geo2basic(NaturalEarth.naturalearth("land", scale))
+land(scale::Int) = to_multipoly(geo2basic(NaturalEarth.naturalearth("land", scale)))
 function land()
     return get!(LOAD_CACHE, "land") do
         geometry = GeoJSON.read(read(assetpath("vector", "110m_land.geojson"), String))
