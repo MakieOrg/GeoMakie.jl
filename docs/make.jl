@@ -36,7 +36,8 @@ examples = joinpath.(
         "world_population.jl",
         "field_and_countries.jl",
         "meshimage.jl",
-        "projections.jl"
+        "projections.jl",
+        "gmt/antioquia.jl",
     ] 
 )
 
@@ -56,6 +57,7 @@ makedocs(;
     pages=[
         "Introduction" => "introduction.md",
         "Nonlinear transforms" => "nonlinear_transforms.md",
+        "Examples" => joinpath.(("examples"), last.(splitdir.(examples))),
         # "Examples" => [
         #     "Basic examples" => "examples/basic.md",
         #     "New API" => "examples/new.md",

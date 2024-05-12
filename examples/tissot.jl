@@ -15,7 +15,7 @@ circle_polys = [GI.Polygon([geodesic_circle(Point2f(lon, lat), 500_000, 50)]) fo
 circle_polys_cut = GO.cut.(circle_polys, (GO.LineString(Point2f[(0, -180), (0, 180)]),), Float32)
 poly!(a, circle_polys; color = Makie.wong_colors(0.7)[2])
 f
-# The polygons look like this in plate-carree:
+# The polygons look like this in lon-lat space:
 poly(circle_polys)
 
 #=
