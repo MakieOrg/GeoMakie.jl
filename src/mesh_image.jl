@@ -1,3 +1,9 @@
+#=
+# MeshImage
+
+This file contains the implementation of the `MeshImage` recipe.
+=#
+
 using Makie: GeometryBasics
 
 """

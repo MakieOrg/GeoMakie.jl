@@ -1,3 +1,9 @@
+#=
+# GeoInterface.jl integration
+
+This code has some utilities to work with GeoJSON and GeoInterface geometries.
+=#
+
 using GeoInterface
 using GeometryBasics
 

@@ -1,3 +1,11 @@
+#=
+# Bundled data
+
+This file contains convenience functions to load bundled data as well as 
+Natural Earth data at different scales.
+
+=#
+
 assetpath(files...) =  joinpath(dirname(@__DIR__), "assets", files...)
 
 const LOAD_CACHE = Dict{String, Any}()

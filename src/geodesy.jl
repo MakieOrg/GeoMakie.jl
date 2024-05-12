@@ -1,3 +1,12 @@
+#=
+# Geodesy.jl integration
+
+This code integrates Geodesy.jl's coordinate transformations into Makie's transformation system.
+
+Ideally, it would be in an extension on Geodesy in Makie, but the code is evolving sufficiently quickly 
+that it's best to leave it here.
+=#
+
 # This is how we implement Makie's transformation interface.
 function Makie.apply_transform(f::Geodesy.ECEFfromLLA, pt::V) where V <: VecTypes{3, T} where {T}
     # The convention in Makie is that x is longitude, y is latitude, and z is altitude if present.

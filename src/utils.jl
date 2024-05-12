@@ -1,4 +1,4 @@
-# General utility functions.
+# # General utility functions
 
 function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 90))
     # Search for a good bound with decent accuracy

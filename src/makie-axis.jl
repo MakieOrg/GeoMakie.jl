@@ -1,3 +1,7 @@
+#=
+# GeoAxis Makie integration
+=#
+
 # Anything in this file was directly taken from Makie/makielayout/blocks/axis.jl
 # TODO, refactor axis.jl to make it easier to extend
 

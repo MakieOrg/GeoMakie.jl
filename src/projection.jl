@@ -11,16 +11,23 @@ for transformations.
 #                                                          #
 ############################################################
 
-# This function is a little gnarly.
-# In Makie, we use NaN as a blank point, i.e. any line
-# ends at NaN and restarts at the next point.
-# However, if NaN goes somewhere in ℝ² in the projection,
-# this utility is lost and the plot will have a bunch of lines
-# going to transformation(Point2f(NaN)).
-# In order to avoid this, we check first if the point is NaN,
-# if so we return NaN.  Then, and only then, do we transform it.
-# This does not seem to effect times too much but can be removed
-# if necessary.
+#= 
+
+This function is a little gnarly.
+In Makie, we use NaN as a blank point, i.e. any line
+ends at NaN and restarts at the next point.  However, 
+if NaN goes somewhere in ℝ² in the projection, this 
+utility is lost and the plot will have a bunch of lines
+going to transformation(Point2f(NaN)). In order to avoid 
+this, we check first if the point is NaN, if so we return NaN. 
+
+Then, and only then, do we transform it.
+
+This does not seem to effect times too adversely, but can be 
+removed if necessary.
+
+=#
+
 function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecTypes{N,T} where {N,T}
     if all(isnan.(pt))
         return V(NaN)
@@ -39,6 +46,7 @@ function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecType
     end
 end
 
+# Converting rectangles requires densifying the edges.
 function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     xmin, ymin = minimum(r)
     xmax, ymax = maximum(r)
@@ -71,6 +79,8 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect3{T}) where {T}
     return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
 end
 
+# The inverse transformation is pretty simple, but the 
+# coordinate order has to be maintained!
 function Makie.inverse_transform(trans::Proj.Transformation)
     return Base.inv(trans; always_xy = true)
 end

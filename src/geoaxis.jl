@@ -1,3 +1,7 @@
+#=
+# GeoAxis
+=#
+
 const Rect2d = Rect2{Float64}
 
 Makie.@Block GeoAxis <: Makie.AbstractAxis begin

@@ -1,3 +1,9 @@
+#=
+# GeoTicks
+
+This file contains the implementation of geographic tickfinders.
+=#
+
 """
     GeoTicks(; multiple = 12, threshold = 3, alternate_tickfinder = Makie.WilkinsonTicks(5; k_min = 3))
 
