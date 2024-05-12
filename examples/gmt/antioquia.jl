@@ -2,12 +2,13 @@
 
 # This example was translated from the [equivalent GMT.jl example](https://www.generic-mapping-tools.org/GMTjl_doc/tutorials/vector_shp/vector_shp/).
 
-using GMT # for data
-using GeoMakie, Polylabel, Shapefile
+import GMT # for data
+using GeoMakie, Polylabel
+using DataFrames
 
 import ZipFile, Shapefile
 
-table = Shapefile.Table(joinpath(GMT.TESTSDIR, "COL_adm2.shp.zip"))
+table = Shapefile.Table(joinpath(GMT.TESTSDIR, "COL_adm2.shp.zip")) |> DataFrame
 
 antioquia_geoms = filter(:NAME_1 => ==("Antioquia"), table)
 
