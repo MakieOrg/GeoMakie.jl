@@ -40,17 +40,10 @@ const volume = Makie.volume
 const Mesh = GeometryBasics.Mesh
 const Text = Makie.Text
 
-# Quick fixes for Makie
-Makie.to_colormap(::Nothing) = nothing
-# Since Makie explicitly sets its allow list, this is definitely piracy,
-# but if we don't do this then passing `source` or `dest` almost universally
-# errors.
-function Makie.MakieCore.attribute_name_allowlist()
-    (:xautolimits, :yautolimits, :zautolimits, :label, :rasterize, :model, :transformation, :dest, :source, :specular, :matcap, :backlight, :shininess, :interpolate, :diffuse, :dim_conversions)
-end
 # Quick fix for GeometryBasics
 Base.convert(::Type{Rect{N, Float64}}, x::Rect{N}) where N = Rect{N, Float64}(x)
 
+include("makie_piracy.jl")
 include("geojson.jl") # GeoJSON/GeoInterface support
 include("conversions.jl")
 include("data.jl")
