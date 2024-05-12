@@ -45,6 +45,11 @@ for example in examples
     Literate.markdown(example, joinpath(@__DIR__, "src", "examples"); documenter = true)
 end
 
+documenter_example_paths = joinpath.(
+    ("examples"), 
+    first.(splitext.(last.(splitdir.(examples)))) .* (".md",)
+)
+
 makedocs(;
     modules=[GeoMakie],
     doctest=false,
@@ -57,7 +62,7 @@ makedocs(;
     pages=[
         "Introduction" => "introduction.md",
         "Nonlinear transforms" => "nonlinear_transforms.md",
-        "Examples" => joinpath.(("examples"), last.(splitdir.(examples))),
+        "Examples" => documenter_example_paths,
         # "Examples" => [
         #     "Basic examples" => "examples/basic.md",
         #     "New API" => "examples/new.md",
