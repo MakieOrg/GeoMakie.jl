@@ -835,15 +835,6 @@ function compute_protrusions(title, titlesize, titlegap, titlevisible,
     return GridLayoutBase.RectSides{Float32}(left, right, bottom, top)
 end
 
-function create_transform(dest::String, source::String)
-    return Proj.Transformation(source, dest; always_xy=true)
-end
-
-function create_transform(dest::Observable, source::Observable)
-    result = Observable{Any}()
-    return map!(create_transform, result, dest, source)
-end
-
 # This is where we override the stuff to make it our stuff.
 function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
     source = pop!(plot.kw, :source, axis.source)
