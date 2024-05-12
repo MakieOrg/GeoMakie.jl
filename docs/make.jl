@@ -17,14 +17,32 @@ if deploy && !haskey(ENV, "GITHUB_TOKEN")
 end
 
 # use Literate for examples
-examples = readdir(joinpath(dirname(@__DIR__), "examples"); join = true)
+example_dir = joinpath(dirname(@__DIR__), "examples")
+examples = readdir(example_dir; join = true)
 exclude = Set(["geodesy.jl", "makiecon_examples.jl", "multiple_crs.jl"])
 filter!(examples) do file
     isfile(file) && !(basename(file) in exclude) && endswith(file, ".jl")
 end
-# for example in examples
-#     Literate.markdown(example, joinpath(@__DIR__, "src", "examples"); documenter = true)
-# end
+
+examples = joinpath.(
+    (example_dir,), 
+    [
+        "basic.jl",
+        "new.jl",
+        "orthographic.jl",
+        "german_lakes.jl",
+        "geostationary_image.jl",
+        "contourf.jl",
+        "world_population.jl",
+        "field_and_countries.jl",
+        "meshimage.jl",
+        "projections.jl"
+    ] 
+)
+
+for example in examples
+    Literate.markdown(example, joinpath(@__DIR__, "src", "examples"); documenter = true)
+end
 
 makedocs(;
     modules=[GeoMakie],
