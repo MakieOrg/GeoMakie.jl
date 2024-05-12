@@ -501,34 +501,6 @@ function vis_spine!(points, text, points_px, d, mindist, labeloffset)
     end
 end
 
-function closest_multiple(M, N)
-    # Step 1: Find the quotient
-    quotient = N ÷ M
-
-    # Step 2: Get the multiple of M just less than or equal to N
-    lower_multiple = N ÷ quotient
-
-    # Step 3: Check if the next multiple is closer
-    upper_multiple = N ÷ (quotient + 1)
-
-    # Determine which multiple is closer to N
-    if abs(N - lower_multiple) <= abs(N - upper_multiple)
-        return lower_multiple
-    else
-        return upper_multiple
-    end
-end
-
-function default_ticks(dmini, dmaxi, mini, maxi)
-    if isfinite(mini) && isfinite(maxi)
-        mini, maxi = min(maxi, mini), max(maxi, mini)
-        step = max(1, closest_multiple((maxi - mini) / 12, dmaxi))
-        return dmini:step:dmaxi
-    else
-        return dmini:30:dmaxi
-    end
-end
-
 function filter_too_close(point, all_points)
     a = point.projected
     for p in all_points
@@ -605,8 +577,8 @@ function Makie.initialize_block!(axis::GeoAxis)
         xlims = Makie.xlimits(limits_t)
         ylims = Makie.ylimits(limits_t)
 
-        xticks = user_xticks isa Makie.Automatic ? default_ticks(-180, 180, xlims...) : Makie.get_tickvalues(user_xticks, xlims...)
-        yticks = user_yticks isa Makie.Automatic ? default_ticks(-90, 90, ylims...) : Makie.get_tickvalues(user_yticks, ylims...)
+        xticks = user_xticks isa Makie.Automatic ? geoticks(-180, 180, xlims...) : Makie.get_tickvalues(user_xticks, xlims...)
+        yticks = user_yticks isa Makie.Automatic ? geoticks(-90, 90, ylims...) : Makie.get_tickvalues(user_yticks, ylims...)
 
         spines = spines_obs[]
         foreach(empty!, [spines.left, spines.right, spines.bottom, spines.top])

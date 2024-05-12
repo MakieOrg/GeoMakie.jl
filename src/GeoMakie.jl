@@ -53,6 +53,7 @@ include("conversions.jl")
 include("data.jl")
 include("utils.jl")
 include("geodesy.jl")
+include("geoticks.jl")
 include("projection.jl")
 
 include("geoaxis.jl")
