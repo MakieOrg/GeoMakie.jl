@@ -12,10 +12,20 @@ import GeometryOps as GO
 using GeoInterfaceMakie # hide
 GeoInterfaceMakie.@enable GADM.ArchGDAL.IGeometry # hide
 
-# Acquire data
+# Acquire the data via [GADM.jl](https://github.com/JuliaGeo/GADM.jl), a package which allows
+# access to the GADM dataset of country border geometries.  We'll get the 1st level of
+# detail, which provides the admin-1 (state) borders.
 ita_df = GADM.get("ITA"; depth = 1) |> DataFrame
+# We can also calculate the centroid of Italy from this data!
+
+# Choosing a projection for the map is important, of course, and for a country like
+# Italy, we can get away with an orthographic projection, which is kind of like an overhead
+# view from a great distance.
+
+# We can center this orthographic projection at the centroid of Italy, so that distortion
+# is minimized.
 ita_centroid = GO.centroid(ita_df.geom)
-# Plot the data
+
 fig = Figure()
 ga = GeoAxis(
     fig[1, 1]; 

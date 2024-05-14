@@ -30,6 +30,8 @@ examples = joinpath.(
         "basic.jl",
         "new.jl",
         "axis_config.jl",
+        "italy.jl",
+        "graph_on_usa.jl",
         "orthographic.jl",
         "german_lakes.jl",
         "geostationary_image.jl",
