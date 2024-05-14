@@ -120,8 +120,9 @@ function Makie.reset_limits!(axis::GeoAxis; xauto = true, yauto = true)
         trans = axis.transform_func[]
         # Fallback to untransformed data limits
         # TODO, is this always correct?
-        rect = data_limits(axis.scene)
-        fxlim, fylim = Makie.limits(rect)
+        transformed_rect = boundingbox(axis.scene)
+        untransformed_rect = Makie.apply_transform(axis.inv_transform_func[], transformed_rect)
+        fxlim, fylim = Makie.limits(untransformed_rect)
         fallback_lims = [fxlim..., fylim...]
         new_lims = [xlims..., ylims...]
         # Replace values that are already transformed with untransformed values
@@ -139,7 +140,7 @@ function Makie.reset_limits!(axis::GeoAxis; xauto = true, yauto = true)
         ylims = (untrans[3], untrans[4])
     end
 
-    axis.targetlimits[] = Makie.BBox(xlims..., ylims...)
+    axis.targetlimits[] = Makie.BBox(xlims..., ylims...) # this is in TRANSFORMED space
     nothing
 end
 
