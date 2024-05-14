@@ -14,6 +14,7 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
     interactions::Dict{Symbol, Tuple{Bool, Any}}
     elements::Dict{Symbol, Any}
     transform_func::Observable{Any}
+    inv_transform_func::Observable{Any}
     @attributes begin
         # unused - only for compat with Makie AbstractAxis functions
         xscale = identity
@@ -525,6 +526,7 @@ function Makie.initialize_block!(axis::GeoAxis)
     transform_ticks_obs = Observable{Any}(identity; ignore_equal_values=true)
     transform_ticks_inv_obs = Observable{Any}(identity; ignore_equal_values=true)
     setfield!(axis, :transform_func, transform_obs)
+    setfield!(axis, :inv_transform_func, transform_inv_obs)
 
     # Set up the axis for the Scene, mostly using Makie's existing functionality
     scene = axis_setup!(axis)
@@ -546,9 +548,9 @@ function Makie.initialize_block!(axis::GeoAxis)
         # and transforms it to the WGS84 CRS, which is how we display the ticks.
         # If you wanted ticks in the input CRS, you'd have to wait until a generic `NonlinearAxis`
         # is implemented, which would then not have any special treatment for geographic stuff.
-        if sp == "+proj=longlat +datum=WGS84" || sp == "+proj=latlong +datum=WGS84 +type=crs"
+        if sp == "+proj=longlat +datum=WGS84" || sp == "+proj=latlong +datum=WGS84 +type=crs" || sp == GeoFormatTypes.EPSG(4326)
             transform_ticks_obs[] = trans
-            transform_ticks_inv_obs = transform_inv_obs[]
+            transform_ticks_inv_obs[] = transform_inv_obs[]
         else
             transform_ticks_obs[] = create_transform(tp, "+proj=longlat +datum=WGS84")
             transform_ticks_inv_obs[] = create_transform("+proj=longlat +datum=WGS84", tp)
