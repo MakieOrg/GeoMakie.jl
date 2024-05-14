@@ -29,6 +29,7 @@ examples = joinpath.(
     [
         "basic.jl",
         "new.jl",
+        "axis_config.jl",
         "orthographic.jl",
         "german_lakes.jl",
         "geostationary_image.jl",
@@ -38,6 +39,8 @@ examples = joinpath.(
         "meshimage.jl",
         "projections.jl",
         "gmt/antioquia.jl",
+        "tissot.jl",
+        "rotating_earth.jl",
     ] 
 )
 
@@ -63,6 +66,20 @@ makedocs(;
         "Introduction" => "introduction.md",
         "Nonlinear transforms" => "nonlinear_transforms.md",
         "Examples" => documenter_example_paths,
+        "Developer documentation" => [
+            "Architecture" => "architecture.md",
+        ]
+        ],
+    sitename="GeoMakie.jl",
+    authors="Anshul Singhvi and the Makie.jl contributors",
+    warnonly = true,
+)
+
+isdir(joinpath(@__DIR__, "src", "examples")) && rm.(readdir(joinpath(@__DIR__, "src", "examples"); join = true); force = true)
+
+deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true, forcepush = true)
+
+
         # "Examples" => [
         #     "Basic examples" => "examples/basic.md",
         #     "New API" => "examples/new.md",
@@ -81,15 +98,3 @@ makedocs(;
         #     "Projections" => "examples/projections.md",
         #     # "GraphMakie with GeoMakie" => "examples/graph_on_usa.md",
         # ],
-        "Developer documentation" => [
-            "Architecture" => "architecture.md",
-        ]
-        ],
-    sitename="GeoMakie.jl",
-    authors="Anshul Singhvi and the Makie.jl contributors",
-    warnonly = true,
-)
-
-isdir(joinpath(@__DIR__, "src", "examples")) && rm.(readdir(joinpath(@__DIR__, "src", "examples"); join = true); force = true)
-
-deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true)

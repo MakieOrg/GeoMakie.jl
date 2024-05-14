@@ -32,7 +32,7 @@ hm1 = surface!(ax, lons, lats, field; shading = NoShading)
 translate!(hm1, 0, 0, -10)
 
 hm2 = poly!(
-    ax, worldCountries;
+    ax, GeoMakie.to_multipoly(worldCountries.geometry);
     color= 1:n,
     colormap = Reverse(:plasma),
     strokecolor = :black,
