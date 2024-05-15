@@ -12,7 +12,7 @@ This example was adapted from code in [this Julia Discourse post](https://discou
 using GeoMakie, CairoMakie
 CairoMakie.activate!(px_per_unit = 4) # hide
 using GraphMakie, GraphMakie.Graphs
-using NaturalEarth
+using NaturalEarth, DataFrames
 # We get US state borders from Natural Earth, and filter it out so it's only the continental states.
 # For the purposes of this example, we only care about those.
 admin_1_df = DataFrame(naturalearth("admin_1_states_provinces", 110))
