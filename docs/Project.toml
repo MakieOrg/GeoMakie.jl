@@ -35,6 +35,7 @@ Proj = "c94c279d-25a6-4763-9509-64d165bea63e"
 RasterDataSources = "3cb90ccd-e1b6-4867-9617-4276c8b2ca36"
 Rasters = "a3a2b9e3-a471-40c9-b274-f788e487c689"
 Shapefile = "8e980c4a-a4fe-5da2-b3a7-4b4b0353a2f4"
+WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 ZipFile = "a5390f91-8eb1-5f08-bee0-b1d1ffed6cea"
 
 [compat]

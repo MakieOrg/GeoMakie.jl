@@ -59,11 +59,15 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v2
-      - run: |
-          julia --project=docs -e '
+      - name: Install documentation dependencies
+        run: |
+          xvfb-run -s '-screen 0 1024x768x24' julia --project=docs -e '
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.add(name = "DocumenterVitepress", rev = "main")
             Pkg.instantiate()'
+        env:
+          DISPLAY: ':0'
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
