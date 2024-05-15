@@ -23,6 +23,7 @@ The Julia package ecosystem has several sources which provide geographic data fr
 - [NaturalEarth.jl](https://github.com/JuliaGeo/NaturalEarth.jl) - get data from [Natural Earth](https://www.naturalearthdata.com/).
 - [GADM.jl](https://github.com/JuliaGeo/GADM.jl) - get data from [GADM](https://gadm.org/), a database of political borders for countries, down to state and even province-equivalent level.
 - [GeoDatasets.jl](https://github.com/JuliaGeo/GeoDatasets.jl) - currently provides access to [GSHHG](https://www.soest.hawaii.edu/pwessel/gshhg/).
+- [GMT.jl](https://github.com/JuliaGeo/GMT.jl) - provides access to the [GMT](https://www.generic-mapping-tools.org/) library, which has quite a bit of data as well as being another geographic plotting library!
 - [RasterDataSources.jl](https://github.com/EcoJulia/RasterDataSources.jl) - provides access to various raster datasets via [Rasters.jl](https://github.com/rafaqz/Rasters.jl).  See their documentation for the full list!
 
 ## Loading data yourself
