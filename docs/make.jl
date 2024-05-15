@@ -66,8 +66,9 @@ makedocs(;
     ),
     pages=[
         "Introduction" => "introduction.md",
-        "Nonlinear transforms" => "nonlinear_transforms.md",
+        "Data" => "data.md",
         "Examples" => documenter_example_paths,
+        "Nonlinear transforms" => "nonlinear_transforms.md",
         "Developer documentation" => [
             "Architecture" => "architecture.md",
         ]
