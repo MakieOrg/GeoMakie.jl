@@ -16,7 +16,7 @@ GeoMakie.land
 GeoMakie.earth
 ```
 
-## External sources
+## External sources 
 
 The Julia package ecosystem has several sources which provide geographic data from various sources.  
 
@@ -28,12 +28,13 @@ The Julia package ecosystem has several sources which provide geographic data fr
 ## Loading data yourself
 
 - Vector data loaders:
-    - Native Julia: GeoJSON.jl, Shapefile.jl, GeoParquet.jl, WellKnownGeometry.jl
-    - C library interfaces: ArchGDAL.jl, and the more primitive GDAL.jl
+    - Native Julia: [GeoJSON.jl](https://github.com/JuliaGeo/GeoJSON.jl), [Shapefile.jl](https://github.com/JuliaGeo/Shapefile.jl), [GeoParquet.jl](https://github.com/JuliaGeo/GeoParquet.jl), [WellKnownGeometry.jl](https://github.com/evetion/WellKnownGeometry.jl)
+    - [GeoDatasets.jl](https://github.com/evetion/GeoDatasets.jl), which wraps ArchGDAL.jl to return a DataFrame.
+    - [ArchGDAL.jl](https://github.com/yeesian/ArchGDAL.jl), and the more primitive [GDAL.jl](https://github.com/yeesian/GDAL.jl), which wraps the [GDAL](https://gdal.org/) library (used by R's `sf`).
 - Raster data loaders
-    - Rasters.jl
-    - NCDatasets.jl
-    - ArchGDAL.jl (used by Rasters.jl as well)
+    - [Rasters.jl](https://github.com/rafaqz/Rasters.jl).
+    - [NCDatasets.jl](https://github.com/JuliaGeo/NCDatasets.jl)
+    - [ArchGDAL.jl](https://github.com/yeesian/ArchGDAL.jl) (used by Rasters.jl as well)
 
 
 
