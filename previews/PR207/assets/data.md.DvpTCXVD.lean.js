@@ -1,0 +1,1 @@
+import{_ as e,c as a,o as t,a6 as r}from"./chunks/framework.CPpXS4ta.js";const b=JSON.parse('{"title":"Data","description":"","frontmatter":{},"headers":[],"relativePath":"data.md","filePath":"data.md","lastUpdated":null}'),s={name:"data.md"},o=r("",19),l=[o];function i(n,h,d,c,p,f){return t(),a("div",null,l)}const g=e(s,[["render",i]]);export{b as __pageData,g as default};
