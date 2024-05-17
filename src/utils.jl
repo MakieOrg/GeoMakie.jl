@@ -374,6 +374,7 @@ module LineSplitting
 
 	import GeoMakie.LineString
 	import GeoMakie.Observable
+	import Makie.@lift
 	import Base.split
 	
 	function regroup(tmp::Vector)
@@ -405,7 +406,7 @@ module LineSplitting
 		end
 	end
 
-	split(tmp::Vector,dest::Observable) = tmp
+	split(tmp::Vector,dest::Observable) = @lift(split(tmp, $(dest)))
 
 	function split(tmp::Vector{<:LineString},dest::String)
 		if occursin("+lon_0",dest)

@@ -834,7 +834,7 @@ Makie.tightlimits!(axis::GeoAxis) = nothing
 Makie.get_scene(ga::GeoAxis) = ga.scene
 
 import Base.split
-split(tmp::Vector{<:LineString},ga::GeoAxis) = split(tmp,ga.dest[])
+split(tmp::Vector{<:LineString},ga::GeoAxis) = @lift(split(tmp,$(ga.dest)))
 
 """
     coastlines(ga::GeoAxis)
