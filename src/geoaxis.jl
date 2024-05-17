@@ -832,3 +832,14 @@ end
 Makie.tightlimits!(axis::GeoAxis) = nothing
 
 Makie.get_scene(ga::GeoAxis) = ga.scene
+
+import Base.split
+split(tmp::Vector{<:LineString},ga::GeoAxis) = split(tmp,ga.dest[])
+
+"""
+    coastlines(ga::GeoAxis)
+
+Split coastline contours when ga.dest includes a "+lon_0" specification.
+"""
+coastlines(ga::GeoAxis)=split(coastlines(),ga)
+#land(ga::GeoAxis)=split(land(),ga)

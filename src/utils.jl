@@ -419,5 +419,3 @@ module LineSplitting
 	end
 
 end
-=======
->>>>>>> master
