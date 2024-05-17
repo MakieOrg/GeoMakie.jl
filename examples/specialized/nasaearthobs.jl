@@ -1,4 +1,7 @@
-using GeoMakie, GLMakie
+# # NASA Earth Observations animation
+
+using GeoMakie, CairoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
 using ProgressMeter # for recording
 
 # acquire data
@@ -10,7 +13,7 @@ path_len = length("/Users/anshul/Downloads/NASAE/MYDAL2_E_CLD_OT_")
 dates = map(x -> x[47:end-4], files)
 
 
-fig = Figure(resolution = (1000,1000))
+fig = Figure(size = (1000,1000))
 
 ga = GeoAxis(
     fig[1, 1];
@@ -31,7 +34,7 @@ end
 ga.yticks[] = -90:30:60
 
 # Image does not work with GLMakie in a transformed axis, be sure to use surface!
-surface!(ga, LinRange(-180, 180, 3600), LinRange(-90, 90, 1800), ones(3600, 1800); color = img, shading = false)
+surface!(ga, LinRange(-180, 180, 3600), LinRange(-90, 90, 1800), ones(3600, 1800); color = img, shading = NoShading)
 
 
 record(fig, "NASA_Earth_Observations.mp4"; framerate = 60) do io

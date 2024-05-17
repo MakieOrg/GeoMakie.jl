@@ -1,5 +1,8 @@
+# # Graphs on maps
+
 # This example was adapted from code in https://discourse.julialang.org/t/combine-makie-with-gmt-jl/74347
 using GeoMakie, CairoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
 using GraphMakie, Graphs, Downloads
 using GeoMakie.GeoJSON, GeoMakie.GeoInterface
 
@@ -28,7 +31,7 @@ gpos = Dict(
 g = complete_graph(length(keys(gpos)))
 positions = Point2f.(collect(keys(gpos)))
 
-fig = Figure(resolution = (1200, 800), fontsize = 22)
+fig = Figure(size = (1200, 800), fontsize = 22)
 ga = GeoAxis(
     fig[1, 1],
     source = "+proj=longlat +datum=WGS84",

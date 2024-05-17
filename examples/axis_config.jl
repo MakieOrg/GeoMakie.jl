@@ -1,26 +1,23 @@
+# # Axis configuration
+
+# !!! warning
+#     This was written for the old API and doesn't work for the new one!
+
 using Makie, CairoMakie, GeoMakie
+CairoMakie.activate!(px_per_unit = 4) # hide
 
-fig = Figure(resolution = (1000,1000))
+fig = Figure(size = (500,1000))
+## GeoAxis defaults to DataAspect()
+## Set source projection and destination projection
+## source can be overwritten per plot
+ax1 = GeoAxis(fig[1, 1]; source="+proj=latlong", dest="+proj=ortho")
+xlims!(ax1, -90, 90) # xlims!, ylims! and limits! are supported
 
-axs = [GeoAxis(fig[i, j]) for i in 1:2, j in 1:2]
+# But supports any other Makie aspect ratio
+ax2 = GeoAxis(fig[2, 1]; aspect=AxisAspect(1.3), xgridstyle=:dashdot, xgridcolor = :blue,
+              ygridcolor=(:orange, 0.5), ygridwidth=5.0)
 
-# axis 1 - I want an orthographic projection.
-axs[1, 1].scene.transformation.transform_func[] = Proj.Transformation("+proj=latlong","+proj=ortho")
-xlims!(axs[1, 1], -90, 90)
 
-# axis 2 - wacky spines
-axs[1, 2].topspinevisible = false
-axs[1, 2].rightspinecolor = :red
-axs[1, 2].spinewidth      = 5
-
-# axis 3 - messing with grids
-axs[2, 1].xgridcolor = :blue
-#axs[2, 1].xgridstyle = :dashdot # bug ! not working now, open independent issue for it
-axs[2, 1].ygridcolor = (:orange, 0.5)
-axs[2, 1].ygridwidth = 2.0
-
-# axis 4 - customizing ticks
-axs[2, 2].xticks = -180:10:180
-axs[2, 2].xticklabelsvisible[] = false
-hidexdecorations!(axs[2, 2])
+# axis 3 - customizing ticks
+ax2 = GeoAxis(fig[3, 1]; xticks = -180:2:180)
 fig
