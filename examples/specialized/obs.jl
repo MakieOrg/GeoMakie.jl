@@ -1,5 +1,9 @@
+# # Animations with Observables
+
 using NetCDF, GeoMakie
 const Node = Observable
+using CairoMakie # hide
+CairoMakie.activate!(px_per_unit = 4) # hide
 
 # Open the NetCDF file
 f = NetCDF.open("/Users/anshul/Downloads/CERES_EBAF-TOA_Ed4.1_Subset_200003-201910.nc"; readdimvar = true)
@@ -29,7 +33,7 @@ projtup[] = [source, dest]
 
 figure = Figure()
 ga = GeoAxis(figure[1, 1]; dest = "+proj=moll")
-surfplot = surface!(ga, xs, ys; color = field, shading = false)
+surfplot = surface!(ga, xs, ys; color = field, shading = NoShading)
 
 ph = on(pm) do pm
     projtup[] = [Projection("+proj=lonlat +lon_0=180 +pm=$pm"), Projection("+proj=moll +lon_0=-pm +pm=$pm")]

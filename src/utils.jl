@@ -4,7 +4,6 @@
 #                                                          #
 ############################################################
 
-
 const PROJ_RESCALE_FACTOR = 100_000
 
 # This function is a little gnarly.
@@ -17,56 +16,114 @@ const PROJ_RESCALE_FACTOR = 100_000
 # if so we return NaN.  Then, and only then, do we transform it.
 # This does not seem to effect times too much but can be removed
 # if necessary.
-function Makie.apply_transform(t::Proj.Transformation, pt::Point{N,T}) where {N,T}
+function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecTypes{N,T} where {N,T}
     if all(isnan.(pt))
-        return Point{N, T}(NaN)
+        return V(NaN)
     end
     # this is to catch errors - show the point which was invalid
     # and then catch it.
     try
-        return Point(t(Vec(pt)) ./ PROJ_RESCALE_FACTOR)
+        return V(t(Vec(pt)) ./ PROJ_RESCALE_FACTOR)
     catch e
         # catch this annoying edge case
         # if pt[2] ≈ 90.0f0 || pt[2] ≈ -90.0f0
-        #     println("Caught a 90-lat")
+        #     println("Caught a 90° latitude")
         #     return Point(t(Vec(pt[1], 90.0f0)) ./ PROJ_RESCALE_FACTOR)
         # end
-        println("Invalid point for transformation: $(pt)")
-        rethrow(e)
+        return V(NaN)
     end
 end
 
 function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
-    # TODO: once Proj4.jl is updated to PROJ 8.2, we can use
-    # proj_trans_bounds (https://proj.org/development/reference/functions.html#c.proj_trans_bounds)
-    N = 21
-    umin = vmin = T(Inf)
-    umax = vmax = T(-Inf)
     xmin, ymin = minimum(r)
     xmax, ymax = maximum(r)
-    for x in range(xmin, xmax; length = N)
-        for y in range(ymin, ymax; length = N)
-            u, v = Makie.apply_transform(f, Point(x, y))
-            umin = min(umin, u)
-            umax = max(umax, u)
-            vmin = min(vmin, v)
-            vmax = max(vmax, v)
-        end
+
+    if isapprox(xmin, -180, rtol = 1e-4)
+        xmin - -180e0
+    end
+    if isapprox(xmax, 180; rtol = 1e-4)
+        xmax = 180e0
+    end
+    if isapprox(ymin, -90; rtol = 1e-4)
+        ymin = -90e0
+    end
+    if isapprox(ymax, 90; rtol = 1e-4)
+        ymax = 90e0
     end
 
-    return Rect(Vec2(umin, vmin), Vec2(umax-umin, vmax-vmin))
+    try
+
+    (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
+
+    return Rect(Vec2(T(umin), T(vmin)) ./ PROJ_RESCALE_FACTOR,
+                Vec2(T(umax-umin), T(vmax-vmin)) ./ PROJ_RESCALE_FACTOR)
+    catch e
+        @show r
+        rethrow(e)
+    end
 end
+
+function Makie.apply_transform(f::Proj.Transformation, r::Rect3{T}) where {T}
+    r2 = Rect2{T}(r)
+    tr2 = Makie.apply_transform(f, r2)
+    return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
+end
+
+_apply_inverse(itrans, p) = Makie.apply_transform(itrans, p .* PROJ_RESCALE_FACTOR) .* PROJ_RESCALE_FACTOR
 
 function Makie.inverse_transform(trans::Proj.Transformation)
     itrans = Base.inv(trans)
-    return Makie.PointTrans{2}() do p
-        return Makie.apply_transform(itrans, p) .* PROJ_RESCALE_FACTOR
+    return Makie.PointTrans{2}(Base.Fix1(_apply_inverse, itrans))
+end
+
+function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie._apply_inverse), Proj.Transformation}}, r::Rect2{T}) where T
+    f = t.f.x
+    xmin, ymin = minimum(r) .* PROJ_RESCALE_FACTOR
+    xmax, ymax = maximum(r) .* PROJ_RESCALE_FACTOR
+    try
+
+        (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
+
+        if !isfinite(umin) || abs(umin) > 1e8
+            umin = -180.0
+        end
+        if !isfinite(umax) || abs(umax) > 1e8
+            umax = 180.0
+        end
+
+        if !isfinite(vmin) || abs(vmin) > 1e8
+            vmin = -90.0
+        end
+        if !isfinite(vmax) || abs(vmax) > 1e8
+            vmax = 90.0
+        end
+
+        if isapprox(umin, -180, rtol = 1e-4)
+            umin - -180e0
+        end
+        if isapprox(umax, 180; rtol = 1e-4)
+            umax = 180e0
+        end
+        if isapprox(vmin, -90; rtol = 1e-4)
+            vmin = -90e0
+        end
+        if isapprox(vmax, 90; rtol = 1e-4)
+            vmax = 90e0
+        end
+
+        return Rect(Vec2(T(umin), T(vmin)),
+                    Vec2(T(umax-umin), T(vmax-vmin)))
+    catch e
+        @show r
+        rethrow(e)
     end
 end
 
-Base.isfinite(p::Point2f) = isfinite(p[1]) && isfinite(p[2])
-Base.isfinite(p::Vec2f) = isfinite(p[1]) && isfinite(p[2])
-
+function Makie.apply_transform(t::Makie.PointTrans{2, Base.Fix1{typeof(GeoMakie._apply_inverse), Proj.Transformation}}, r::Rect3{T}) where {T}
+    r2 = Rect2{T}(r)
+    tr2 = Makie.apply_transform(t, r2)
+    return Rect3{T}((tr2.origin..., r.origin[3]), (tr2.widths..., r.widths[3]))
+end
 # Some minor type piracy
 
 function (transformation::Proj.Transformation)(coord::Point{N, T}) where {N, T <: Real}
@@ -82,25 +139,21 @@ end
 
 function find_transform_limits(ptrans; lonrange = (-180, 180), latrange = (-90, 90))
     # Search for a good bound with decent accuracy
-    lons = Float32.(LinRange(lonrange..., 360 * 2))
-    lats = Float32.(LinRange(latrange..., 180 * 2))
+    lons = Float64.(LinRange(lonrange..., 360 * 2))
+    lats = Float64.(LinRange(latrange..., 180 * 2))
     # avoid PROJ wrapping 180 to -180
     lons[1]   = nextfloat(lons[1])   |> nextfloat
     lons[end] = prevfloat(lons[end]) |> prevfloat
     lats[1]   = nextfloat(lats[1])   |> nextfloat
     lats[end] = prevfloat(lats[end]) |> prevfloat
 
-    points = Point2f.(lons, lats')
+    points = Point2{Float64}.(lons, lats')
     tpoints = ptrans.(points)
     itpoints = Makie.apply_transform(Makie.inverse_transform(ptrans), tpoints)
 
     finite_inds = findall(isfinite, itpoints)
 
-    # debug && display(Makie.heatmap(..(lonrange...), ..(latrange...), isfinite.(itpoints); colorrange = (0,1)))
-
     min, max = getindex.(Ref(itpoints), finite_inds[[begin, end]])
-
-
     return (min[1], max[1], min[2], max[2])
 end
 
@@ -143,7 +196,7 @@ julia> geoformat_ticklabels([1.0, 1.1, 2.5, 25])
  "1.1ᵒ"
  "2.5ᵒ"
  "25ᵒ"
- ```
+```
 """
 function geoformat_ticklabels(nums)
     labels = fill("", length(nums))
@@ -239,10 +292,10 @@ function project_to_pixelspace(scene, points::AbstractVector{Point{N, T}}) where
     )
 end
 
-function text_bbox(textstring::AbstractString, textsize::Union{AbstractVector, Number}, font, align, rotation, justification, lineheight)
+function text_bbox(textstring::AbstractString, fontsize::Union{AbstractVector, Number}, font, fonts, align, rotation, justification, lineheight)
     glyph_collection = Makie.layout_text(
-            textstring, textsize,
-            font, align, rotation, justification, lineheight,
+            textstring, fontsize,
+            string(font), fonts, align, rotation, justification, lineheight,
             RGBAf(0,0,0,0), RGBAf(0,0,0,0), 0f0, 0f0
         )
 
@@ -265,7 +318,8 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
     # determine direction to go in order to stay inbounds.
     xdir = tickcoord_in_inputspace[1] < 0 ? +1 : -1
     ydir = tickcoord_in_inputspace[2] < 0 ? +1 : -1
-    Δs = Vec2f(xdir, ydir) .* tickpad ./ sum(tickpad) * ds
+    Δs = iszero(sum(tickpad)) ? Vec2f(0) : Vec2f(xdir, ydir) .* tickpad ./ (sum(tickpad)) * ds
+
     # find the x and y directions
     # multiply by the sign in order to have them going outwards at any point
     Σp = sign(sum(Δs)) * inv_tfunc(tickcoord_in_dataspace + Δs)
@@ -290,9 +344,10 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
     normal_vec = Vec2f((dx, dy)./sqrt(dx^2 + dy^2))
 
     # We have computed the normal vector - now we have to get tick extents
+    fonts = theme(scene, :fonts)
     extents = text_bbox(
         ticklabel, ticksize,
-        tickfont, Vec2f(0), tickrotation,
+        tickfont, fonts, Vec2f(0), tickrotation,
         0.0, # Makie.to_value(Makie.theme(scene, :justification)),
         0.0, # Makie.to_value(Makie.theme(scene, :lineheight))
     )
@@ -303,117 +358,6 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
 
 
     return padding_vec
-end
-
-
-function _sprinti(obj)
-    return "[" * join(Makie.Formatters.plain(obj), ",") * "]"
-end
-
-# Positions in pixelspace
-
-function are_ticks_colocated(scene, positions, labels, fontsize)
-    isempty(positions) && return false
-    @assert length(positions) == length(labels)
-    pixel_positions = positions
-    if all(isapprox(positions[1]; atol = 10.0), positions)
-        return true
-    elseif false
-        return true
-    else
-        return false
-    end
-end
-
-function euclidean_distance(p1::Point{N, T}, p2::Point{N, T})::T where {T <: Real, N}
-    return sqrt(sum((p1 .- p2) .^2))
-end
-
-# Positions in pixelspace
-# This function assumes that all ticks are not colocated
-function remove_overlapping_ticks!(scene, xpositions, xlabels, xvisible, ypositions, ylabels, yvisible, fontsize)
-
-    nx = length(xpositions); ny = length(ypositions)
-
-    !xvisible && !yvisible && return
-
-    combined_positions = vcat(xpositions, ypositions)
-
-    if !xvisible
-        nx = 0
-        combined_positions = ypositions
-    elseif !yvisible
-        ny = 0
-        combined_positions = xpositions
-    end
-
-    # compute distances between all positions
-    # we cannot optimize this, because of literal edge cases
-    distmat = fill(Inf32, (nx+ny), (nx+ny))
-    @inbounds for i in 1:(nx+ny)
-        @inbounds for j in 1:(i-1)
-            distmat[i, j] = euclidean_distance(combined_positions[i], combined_positions[j])
-        end
-    end
-
-
-    bad_combos = findall(distmat .< (fontsize))
-    remove = fill(0, length(bad_combos))
-
-    for (i, bad_pair) in enumerate(bad_combos)
-        remove[i] = bad_pair[1]
-    end
-
-    unique!(remove); sort!(remove)
-    length(remove)==0 && return
-    length(remove)==1 && remove[1] == 0 && return
-    remove[1] == 0 && popfirst!(remove)
-
-    splitind = findfirst(>(nx), remove)
-    if splitind == nothing
-        splitind = length(remove)+1
-    end
-
-    deleteat!(xpositions, remove[1:(splitind-1)])
-    deleteat!(xlabels,    remove[1:(splitind-1)])
-    splitind == length(remove)+1 && return
-    deleteat!(ypositions, remove[splitind:end] .- nx)
-    deleteat!(ylabels,    remove[splitind:end] .- nx)
-
-    return
-end
-
-############################################################
-#                                                          #
-#                      Useful macros                       #
-#                                                          #
-############################################################
-
-#=
-    @hijack_observable name::Symbol
-
-Assuming the presence of a `hijacked_observables::Dict{Symbol, Any}` and `ax::Axis`,
-hijacks the Observable `ax[name]` and redirects all its updates to `hijacked_observables[name]`,
-while keeping `ax[name]` as `false`.
-
-More technically, this macro injects a function at the beginning of `ax[name].listeners`, which
-forwards whatever update was made to `hijacked_observables[name]`, and sets `ax[name].val = false`.
-Thus, even though the rest of the listeners will continue to receive updates from this observable
-(in case there is a need for it to remain), its value will remain `false`.
-=#
-macro hijack_observable(name)
-    return esc(quote
-        getproperty(ax, $name)[] = $(false)
-        hijacked_observables[$name] = Observable($(true))
-        __listener = on(getproperty(ax, $name); update = true, priority = typemax(Int)) do hijacked_obs_value
-            hijacked_observables[$name][] = hijacked_obs_value
-            getproperty(ax, $name).val = $(false)
-        end
-        getproperty(ax, $name)[] = $(false)
-        hijacked_observables[$name][] = $(true)
-
-    end)
-
 end
 
 ############################################################
@@ -475,3 +419,5 @@ module LineSplitting
 	end
 
 end
+=======
+>>>>>>> master
