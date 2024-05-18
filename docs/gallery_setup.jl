@@ -38,7 +38,7 @@ function mdify(cards::Vector{Card}; name = "demos", )
         Markdown.Paragraph(
             """
             <script setup lang="ts">
-            import Gallery from "components/Gallery.vue";
+            import Gallery from "./components/Gallery.vue";
             const $name = $card_json
             </script>
             <Gallery :images="$name" />
