@@ -37,9 +37,9 @@ module LineSplitting
 			tmp1=tmp[p]
 			tmp2[p]=maximum( [(tmp1[1][1]<=lon1)+2*(tmp1[2][1]>=lon1) , (tmp1[2][1]<=lon1)+2*(tmp1[1][1]>=lon1)] )
 		end
-		if sum(tmp2.==3)==0
+		if !any(==(3), tmp2) # no value in tmp2 is equal to 3
 			[tmp]
-		else
+		else # some value in tmp2 is equal to 3
 			jj=[0;findall(tmp2.==3)...;np+1]
 			[LineString(tmp[jj[ii]+1:jj[ii+1]-1]) for ii in 1:length(jj)-1]
 		end
