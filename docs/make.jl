@@ -1,12 +1,13 @@
 using Documenter, DocumenterVitepress, Literate
 using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
+
+include("gallery_setup.jl")
 # Set some global settings
 # Good quality CairoMakie with PNG
-CairoMakie.activate!(px_per_unit = 4, type = :png)
+CairoMakie.activate!(px_per_unit = 3, type = :png)
 # Rasters should download into the artifacts folder (so they can be cached :D)
 ENV["RASTERDATASOURCES_PATH"] = joinpath(first(Base.DEPOT_PATH), "artifacts")
-
-# invoke some geomakie things to be sure
+# invoke some geomakie things to be sure it works
 GeoMakie.coastlines()
 GeoMakie.earth()
 
@@ -16,46 +17,33 @@ if deploy && !haskey(ENV, "GITHUB_TOKEN")
     deploy = false
 end
 
-# use Literate for examples
+using Literate
+
+examples = [
+    "basic.jl",
+    "new.jl",
+    "axis_config.jl",
+    "italy.jl",
+    "graph_on_usa.jl",
+    "orthographic.jl",
+    "german_lakes.jl",
+    "geostationary_image.jl",
+    "contourf.jl",
+    "world_population.jl",
+    "field_and_countries.jl",
+    "meshimage.jl",
+    "projections.jl",
+    "tissot.jl",
+    # "rotating_earth.jl",
+    # joinpath("gmt", "antioquia.jl"),
+]
 example_dir = joinpath(dirname(@__DIR__), "examples")
-examples = readdir(example_dir; join = true)
-exclude = Set(["geodesy.jl", "makiecon_examples.jl", "multiple_crs.jl"])
-filter!(examples) do file
-    isfile(file) && !(basename(file) in exclude) && endswith(file, ".jl")
+for file in joinpath.((example_dir,), examples)
+    endswith(file, ".jl") || continue
+    Literate.markdown(file, joinpath(@__DIR__, "src", "examples"); documenter = true)
 end
 
-examples = joinpath.(
-    (example_dir,), 
-    [
-        "basic.jl",
-        "new.jl",
-        "axis_config.jl",
-        "italy.jl",
-        "graph_on_usa.jl",
-        "orthographic.jl",
-        "german_lakes.jl",
-        "geostationary_image.jl",
-        "contourf.jl",
-        "world_population.jl",
-        "field_and_countries.jl",
-        "meshimage.jl",
-        "projections.jl",
-        "gmt/antioquia.jl",
-        "tissot.jl",
-        "rotating_earth.jl",
-    ] 
-)
-
-for example in examples
-    Literate.markdown(example, joinpath(@__DIR__, "src", "examples"); documenter = true)
-end
-
-documenter_example_paths = joinpath.(
-    ("examples"), 
-    first.(splitext.(last.(splitdir.(examples)))) .* (".md",)
-)
-
-makedocs(;
+Documenter.makedocs(;
     modules=[GeoMakie],
     doctest=false,
     format=DocumenterVitepress.MarkdownVitepress(; 
@@ -67,18 +55,22 @@ makedocs(;
     pages=[
         "Introduction" => "introduction.md",
         "Data" => "data.md",
-        "Examples" => documenter_example_paths,
-        "Nonlinear transforms" => "nonlinear_transforms.md",
+        "Examples" => "examples.md",
         "Developer documentation" => [
+            "Nonlinear transforms" => "nonlinear_transforms.md",
             "Architecture" => "architecture.md",
             "Adding demos" => "adding_demos.md",
+            "hide" => [
+            "hide" => ["hide" => ["hide" => joinpath.(("examples",), replace.(examples, (".jl" => ".md",)))]]
+            ],
+        ],
         ],
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
     warnonly = true,
 )
 
-isdir(joinpath(@__DIR__, "src", "examples")) && rm.(readdir(joinpath(@__DIR__, "src", "examples"); join = true); force = true)
+# isdir(joinpath(@__DIR__, "src", "examples")) && rm.(readdir(joinpath(@__DIR__, "src", "examples"); join = true); force = true)
 
 deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true, forcepush = true)
 
@@ -101,3 +93,21 @@ deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", p
         #     "Projections" => "examples/projections.md",
         #     # "GraphMakie with GeoMakie" => "examples/graph_on_usa.md",
         # ],
+
+    
+# # use Literate for examples
+# examples = readdir(example_dir; join = true)
+# exclude = Set(["geodesy.jl", "makiecon_examples.jl", "multiple_crs.jl"])
+# filter!(examples) do file
+#     isfile(file) && !(basename(file) in exclude) && endswith(file, ".jl")
+# end
+
+
+# for example in examples
+#     Literate.markdown(example, joinpath(@__DIR__, "src", "examples"); documenter = true)
+# end
+
+# documenter_example_paths = joinpath.(
+#     ("examples"), 
+#     first.(splitext.(last.(splitdir.(examples)))) .* (".md",)
+# )
