@@ -42,3 +42,8 @@ hm2 = poly!(
 cb = Colorbar(fig[1,2]; colorrange = (1, n), colormap = Reverse(:plasma), label = "variable, color code", height = Relative(0.65))
 
 fig
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

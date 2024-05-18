@@ -44,3 +44,8 @@ fig
 # Whoops, this doesn't cover the whole of Italy!
 # No worries, we'll have a spine eventually to show this.
 
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

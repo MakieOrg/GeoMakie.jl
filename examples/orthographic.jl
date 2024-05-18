@@ -18,3 +18,8 @@ lp = lines!(ga, GeoMakie.coastlines(); transformation = (; translation = (0, 0, 
 sp = surface!(ga, lons, lats, zeros(size(field)); color=field, shading = NoShading, colormap=:rainbow_bgyrm_35_85_c69_n256)
 cb = Colorbar(fig[1, 2], sp)
 fig
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

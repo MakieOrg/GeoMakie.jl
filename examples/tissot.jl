@@ -37,3 +37,8 @@ circle_polys = [GO.GI.Polygon([geodesic_circle(Point2d(lon, lat), 500_000, 50)])
 # circle_polys_cut = GO.cut.(circle_polys, (GO.GI.Line(Point2d[(0, -180), (0, 180)]),)) .|> GO.GI.MultiPolygon # hide
 poly!(a, circle_polys; color = Makie.wong_colors(0.7)[2])
 f
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

@@ -49,3 +49,8 @@ ga = GeoAxis(fig[1, 1]; source = "+proj=webmerc +datum=WGS84", dest = "+proj=eqe
 mgeo = Tyler.Map(GeoInterface.extent(m), Tyler.MapTiles.web_mercator; figure=fig, axis=ga)
 
 limrect = Rect2f(rect.X[1], rect.Y[1], -(-)(rect.X...), -(-)(rect.Y...))
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

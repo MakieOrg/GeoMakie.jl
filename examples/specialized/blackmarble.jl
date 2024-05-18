@@ -17,4 +17,10 @@ imgplot = image!(-180..180, -89.9..89.9, img; interpolate = false)
 
 fig
 # save at high resolution
+# ```julia
 # save("blackmarble.png", fig; px_per_unit = 2)
+#```
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

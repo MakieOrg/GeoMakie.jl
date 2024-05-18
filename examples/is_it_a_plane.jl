@@ -60,3 +60,8 @@ fig = Figure()
 ga = GeoAxis(fig[1, 1]; dest = "+proj=nsper +h=3000000 +lat_0=-20 +lon_0=145")
 meshimage!(ga, -180..180, -90..90, GeoMakie.earth(), shading = NoShading)
 fig
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

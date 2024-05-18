@@ -54,3 +54,8 @@ fig = let k = 1
 end
 resize!(fig, 1500, 4000)
 fig
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

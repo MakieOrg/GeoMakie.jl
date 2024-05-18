@@ -44,3 +44,8 @@ end
 record(scene, "test.mp4", 0:10:180; framerate = 2) do i
     pm[] = i
 end
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", figure) #hide
+nothing #hide

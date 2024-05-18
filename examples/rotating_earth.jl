@@ -22,3 +22,8 @@ record(fig, "rotating_earth_ortho.mp4"; framerate=30) do io
     end
 end
 # ![](rotating_earth_ortho.mp4)
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

@@ -32,3 +32,9 @@ cx, cy = GO.centroid(antioquia_geoms)
 a.dest = "+proj=ortho +lon_0=$cx +lat_0=$cy"
 f
 # That looks a lot more like what the GMT example does!
+
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

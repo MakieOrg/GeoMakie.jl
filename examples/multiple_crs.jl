@@ -27,3 +27,8 @@ fig
 surface!(ga, new_worldclim; shading = NoShading, source = convert(GeoFormatTypes.ProjString, Rasters.crs(new_worldclim)).val)
 fig
 # Success!  You can clearly see how the raster was adapted here.
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

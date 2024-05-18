@@ -32,3 +32,8 @@ end
 record(f, "test.mp4", LinRange(0, maximum(distances), 200); framerate = 30) do τ
     set_close_to!(distance_slider, τ)
 end
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

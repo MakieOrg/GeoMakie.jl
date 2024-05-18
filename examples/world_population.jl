@@ -39,3 +39,8 @@ begin
     scatter!(ga, pop_geo; color=popisqrt, markersize=msize)
     fig
 end
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide
