@@ -40,7 +40,6 @@ include("geojson.jl") # GeoJSON/GeoInterface support
 include("conversions.jl")
 include("data.jl")
 include("utils.jl")
-include("linesplitting.jl")
 include("geodesy.jl")
 
 @reexport using Colors, Makie
@@ -53,6 +52,7 @@ include("makie-axis.jl")
 
 # some basic recipes
 include("mesh_image.jl")
+include("linesplitting.jl")
 
 export GeoAxis, datalims, datalims!, automatic
 
