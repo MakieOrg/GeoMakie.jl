@@ -46,6 +46,8 @@ module LineSplitting
 	end
 
 	split(tmp::Vector,dest::Observable) = @lift(split(tmp, $(dest)))
+	split(tmp::Observable,dest::Observable) = @lift(split($(tmp), $(dest)))
+	split(tmp::Observable,dest::String) = @lift(split($(tmp), (dest)))
 
 	function split(tmp::Vector{<:LineString},dest::String)
 		if occursin("+lon_0",dest)
