@@ -8,11 +8,6 @@ function earth()
     end
 end
 
-"""
-    coastlines(ga::GeoAxis)
-
-Read in "110m_coastline.geojson" and convert to LineStrings.
-"""
 function coastlines()
     return get!(LOAD_CACHE, "coastlines") do
         geometry = GeoJSON.read(read(assetpath("vector", "110m_coastline.geojson"), String))
