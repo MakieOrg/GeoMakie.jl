@@ -71,7 +71,7 @@ makedocs(;
         "Nonlinear transforms" => "nonlinear_transforms.md",
         "Developer documentation" => [
             "Architecture" => "architecture.md",
-        ]
+            "Adding demos" => "adding_demos.md",
         ],
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
