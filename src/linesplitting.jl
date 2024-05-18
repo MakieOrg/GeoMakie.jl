@@ -11,9 +11,9 @@
 
 module LineSplitting
 
-	import GeoMakie.LineString
-	import GeoMakie.Observable
-	import Makie.@lift
+	using GeometryBasics: LineString
+	using Makie: Observable, @lift
+    # Since we're overriding Base.split, we must import it
 	import Base.split
 	
 	function regroup(tmp::Vector)
