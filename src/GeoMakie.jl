@@ -52,6 +52,7 @@ include("makie-axis.jl")
 
 # some basic recipes
 include("mesh_image.jl")
+include("linesplitting.jl")
 
 export GeoAxis, datalims, datalims!, automatic
 
