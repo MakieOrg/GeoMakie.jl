@@ -65,12 +65,27 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     end
 
     try
-        (umin, umax), (vmin, vmax) = Proj.bounds(f, (xmin,xmax), (ymin,ymax))
+        (umin, umax), (vmin, vmax) = iterated_bounds(f, (xmin,xmax), (ymin,ymax))
         return Rect(Vec2(T(umin), T(vmin)), Vec2(T(umax-umin), T(vmax-vmin)))
     catch e
         @show r
         rethrow(e)
     end
+end
+
+function iterated_bounds(f, (xmin, xmax), (ymin, ymax), N = 21)
+    umin, umax = Inf, -Inf
+    vmin, vmax = Inf, -Inf
+    for x in LinRange(xmin, xmax, N)
+        for y in LinRange(ymin, ymax, N)
+            u, v = Makie.apply_transform(f, Vec(x, y))
+            isfinite(u) && (umin = min(umin, u))
+            isfinite(u) && (umax = max(umax, u))
+            isfinite(v) && (vmin = min(vmin, v))
+            isfinite(v) && (vmax = max(vmax, v))
+        end
+    end
+    return (umin, umax), (vmin, vmax)
 end
 
 function Makie.apply_transform(f::Proj.Transformation, r::Rect3{T}) where {T}
