@@ -64,41 +64,41 @@ This page is a gallery of various examples.
 
 <!--
 ```@eval
-using Main.Gallery
-mdify([
-    Card(
-        path = "axis_config",
-        desc = "Ways to configure and theme GeoAxis",
-        caption = "Axis configuration"
-    ),
-    Card(
-        path = "basic",
-        desc = "Basic GeoMakie usage",
-        caption = "Basic GeoMakie usage"
-    ),
-    Card(
-        path = "contourf",
-        caption = "Filled contours"
-    ),
-]; name = "basic")
-```
+# using Main.Gallery
+# mdify([
+#     Card(
+#         path = "axis_config",
+#         desc = "Ways to configure and theme GeoAxis",
+#         caption = "Axis configuration"
+#     ),
+#     Card(
+#         path = "basic",
+#         desc = "Basic GeoMakie usage",
+#         caption = "Basic GeoMakie usage"
+#     ),
+#     Card(
+#         path = "contourf",
+#         caption = "Filled contours"
+#     ),
+# ]; name = "basic")
+ ```
 
 ## Advanced functionality
 
 ```@eval
-using Main.Gallery
-mdify([
-    Card(
-        path = "tissot",
-        desc = "Visualizing distortion in projections",
-        caption = "Tissot's indicatrices"
-    ),
-    Card(
-        path = "world_population",
-        desc = "A plot of world population",
-        caption = "World Population"
-    ),
-]; name = "advanced")
+# using Main.Gallery
+# mdify([
+#     Card(
+#         path = "tissot",
+#         desc = "Visualizing distortion in projections",
+#         caption = "Tissot's indicatrices"
+#     ),
+#     Card(
+#         path = "world_population",
+#         desc = "A plot of world population",
+#         caption = "World Population"
+#     ),
+# ]; name = "advanced")
 ```
 
 -->
