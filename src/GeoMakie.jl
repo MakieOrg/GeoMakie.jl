@@ -57,6 +57,7 @@ include("makie-axis.jl")
 
 # some basic recipes
 include("mesh_image.jl")
+include("linesplitting.jl")
 
 @reexport using Colors, Makie
 export Proj
