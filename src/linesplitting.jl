@@ -9,8 +9,6 @@
 #
 #This is needed to fix e.g. coast line displays when lon_0 is not 0 but cutting polygons at lon_0+-180.
 
-Base.split(tmp::Vector{<:LineString},ga::GeoAxis) = @lift(split(tmp,$(ga.dest)))
-
 """
     coastlines(ga::GeoAxis)
 Split coastline contours when ga.dest includes a "+lon_0" specification.
