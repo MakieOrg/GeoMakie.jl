@@ -21,24 +21,14 @@ module LineSplitting
 
 	import GeometryBasics
 	import Makie: Observable, @lift
+	import GeoMakie: GeoAxis
+
     # Since we're overriding Base.split, we must import it
 	import Base.split
-	
-	function regroup(tmp::Vector)
-		coastlines_custom=GeometryBasics.LineString[]
-		println(typeof(coastlines_custom))
-		for ii in 1:length(tmp)
-			push!(coastlines_custom,tmp[ii][:]...)
-		end
-		coastlines_custom
-	end
-	
-	function split(tmp::Vector{<:GeometryBasics.LineString}, lon0::Real)
-		[split(a,lon0) for a in tmp]
-	end
-	
+			
 	getlon(p::GeometryBasics.Point) = p[1]
 
+	###
 	function split(tmp::GeometryBasics.LineString, lon0::Real)
 		lon0<0.0 ? lon1=lon0+180 : lon1=lon0-180 
 
@@ -56,19 +46,44 @@ module LineSplitting
 		split_lines = GeometryBasics.LineString.(split_coords) 
 	end
 
-	split(tmp::Vector,dest::Observable) = @lift(split(tmp, $(dest)))
-	split(tmp::Observable,dest::Observable) = @lift(split($(tmp), $(dest)))
-	split(tmp::Observable,dest::String) = @lift(split($(tmp), (dest)))
+	function split(tmp::Vector{<:GeometryBasics.LineString}, lon0::Real)
+		[split(a,lon0) for a in tmp]
+	end
 
-	function split(tmp::Vector{<:GeometryBasics.LineString},dest::String)
+	###
+	split(tmp::GeometryBasics.LineString,dest::Observable) = @lift(split(tmp, $(dest)))
+
+	function split(tmp::Vector{<:GeometryBasics.LineString},dest::Observable)
+		@lift([split(a,$(dest)) for a in tmp])
+	end
+
+	###
+	split(tmp::GeometryBasics.LineString,ax::GeoAxis) = split(tmp, ax.dest)
+	
+	function split(tmp::Vector{<:GeometryBasics.LineString},ax::GeoAxis)
+		[split(a,ax.dest) for a in tmp]
+	end
+	
+	###
+	function split(tmp::GeometryBasics.LineString,dest::String)
 		if occursin("+lon_0",dest)
 			tmp1=split(dest)
 			tmp2=findall(occursin.(Ref("+lon_0"),tmp1))[1]
 			lon_0=parse(Float64,split(tmp1[tmp2],"=")[2])
-			regroup(split(tmp,lon_0))
+			split(tmp,lon_0)
 		else
 			tmp
 		end
 	end
 
+	function split(tmp::Vector{<:GeometryBasics.LineString},dest::String)
+		[split(a,dest) for a in tmp]
+	end
+
+	###
+
+#	split(tmp::Vector,dest::Observable) = @lift(split(tmp, $(dest)))
+	split(tmp::Observable,dest::Observable) = @lift(split($(tmp), $(dest)))
+	split(tmp::Observable,dest::String) = @lift(split($(tmp), (dest)))
+	
 end
