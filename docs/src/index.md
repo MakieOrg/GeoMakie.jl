@@ -73,21 +73,28 @@ fig
 Be careful! Each data point is transformed individually.
 However, when using `surface` or `contour` plots this can lead to errors when the longitudinal dimension "wraps" around the planet.
 
-E.g., if the data have the dimensions
+To fix this issue, the recommended approach is that you (1) change the central longitude of the map transformation (`dest`), and (2) `circshift` your data accordingly for `lons` and `field`.
 
 ```@example MAIN
-lons = 0.5:359.5
-lats = -90:90
-field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats];
-```
-a `surface!` plot with the default arguments will lead to artifacts if the data along longitude 179 and 180 have significantly different values.
-To fix this, there are two approaches: (1) to change the central longitude of the map transformation, by changing the projection destination used like so:
-
-```julia
-ax = GeoAxis(fig[1,1]; dest = "+proj=eqearth +lon_0=180")
+cshift(lons, lats, field,lon_0)=begin
+   nn=sum((lons.-lon_0).>180)
+   ([(lons[end-nn+1:end].-360)...,lons[1:end-nn]...],
+   	lats,circshift(field,(nn,0)))
+end
 ```
 
-_or_ (2), circshift your data appropriately so that the central longitude you want coincides with the center of the longitude dimension of the data.
+```@example MAIN
+lon_0=-160
+(x,y,c)=cshift(lons, lats, field,lon_0)
+```
+
+```@example MAIN
+fig = Figure()
+ax = GeoAxis(fig[1,1]; dest = "+proj=eqearth +lon_0=$(lon_0)")
+surface!(ax, x, y, c, colormap=:balance)
+lines!.(ax, GeoMakie.coastlines(ax),color=:black,overdraw = true)
+fig
+```
 
 ### Countries loaded with GeoJSON
 ```@example MAIN
