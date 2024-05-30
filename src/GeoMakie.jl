@@ -29,7 +29,8 @@ import GeoFormatTypes
 
 export GeoInterface
 
-
+# bring in missing Makie methods required for block definition
+using Makie: make_block_docstring
 # fix conflicts
 import Makie: rotate! # use LinearAlgebra.rotate! otherwise
 
