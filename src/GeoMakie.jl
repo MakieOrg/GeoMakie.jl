@@ -5,7 +5,7 @@ module GeoMakie
 # at `__init__`, but that would also invalidate lots of Makie caches.
 # One way might be to define a const array in MakieCore which can be 
 # pushed to by different packages...
-__precompile__(false)
+# __precompile__(false)
 
 using Statistics, LinearAlgebra
 
@@ -66,5 +66,16 @@ export Proj
 export FileIO
 
 export GeoAxis, datalims, datalims!, automatic
+
+function __init__()
+    @eval Makie.MakieCore begin
+        # Since Makie explicitly sets its allow list, this is definitely piracy,
+        # but if we don't do this then passing `source` or `dest` almost universally
+        # errors.
+        function attribute_name_allowlist()
+            (:xautolimits, :yautolimits, :zautolimits, :label, :rasterize, :model, :transformation, :dest, :source, :specular, :matcap, :backlight, :shininess, :interpolate, :diffuse, :dim_conversions)
+        end
+    end
+end
 
 end # module

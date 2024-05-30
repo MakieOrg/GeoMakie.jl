@@ -1,12 +1,6 @@
 
 # Quick fixes for Makie
 Makie.to_colormap(::Nothing) = nothing
-# Since Makie explicitly sets its allow list, this is definitely piracy,
-# but if we don't do this then passing `source` or `dest` almost universally
-# errors.
-function Makie.MakieCore.attribute_name_allowlist()
-    (:xautolimits, :yautolimits, :zautolimits, :label, :rasterize, :model, :transformation, :dest, :source, :specular, :matcap, :backlight, :shininess, :interpolate, :diffuse, :dim_conversions)
-end
 
 #=
 function Makie.transform_bbox(scenelike, lims::Rect{N, T}) where {N, T}
