@@ -51,7 +51,7 @@ Documenter.makedocs(;
         deploy_url = "https://geo.makie.org",
         devbranch = "master",
         devurl = "dev",
-        build_vitepress = false,
+        # build_vitepress = false,
     ),
     pages=[
         "Introduction" => "introduction.md",
@@ -71,20 +71,20 @@ Documenter.makedocs(;
     warnonly = true,
 )
 
-publicpath = joinpath(@__DIR__, "build", ".documenter", "public")
-mkpath(publicpath)
-mv(joinpath(@__DIR__, "build", ".documenter", "examples", "covers"), joinpath(publicpath, "covers"))
+# publicpath = joinpath(@__DIR__, "build", ".documenter", "public")
+# mkpath(publicpath)
+# mv(joinpath(@__DIR__, "build", ".documenter", "examples", "covers"), joinpath(publicpath, "covers"))
 
-DocumenterVitepress.build_docs(joinpath(@__DIR__, "build"))
+# DocumenterVitepress.build_docs(joinpath(@__DIR__, "build"))
 
-rm(joinpath(@__DIR__, "build", ".documenter"); recursive = true, force = true)
-contents = readdir(joinpath(@__DIR__, "build", "final_site"))
-for item in contents
-    src = joinpath(joinpath(@__DIR__, "build"), "final_site", item)
-    dst = joinpath(joinpath(@__DIR__, "build"), item)
-    cp(src, dst)
-end
-rm(joinpath(@__DIR__, "build", "final_site"); recursive = true)
+# rm(joinpath(@__DIR__, "build", ".documenter"); recursive = true, force = true)
+# contents = readdir(joinpath(@__DIR__, "build", "final_site"))
+# for item in contents
+#     src = joinpath(joinpath(@__DIR__, "build"), "final_site", item)
+#     dst = joinpath(joinpath(@__DIR__, "build"), item)
+#     cp(src, dst)
+# end
+# rm(joinpath(@__DIR__, "build", "final_site"); recursive = true)
 
 
 # isdir(joinpath(@__DIR__, "src", "examples")) && rm.(readdir(joinpath(@__DIR__, "src", "examples"); join = true); force = true)
