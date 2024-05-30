@@ -62,7 +62,7 @@ This page is a gallery of various examples.
 <Gallery :images="advanced" />
 ```
 
-<!--
+
 ```@eval
 # using Main.Gallery
 # mdify([
@@ -81,7 +81,8 @@ This page is a gallery of various examples.
 #         caption = "Filled contours"
 #     ),
 # ]; name = "basic")
- ```
+nothing
+```
 
 ## Advanced functionality
 
@@ -99,7 +100,6 @@ This page is a gallery of various examples.
 #         caption = "World Population"
 #     ),
 # ]; name = "advanced")
+nothing
 ```
-
--->
 
