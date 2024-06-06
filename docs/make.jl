@@ -23,19 +23,19 @@ examples = [
     "basic.jl",
     "new.jl",
     "axis_config.jl",
-    # "italy.jl",
-    # "graph_on_usa.jl",
+    "italy.jl",
+    "graph_on_usa.jl",
     "orthographic.jl",
-    # "german_lakes.jl",
+    "german_lakes.jl",
     "geostationary_image.jl",
     "contourf.jl",
     "world_population.jl",
-    # "field_and_countries.jl",
-    # "meshimage.jl",
-    # "projections.jl",
-    # "tissot.jl",
-    # "rotating_earth.jl",
-    # joinpath("gmt", "antioquia.jl"),
+    "field_and_countries.jl",
+    "meshimage.jl",
+    "projections.jl",
+    "tissot.jl",
+    "rotating_earth.jl",
+    joinpath("gmt", "antioquia.jl"),
 ]
 example_dir = joinpath(dirname(@__DIR__), "examples")
 for file in joinpath.((example_dir,), examples)
@@ -56,14 +56,13 @@ Documenter.makedocs(;
     pages=[
         "Introduction" => "introduction.md",
         "Data" => "data.md",
-        "Examples" => "examples.md",
+        # "Examples" => "examples.md",
+        "Examples" => [joinpath.(("examples",), replace.(examples, (".jl" => ".md",)))],
         "Developer documentation" => [
             "Nonlinear transforms" => "nonlinear_transforms.md",
             "Architecture" => "architecture.md",
             "Adding demos" => "adding_demos.md",
-            "hide" => [
-            "hide" => ["hide" => ["hide" => joinpath.(("examples",), replace.(examples, (".jl" => ".md",)))]]
-            ],
+            "Test example page" => "examples.md",
         ],
         ],
     sitename="GeoMakie.jl",
