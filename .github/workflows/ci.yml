@@ -7,6 +7,10 @@ on:
     branches:
       - master
     tags: '*'
+# needed to allow julia-actions/cache to delete old caches that it has created
+permissions:
+  actions: write
+  contents: read
 jobs:
   test:
     name: Tests, Julia ${{ matrix.version }} - ${{ matrix.os }}
@@ -37,6 +41,10 @@ jobs:
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        env: 
+          DISPLAY: ':0'
+        with: 
+          prefix: xvfb-run -s '-screen 0 1024x768x24'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -55,13 +63,18 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v2
-      - run: |
-          julia --project=docs -e '
+      - name: Install documentation dependencies
+        run: |
+          xvfb-run -s '-screen 0 1024x768x24' julia --project=docs -e '
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.add([PackageSpec(name = "DocumenterVitepress", rev = "master"), PackageSpec(name = "Makie", rev = "master"), PackageSpec(name = "MakieCore", rev = "master"), PackageSpec(name = "CairoMakie", rev = "master")])
             Pkg.instantiate()'
+        env:
+          DISPLAY: ':0'
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # If authenticating with SSH deploy key
-        run: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs/ docs/make.jl deploy
+          DISPLAY: ':0'
+        run: xvfb-run -s '-screen 0 1024x768x24' julia --project=docs/ docs/make.jl deploy

@@ -43,3 +43,8 @@ record(f, "earth_temperature_deformations.mp4", axes(env_transfer_raw_raster, 3)
     p.input_args[1][] = surface_mesh
 end
 # ![](earth_temperature_deformations.mp4)
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

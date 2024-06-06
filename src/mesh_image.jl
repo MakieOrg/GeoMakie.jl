@@ -1,3 +1,9 @@
+#=
+# MeshImage
+
+This file contains the implementation of the `MeshImage` recipe.
+=#
+
 using Makie: GeometryBasics
 
 """
@@ -28,11 +34,9 @@ end
 
 # this inherits all conversions for `Image`,
 # if no specialized conversion for `MeshImage` is found.
-Makie.conversion_trait(::Type{<: MeshImage}) = Image
+Makie.conversion_trait(::Type{<: MeshImage}) = ImageLike()
 # There really is no difference between this and Image, 
-# except the implementation under the hood.  As such
-# I chose not to use the conversion trait in case someone
-# implemented a convert for images only...
+# except the implementation under the hood.
 
 # This is the recipe implementation.
 

@@ -50,3 +50,8 @@ ga = GeoAxis(fig[1, 1]; dest="+proj=ortho +lon_0=0 +lat_0=51.5", lonlims = (0, 1
 plot = osmplot!(ga, osm; buildings)
 datalims!(ga)
 fig
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

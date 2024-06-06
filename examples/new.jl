@@ -11,9 +11,14 @@ ga = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=19 +lat_0=50")
 lines!(ga, GeoMakie.coastlines())
 fig
 # This is an orthographic projection, note how it shows the pole as well!
-surface!(ga, -180..180, -90..90, rand(100, 100))
+surface!(ga, -180..180, -90..90, rand(100, 100); shading = NoShading)
 fig
 # You can plot any Makie plot type into the GeoAxis - there is no difference between it and any other axis-like object in Makie.
 # Beware that some plot types will create points which cannot support transformations, though!
 
 # If you encounter this kind of issue, please file a GitHub issue at the GeoMakie.jl repo!
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

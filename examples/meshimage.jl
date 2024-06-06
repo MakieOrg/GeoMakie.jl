@@ -12,7 +12,6 @@
 # unless your mesh is very fine (`npoints > 1000` usually).
 
 using GeoMakie, GLMakie
-GLMakie.activate!(px_per_unit = 4)
 
 # ## Affine transform (no nonlinearity)
 fig = Figure()
@@ -47,4 +46,9 @@ fig
 m1 = meshimage!(ax1, -166..169, -90..90, (Makie.logo()); npoints = 400)
 fig
 
-hidedecorations!(ax1; )
+hidedecorations!(ax1)
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

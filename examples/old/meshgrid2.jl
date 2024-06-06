@@ -67,3 +67,8 @@ record(fullsc, "test.mp4", imgpaths) do img
 
 end
 lines(rand(10))
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

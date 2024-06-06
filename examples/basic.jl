@@ -1,6 +1,5 @@
 # # Basic examples
-using GeoMakie, GLMakie
-GLMakie.activate!(px_per_unit = 4) # hide
+using GeoMakie, CairoMakie # you could use GLMakie too
 
 lons = -180:180
 lats = -90:90
@@ -31,3 +30,8 @@ ax = GeoAxis(fig[1,1])
 scatter!(slons, slats; color = sfield)
 fig
 # Again, to save, run e.g. `save("scatter_example.png", fig; px_per_unit=2)`.
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide
