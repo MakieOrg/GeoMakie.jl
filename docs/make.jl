@@ -58,7 +58,7 @@ Documenter.makedocs(;
         "Introduction" => "introduction.md",
         "Data" => "data.md",
         # "Examples" => "examples.md",
-        "Examples" => [joinpath.(("examples",), replace.(examples, (".jl" => ".md",)))],
+        "Examples" => joinpath.(("examples",), replace.(examples, (".jl" => ".md",))),
         "Developer documentation" => [
             "Nonlinear transforms" => "nonlinear_transforms.md",
             "Architecture" => "architecture.md",
