@@ -38,9 +38,10 @@ examples = [
     joinpath("gmt", "antioquia.jl"),
 ]
 example_dir = joinpath(dirname(@__DIR__), "examples")
-for file in joinpath.((example_dir,), examples)
+for filename in examples
+    file = joinpath(example_dir, filename)
     endswith(file, ".jl") || continue
-    Literate.markdown(file, joinpath(@__DIR__, "src", "examples"); documenter = true)
+    Literate.markdown(file, joinpath(@__DIR__, "src", "examples", first(splitdir(filename))); documenter = true)
 end
 
 Documenter.makedocs(;
