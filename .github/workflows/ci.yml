@@ -74,6 +74,7 @@ jobs:
               # PackageSpec(name = "MakieCore", rev = "master"), 
               # PackageSpec(name = "CairoMakie", rev = "master"), 
               PackageSpec(name = "Rasters", rev = "la/compacts"),
+              PackageSpec(name = "ArchGDAL", rev = "master")
             ])
             Pkg.instantiate()'
         env:
