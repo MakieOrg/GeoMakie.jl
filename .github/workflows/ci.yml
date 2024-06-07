@@ -68,7 +68,7 @@ jobs:
           xvfb-run -s '-screen 0 1024x768x24' julia --project=docs -e '
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
-            Pkg.add([PackageSpec(name = "DocumenterVitepress", rev = "master"), PackageSpec(name = "Makie", rev = "master"), PackageSpec(name = "MakieCore", rev = "master"), PackageSpec(name = "CairoMakie", rev = "master")])
+            Pkg.add([PackageSpec(name = "DocumenterVitepress", rev = "master"), PackageSpec(name = "Makie", rev = "master"), PackageSpec(name = "MakieCore", rev = "master"), PackageSpec(name = "CairoMakie", rev = "master"), PackageSpec(name = "Rasters", rev = "la/compacts")])
             Pkg.instantiate()'
         env:
           DISPLAY: ':0'
