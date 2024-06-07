@@ -30,7 +30,9 @@ import GeoFormatTypes
 export GeoInterface
 
 # bring in missing Makie methods required for block definition
-using Makie: make_block_docstring
+if hasproperty(Makie, :make_block_docstring )
+    using Makie: make_block_docstring
+end
 # fix conflicts
 import Makie: rotate! # use LinearAlgebra.rotate! otherwise
 
