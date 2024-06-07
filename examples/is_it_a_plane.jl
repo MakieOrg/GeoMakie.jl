@@ -29,9 +29,9 @@ f, a, p = lines(reverse(Proj.geod_path(geod, reverse(jfk)..., reverse(sin)...)).
 # relative distances along the path, and altitudes of observation, as 
 # a function of time.  This is done by using the Animations.jl library.
 
-times = [0, 0.5, 17.5, 18]
+times = [0, 0.5, 30.5, 31]
 distances = [0, 0.05, 0.95, 1]
-altitudes = [357860, 35786000/2, 35786000/2, 357860]
+altitudes = [357860*2, 35786000/2, 35786000/2, 357860*2]
 distance_animation = Animation(times, distances, linear())
 altitude_animation = Animation(times, altitudes, sineio())
 
@@ -47,11 +47,14 @@ satview_projection = lift(sl.value) do alt
 end
 ga = GeoAxis(fig[1, 1]; dest = satview_projection)
 meshimage!(ga, -180..180, -90..90, GeoMakie.earth(), shading = NoShading)
+lines!(ga, GeoMakie.coastlines())
 fig
 
+#
 
-record(fig, "plots/plane.mp4", LinRange(0, 1, 120)) do i
-    satview_projection[] = "+proj=geos +h=$(round(Int, at(altitude_animation, i*18))) +lon_0=$(Proj.geod_position_relative(inv_line, i)[2]) +lat_0=$(Proj.geod_position_relative(inv_line, i)[1])"
+record(fig, "plane.mp4", LinRange(0, 1, 240)) do i
+    current_position = Proj.geod_position_relative(inv_line, i)
+    satview_projection[] = "+proj=geos +h=$(round(Int, at(altitude_animation, i*18))) +lon_0=$(current_position[2])"
     yield()
 end
 # ![](plane.mp4)

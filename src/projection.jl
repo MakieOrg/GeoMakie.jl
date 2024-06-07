@@ -140,10 +140,11 @@ end
 #      GeoFormatTypes integration      #
 ########################################
 
+const _GFTCRS = Union{GeoFormatTypes.CoordinateReferenceSystemFormat, GeoFormatTypes.WellKnownText{GeoFormatTypes.CRS}}
 # Define methods for GeoFormatTypes CRS objects and all possible combinations thereof.
-create_transform(dest::GeoFormatTypes.CoordinateReferenceSystemFormat, source::GeoFormatTypes.CoordinateReferenceSystemFormat) = create_transform(gft2str(dest), gft2str(source))
-create_transform(dest::String, source::GeoFormatTypes.CoordinateReferenceSystemFormat) = create_transform(dest, gft2str(source))
-create_transform(dest::GeoFormatTypes.CoordinateReferenceSystemFormat, source::String) = create_transform(gft2str(dest), source)
+create_transform(dest::_GFTCRS, source::_GFTCRS) = create_transform(gft2str(dest), gft2str(source))
+create_transform(dest::String, source::_GFTCRS) = create_transform(dest, gft2str(source))
+create_transform(dest::_GFTCRS, source::String) = create_transform(gft2str(dest), source)
 
 """
     gft2str(crs)::String
@@ -152,4 +153,5 @@ Return a PROJ-compatible string from a GeoFormatTypes CRS object.
 """
 function gft2str end
 gft2str(crs::GeoFormatTypes.EPSG{1}) = String("EPSG:$(GeoFormatTypes.val(crs))")
-GeoFormatTypes2str(crs::GeoFormatTypes.CoordinateReferenceSystemFormat) = string(GeoFormatTypes.val(crs))
+gft2str(crs::GeoFormatTypes.CoordinateReferenceSystemFormat) = string(GeoFormatTypes.val(crs))
+gft2str(crs::GeoFormatTypes.WellKnownText{GeoFormatTypes.CRS}) = string(GeoFormatTypes.val(crs))
