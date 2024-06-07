@@ -18,10 +18,6 @@ webmerc_geojson = GO.reproject(GI.convert.((GI,), geojson) |> GO.tuples; transfo
 
 london = Rect2d(-0.0921, 51.5, 0.04, 0.025)
 
-function Makie.MakieCore.attribute_name_allowlist()
-    (:xautolimits, :yautolimits, :zautolimits, :label, :rasterize, :model, :transformation, :dest, :source, :specular, :matcap, :backlight, :shininess, :interpolate, :diffuse,:dim_conversions)
-end
-
 fig = Figure()
 nax = Axis(fig[1, 1]; aspect = DataAspect())
 m = Tyler.Map(london, figure = fig, axis = nax)

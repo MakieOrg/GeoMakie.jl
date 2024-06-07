@@ -28,6 +28,8 @@ examples = [
     "orthographic.jl",
     "german_lakes.jl",
     "geostationary_image.jl",
+    "multiple_crs.jl",
+    joinpath("gmt", "antioquia.jl"),
     "contourf.jl",
     "world_population.jl",
     "field_and_countries.jl",
@@ -35,7 +37,8 @@ examples = [
     "projections.jl",
     "tissot.jl",
     "rotating_earth.jl",
-    joinpath("gmt", "antioquia.jl"),
+    "rasters.jl",
+    
 ]
 example_dir = joinpath(dirname(@__DIR__), "examples")
 for filename in examples
