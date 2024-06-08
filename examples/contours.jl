@@ -9,8 +9,9 @@ lats = -90:90
 # This grid can be of any density, but note that the
 # time it takes to plot scales with the grid size!
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
-# There are two 
-fig = Figure()
+# Makie provides two main recipes for contours = `contour` for lines, and `contourf` for fills.  
+# In this example, we'll see examples of both.
+fig = Figure(size = (1000, 750), Contour = (; labelsize = 14, labelfont = :bold), Text = (; strokecolor = :gray, strokewidth = .3))
 ax1 = GeoAxis(fig[1,1]; title = "Plain contour")
 contour!(ax1, lons, lats, field)
 fig
