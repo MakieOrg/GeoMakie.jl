@@ -55,8 +55,8 @@ record(fig, "plane.mp4", LinRange(0, 1, 240)) do i
 end
 # ![](plane.mp4)
 
-```@cardmeta
-Description = "A great circle flight from JFK to SIN"
-Cover = fig
-```
+# ```@cardmeta
+# Description = "A great circle flight from JFK to SIN"
+# Cover = fig
+# ```
 
