@@ -24,6 +24,7 @@ examples = [
     "new.jl",
     "axis_config.jl",
     "italy.jl",
+    "histogram.jl",
     "graph_on_usa.jl",
     "orthographic.jl",
     "german_lakes.jl",
