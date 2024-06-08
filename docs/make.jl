@@ -26,11 +26,13 @@ examples = [
     "orthographic.jl",
     "geostationary_image.jl",
     "multiple_crs.jl",
+    "rasters.jl",
     "is_it_a_plane.jl",
     joinpath("cartopy", "annotation.jl"),
     joinpath("cartopy", "katrina.jl"),
     joinpath("cartopy", "arrows.jl"),
     joinpath("cartopy", "vesta.jl"),
+    joinpath("cartopy", "streamplot.jl"),
     joinpath("gmt", "antioquia.jl"),
     "german_lakes.jl",
     "field_and_countries.jl",
@@ -38,8 +40,6 @@ examples = [
     "projections.jl",
     "tissot.jl",
     "rotating_earth.jl",
-    "rasters.jl",
-    
 ]
 example_dir = joinpath(dirname(@__DIR__), "examples")
 for filename in examples
