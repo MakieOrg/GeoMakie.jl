@@ -12,16 +12,18 @@ Functional requirements are:
 - At each stage, return a `FigureLike`.  You can simply dispose of things for it to work...
 
 
-When adding the code to save to `covers`, you must add the following exactly:
-```julia
-#
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
-nothing #hide
-```
+When adding the code to save to `covers`, you must add the following code to the bottom of your Julia file:
+````julia
+# ```@cardmeta
+# Cover = fig
+# Description = "A very short description of the example"
+# Title = "Some title, optional"
+# ```
+````
 assuming `fig` is the main figure of that example.
 
-The first comment is important, so that there is a separation between the code block above this one, and this one.  Otherwise, the last figure will not be displayed!
+Note that all of this code is commented out - this is important, otherwise Documenter.jl will not be able to pick it up.
+
+You can even pass a compound expression as `Cover = begin ... end` if you want to create a custom cover figure.  This will all be evaluated in the same scope as your example, but after all the code is executed.
 
 We also require that the comments in the file be of sufficient quantity and quality to explain what is going on to a newcomer.

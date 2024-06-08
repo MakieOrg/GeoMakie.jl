@@ -79,9 +79,13 @@ jobs:
             Pkg.instantiate()'
         env:
           DISPLAY: ':0'
+          DATADEPS_ALWAYS_ACCEPT: 'true'
+          RASTERDATASOURCES_PATH: '~/.julia/artifacts/RasterDataSources'
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # If authenticating with GitHub Actions token
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # If authenticating with SSH deploy key
           DISPLAY: ':0'
+          DATADEPS_ALWAYS_ACCEPT: 'true'
+          RASTERDATASOURCES_PATH: '~/.julia/artifacts/RasterDataSources'
         run: xvfb-run -s '-screen 0 1024x768x24' julia --project=docs/ docs/make.jl deploy

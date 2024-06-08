@@ -12,7 +12,7 @@ using Rasters, RasterDataSources, ArchGDAL
 # We'll also load GeoMakie and CairoMakie to plot the data.
 using GeoMakie, CairoMakie
 
-# First, we can load a Raster from the [EarthEnv](earthenv.org) project, which represents habitat or ecosystem heterogeneity.
+# First, we can load a Raster from the [EarthEnv](https://www.earthenv.org) project, which represents habitat or ecosystem heterogeneity.
 
 ras = Raster(EarthEnv{HabitatHeterogeneity}, :homogeneity) # habitat homogeneity to neighbouring pixel
 # Let's take a look at this in regular Makie first:

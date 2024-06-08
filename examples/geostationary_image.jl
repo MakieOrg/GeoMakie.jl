@@ -25,7 +25,6 @@
 # in this case a black-and-white image of the Earth from a satellite in 
 # geostationary orbit.
 using Makie, GeoMakie, CairoMakie
-CairoMakie.activate!(px_per_unit = 4) # hide
 using Downloads, FileIO
 # Download a geostationary satellite image
 img = FileIO.load(Downloads.download("https://gist.github.com/pelson/5871263/raw/EIDA50_201211061300_clip2.png"))

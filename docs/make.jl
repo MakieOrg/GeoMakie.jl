@@ -2,20 +2,15 @@ using Documenter, DocumenterVitepress, Literate
 using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
 
 include("gallery_setup.jl")
+include("example_meta_block.jl")
 # Set some global settings
 # Good quality CairoMakie with PNG
-CairoMakie.activate!(px_per_unit = 3, type = :png)
+CairoMakie.activate!(px_per_unit = 2, type = :png)
 # Rasters should download into the artifacts folder (so they can be cached :D)
 ENV["RASTERDATASOURCES_PATH"] = joinpath(first(Base.DEPOT_PATH), "artifacts")
 # invoke some geomakie things to be sure it works
 GeoMakie.coastlines()
 GeoMakie.earth()
-
-deploy = length(ARGS) == 1 && ARGS[1] == "deploy"
-if deploy && !haskey(ENV, "GITHUB_TOKEN")
-    @warn("Not deploying, no GITHUB_TOKEN not found in ENV")
-    deploy = false
-end
 
 using Literate
 
@@ -24,21 +19,27 @@ examples = [
     "new.jl",
     "axis_config.jl",
     "italy.jl",
+    "histogram.jl",
+    "contours.jl",
+    "world_population.jl",
     "graph_on_usa.jl",
     "orthographic.jl",
-    "german_lakes.jl",
     "geostationary_image.jl",
     "multiple_crs.jl",
+    "rasters.jl",
+    "is_it_a_plane.jl",
+    joinpath("cartopy", "annotation.jl"),
+    joinpath("cartopy", "katrina.jl"),
+    joinpath("cartopy", "arrows.jl"),
+    joinpath("cartopy", "vesta.jl"),
+    joinpath("cartopy", "streamplot.jl"),
     joinpath("gmt", "antioquia.jl"),
-    "contourf.jl",
-    "world_population.jl",
+    "german_lakes.jl",
     "field_and_countries.jl",
     "meshimage.jl",
     "projections.jl",
     "tissot.jl",
     "rotating_earth.jl",
-    "rasters.jl",
-    
 ]
 example_dir = joinpath(dirname(@__DIR__), "examples")
 for filename in examples
@@ -72,7 +73,17 @@ Documenter.makedocs(;
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
     warnonly = true,
+    draft = false,
 )
+
+
+deploydocs(; 
+    repo="github.com/MakieOrg/GeoMakie.jl", 
+    target="build", 
+    push_preview = true, 
+    forcepush = true
+)
+
 
 # publicpath = joinpath(@__DIR__, "build", ".documenter", "public")
 # mkpath(publicpath)
@@ -91,9 +102,6 @@ Documenter.makedocs(;
 
 
 # isdir(joinpath(@__DIR__, "src", "examples")) && rm.(readdir(joinpath(@__DIR__, "src", "examples"); join = true); force = true)
-
-deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true, forcepush = true)
-
 
         # "Examples" => [
         #     "Basic examples" => "examples/basic.md",

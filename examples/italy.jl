@@ -6,7 +6,6 @@ GeoMakie.  It's more to show how to hybridize two data sources than
 anything else.
 =#
 using CairoMakie, GeoMakie
-CairoMakie.activate!(px_per_unit = 4) # hide
 using GADM, DataFrames
 import GeometryOps as GO
 using GeoInterfaceMakie # hide

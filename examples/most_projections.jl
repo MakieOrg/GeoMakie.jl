@@ -3,7 +3,6 @@
 # This page shows most projections, without replacement, as they are 
 # without tweaks in GeoMakie.
 using GeoMakie, CairoMakie
-CairoMakie.activate!(px_per_unit = 4) # hide
 
 projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=aea +lat_1=29.5 +lat_2=42.5", "+proj=aeqd", "+proj=airy", "+proj=aitoff",

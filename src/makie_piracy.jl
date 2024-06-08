@@ -2,6 +2,12 @@
 # Quick fixes for Makie
 Makie.to_colormap(::Nothing) = nothing
 
+# Add plotting capabilities for MultiLineStrings
+function Makie.convert_arguments(trait::PointBased, mls::AbstractArray{<: GeometryBasics.MultiLineString})
+    return Makie.convert_arguments(trait, _mls2ls.(mls)) # _mls2ls in geojson.jl
+end
+
+
 #=
 function Makie.transform_bbox(scenelike, lims::Rect{N, T}) where {N, T}
     mini = Makie.to_ndim(Point3d, minimum(lims), 0.0)

@@ -4,19 +4,18 @@
 # to Singapore (SIN) airport. 
 
 using GeoMakie, CairoMakie
-CairoMakie.activate!(px_per_unit = 2) # hide
 using Proj, Animations
 
-jfk = Point2f(-73.7789, 40.6397)
-sin = Point2f(103.9894, 1.3592)
+JFK = Point2f(-73.7789, 40.6397)
+SIN = Point2f(103.9894, 1.3592)
 
 # First, we define the globe, as the WGS84 ellipsoid:
 geod = Proj.geod_geodesic(6378137, 1/298.257223563)
 # Then, we can solve the inverse geodesic problem, which provides 
 # the shortest path between two points on our defined ellipsoid:
-inv_line = Proj.geod_inverseline(geod, reverse(jfk)..., reverse(sin)...)
+inv_line = Proj.geod_inverseline(geod, reverse(JFK)..., reverse(SIN)...)
 # Just for reference, this is the path:
-f, a, p = lines(reverse(Proj.geod_path(geod, reverse(jfk)..., reverse(sin)...))...; linewidth = 3, axis = (; type = GeoAxis, dest = "+proj=natearth")); lines!(a, GeoMakie.coastlines(), color = (:black, 0.4)); f
+f, a, p = lines(reverse(Proj.geod_path(geod, reverse(JFK)..., reverse(SIN)...))...; linewidth = 3, axis = (; type = GeoAxis, dest = "+proj=natearth")); lines!(a, GeoMakie.coastlines(), color = (:black, 0.4)); f
 
 # We'll use a satellite view for this, and alter the projection as a way of controlling the animation.
 
@@ -29,9 +28,9 @@ f, a, p = lines(reverse(Proj.geod_path(geod, reverse(jfk)..., reverse(sin)...)).
 # relative distances along the path, and altitudes of observation, as 
 # a function of time.  This is done by using the Animations.jl library.
 
-times = [0, 0.5, 30.5, 31]
-distances = [0, 0.05, 0.95, 1]
-altitudes = [357860*2, 35786000/2, 35786000/2, 357860*2]
+times = [0.0, 3.5, 14.5, 18]
+distances = [0.0, 0.05, 0.95, 1]
+altitudes = [357860.0*2, 35786000, 35786000, 357860*2]
 distance_animation = Animation(times, distances, linear())
 altitude_animation = Animation(times, altitudes, sineio())
 
@@ -41,12 +40,9 @@ altitude_animation = Animation(times, altitudes, sineio())
 # altitude to see how the zoom works in real time!
 
 fig = Figure()
-sl = Slider(fig[2, 1], range = exp.(LinRange(log(357860), log(35786000), 30)), startvalue = 35786000)
-satview_projection = lift(sl.value) do alt
-    "+proj=geos +h=$(round(Int, alt)) +lon_0=$(sin[1]) +lat_0=$(sin[2])"
-end
+satview_projection = Observable("+proj=nsper +h=$(first(altitudes)) +lon_0=$(SIN[1]) +lat_0=$(SIN[2])")
 ga = GeoAxis(fig[1, 1]; dest = satview_projection)
-meshimage!(ga, -180..180, -90..90, GeoMakie.earth(), shading = NoShading)
+surface!(ga, -180..180, -90..90, zeros(axes(GeoMakie.earth() |> rotr90)); color = GeoMakie.earth() |> rotr90, shading = NoShading)
 lines!(ga, GeoMakie.coastlines())
 fig
 
@@ -54,17 +50,13 @@ fig
 
 record(fig, "plane.mp4", LinRange(0, 1, 240)) do i
     current_position = Proj.geod_position_relative(inv_line, i)
-    satview_projection[] = "+proj=geos +h=$(round(Int, at(altitude_animation, i*18))) +lon_0=$(current_position[2])"
-    yield()
+    current_time = i * last(times)
+    ga.dest[] = "+proj=nsper +h=$(round(Int, at(altitude_animation, current_time))) +lon_0=$(current_position[2]) +lat_0=$(current_position[1])"
 end
 # ![](plane.mp4)
 
-fig = Figure()
-ga = GeoAxis(fig[1, 1]; dest = "+proj=nsper +h=3000000 +lat_0=-20 +lon_0=145")
-meshimage!(ga, -180..180, -90..90, GeoMakie.earth(), shading = NoShading)
-fig
-#
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
-nothing #hide
+# ```@cardmeta
+# Description = "A great circle flight from JFK to SIN"
+# Cover = fig
+# ```
+

@@ -3,9 +3,10 @@
 # This is an example of how you can use multiple CRS in one plot.
 using CairoMakie, GeoMakie
 using Rasters, RasterDataSources, ArchGDAL
-CairoMakie.activate!(px_per_unit = 4) # hide
 
 ras = Raster(EarthEnv{HabitatHeterogeneity}, :homogeneity)
+#
+heatmap(ras; axis = (; aspect = DataAspect()))
 # Let's simulate a new CRS, assuming this was an image taken from a geostationary satellite, hovering above 72° E:
 projected_ras = Rasters.warp(
         ras,
@@ -24,7 +25,7 @@ fig
 # The coastlines function returns points in the (lon, lat) coordinate reference system.
 
 # We will now plot our image, from the geostationary coordinate system:
-surface!(ga, projected_ras; shading = NoShading, source = Rasters.crs(projected_ras))
+heatmap!(ga, projected_ras)
 fig
 # Success!  You can clearly see how the raster was adapted here.
 #
