@@ -1,8 +1,4 @@
-# ```@cardmeta
-# Title = "Basic examples"
-# Description = "Basic examples of GeoMakie"
-# Cover = fig
-# ```
+# # Basic examples
 
 using GeoMakie, CairoMakie # you could use GLMakie too
 
@@ -37,7 +33,9 @@ scatter!(slons, slats; color = sfield)
 fig
 # Again, to save, run e.g. `save("scatter_example.png", fig; px_per_unit=2)`.
 #
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
-nothing #hide
+
+# ```@cardmeta
+# Title = "Basic examples"
+# Description = "Basic examples of GeoMakie"
+# Cover = fig
+# ```
