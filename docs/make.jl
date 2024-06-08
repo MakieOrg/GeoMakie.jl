@@ -77,15 +77,12 @@ Documenter.makedocs(;
 )
 
 
-if length(ARGS) == 1 && ARGS[1] == "deploy" && !haskey(ENV, "GITHUB_TOKEN")
-    @warn("Not deploying, no GITHUB_TOKEN not found in ENV")
-    deploydocs(; 
-        repo="github.com/MakieOrg/GeoMakie.jl", 
-        target="build", 
-        push_preview = true, 
-        forcepush = true
-    )
-end
+deploydocs(; 
+    repo="github.com/MakieOrg/GeoMakie.jl", 
+    target="build", 
+    push_preview = true, 
+    forcepush = true
+)
 
 
 # publicpath = joinpath(@__DIR__, "build", ".documenter", "public")
