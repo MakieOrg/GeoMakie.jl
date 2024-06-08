@@ -12,12 +12,6 @@ haskey(ENV, "RASTERDATASOURCES_PATH") || (ENV["RASTERDATASOURCES_PATH"] = joinpa
 GeoMakie.coastlines()
 GeoMakie.earth()
 
-deploy = length(ARGS) == 1 && ARGS[1] == "deploy"
-if deploy && !haskey(ENV, "GITHUB_TOKEN")
-    @warn("Not deploying, no GITHUB_TOKEN not found in ENV")
-    deploy = false
-end
-
 using Literate
 
 examples = [
@@ -32,6 +26,7 @@ examples = [
     "orthographic.jl",
     "geostationary_image.jl",
     "multiple_crs.jl",
+    "is_it_a_plane.jl",
     joinpath("gmt", "antioquia.jl"),
     joinpath("cartopy", "annotation.jl"),
     joinpath("cartopy", "katrina.jl"),
@@ -76,7 +71,20 @@ Documenter.makedocs(;
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
     warnonly = true,
+    draft = false,
 )
+
+
+if length(ARGS) == 1 && ARGS[1] == "deploy" && !haskey(ENV, "GITHUB_TOKEN")
+    @warn("Not deploying, no GITHUB_TOKEN not found in ENV")
+    deploydocs(; 
+        repo="github.com/MakieOrg/GeoMakie.jl", 
+        target="build", 
+        push_preview = true, 
+        forcepush = true
+    )
+end
+
 
 # publicpath = joinpath(@__DIR__, "build", ".documenter", "public")
 # mkpath(publicpath)
@@ -95,9 +103,6 @@ Documenter.makedocs(;
 
 
 # isdir(joinpath(@__DIR__, "src", "examples")) && rm.(readdir(joinpath(@__DIR__, "src", "examples"); join = true); force = true)
-
-deploy && deploydocs(; repo="github.com/MakieOrg/GeoMakie.jl", target="build", push_preview=true, forcepush = true)
-
 
         # "Examples" => [
         #     "Basic examples" => "examples/basic.md",
