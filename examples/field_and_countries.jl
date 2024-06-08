@@ -4,7 +4,6 @@
 # BeautifulMakie.jl repository.  It has some really
 # good stuff - check it out!
 using Makie, CairoMakie, GeoMakie
-CairoMakie.activate!(px_per_unit = 4) # hide
 import Downloads
 using GeoMakie.GeoJSON
 using GeometryBasics

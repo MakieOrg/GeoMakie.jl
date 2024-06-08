@@ -4,7 +4,6 @@
 # to Singapore (SIN) airport. 
 
 using GeoMakie, CairoMakie
-CairoMakie.activate!(px_per_unit = 2) # hide
 using Proj, Animations
 
 jfk = Point2f(-73.7789, 40.6397)

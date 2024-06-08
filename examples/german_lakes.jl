@@ -1,7 +1,6 @@
 # # German lakes
 using GeoMakie, CairoMakie
 using GeoJSON, Downloads
-CairoMakie.activate!(px_per_unit = 4) # hide
 
 geoger = GeoJSON.read(read(Downloads.download("https://raw.githubusercontent.com/isellsoap/deutschlandGeoJSON/main/2_bundeslaender/4_niedrig.geo.json"), String))
 lakes = GeoJSON.read(read(Downloads.download("https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_lakes_europe.geojson"), String))

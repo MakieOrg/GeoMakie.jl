@@ -2,7 +2,6 @@
 # Example of the new API
 using Makie, GeoMakie # add your preferred backend here
 using CairoMakie # hide
-CairoMakie.activate!(px_per_unit = 4) # hide
 # GeoAxis is a Block object, just like Axis or Axis3, with the same semantics.
 
 # You can insert it into a figure in the same way, or specify it when plotting as `plot(...; axis = (; type = GeoAxis, geoaxis_kwargs...))`.

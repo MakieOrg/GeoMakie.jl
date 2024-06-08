@@ -1,7 +1,6 @@
 # # Orthographic projection
 
 using GeoMakie, CairoMakie
-CairoMakie.activate!(px_per_unit = 4) # hide
 
 lons = -180:180
 lats = -90:90

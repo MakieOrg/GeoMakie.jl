@@ -2,7 +2,6 @@
 
 using LightOSM, OSMMakie
 using GeoMakie, CairoMakie
-CairoMakie.activate!(px_per_unit = 4) # hide
 
 # This works with GLMakie as well,
 # if you want interactivity!
