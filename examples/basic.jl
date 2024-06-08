@@ -1,8 +1,14 @@
-# # Basic examples
+# ```@cardmeta
+# Title = "Basic examples"
+# Description = "Basic examples of GeoMakie"
+# Cover = fig
+# ```
+
 using GeoMakie, CairoMakie # you could use GLMakie too
 
 lons = -180:180
 lats = -90:90
+
 # Create some field of values across `lons` and `lats`
 # This grid can be of any density, but note that the
 # time it takes to plot scales with the grid size!
