@@ -3,6 +3,8 @@
 
 # The big idea is to plot arrows from one CRS in another!
 
+using GeoMakie, CairoMakie
+
 xs = LinRange(311.9, 391.1, 30)
 ys = LinRange(-23.6, 24.8, 20)
 

@@ -22,6 +22,9 @@ vesta_image_matrix = FileIO.load(joinpath(DataDeps.datadep"vesta_image", "PIA170
 # We use Proj's [ellipsoid parameters](https://proj.org/en/9.3/usage/ellipsoids.html#ellipsoid-size-parameters)
 # to define the ellipsoid of Vesta, specifically the semi-major and semi-minor axes (`+a` and `+b` respectively).
 vesta_crs = GeoMakie.GeoFormatTypes.ProjString("+proj=longlat +a=285000 +b=229000 +type=crs")
+# Additionally, since the Vesta CRS is on a non-Earth datum, we have to set this environment variable
+# so that Proj knows that we are aware of this problem:
+ENV["PROJ_IGNORE_CELESTIAL_BODY"] = "yes"
 # Now, we can create a `Raster` from the image.
 vesta_raster = Raster(
     rotr90(vesta_image_matrix); 
