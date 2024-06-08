@@ -1,4 +1,5 @@
 using Documenter
+using ImageTransformations # for resize
 
 abstract type CardMetaBlocks <: Documenter.Expanders.ExpanderPipeline end
 
