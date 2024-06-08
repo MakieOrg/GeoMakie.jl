@@ -2,6 +2,7 @@
 # Taken from the [Cartopy `Hurricane Katrina` example](https://scitools.org.uk/cartopy/docs/latest/gallery/lines_and_polygons/hurricane_katrina.html#sphx-glr-gallery-lines-and-polygons-hurricane-katrina-py)
 
 using CairoMakie, GeoMakie
+using Makie
 using DataFrames
 using NaturalEarth
 import GeometryOps as GO
@@ -27,7 +28,7 @@ lats = [23.1, 23.4, 23.8, 24.5, 25.4, 26.0, 26.1, 26.2, 26.2, 26.0,
         25.7, 26.3, 27.2, 28.2, 29.3, 29.5, 30.2, 31.1, 32.6, 34.1,
         35.6, 37.0, 38.6, 40.1]
 
-katrina_path = GO.LineString(Point2d.(lons, lats))
+katrina_path = GO.LineString(Point2.(lons, lats))
 
 # We can retrieve the US states from Natural Earth.  This particular feature collection
 # only contains US states.
