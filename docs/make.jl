@@ -7,7 +7,7 @@ include("example_meta_block.jl")
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)
 # Rasters should download into the artifacts folder (so they can be cached :D)
-haskey(ENV, "RASTERDATASOURCES_PATH") || (ENV["RASTERDATASOURCES_PATH"] = joinpath(first(Base.DEPOT_PATH), "artifacts"))
+ENV["RASTERDATASOURCES_PATH"] = joinpath(first(Base.DEPOT_PATH), "artifacts")
 # invoke some geomakie things to be sure it works
 GeoMakie.coastlines()
 GeoMakie.earth()
