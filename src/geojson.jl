@@ -118,3 +118,17 @@ function geo2basic(fc::GeoJSON.FeatureCollection)
 end
 
 geo2basic(feature::GeoJSON.Feature) = geo2basic(GeoInterface.geometry(feature))
+
+function _mls2ls(mls::GeometryBasics.MultiLineString{N, T}) where {N, T}
+    points = Vector{Point{N, T}}()
+    sizehint!(
+        points, 
+        sum(GeometryBasics.GeoInterface.npoint, mls.linestrings) #= length of individual linestrings =# + 
+        length(mls.linestrings) #= NaN points between linestrings =#
+    )
+    for ls in mls
+        append!(points, GeometryBasics.coordinates(ls))
+        push!(points, Point{N, T}(NaN))
+    end
+    return GeometryBasics.LineString(points)
+end
