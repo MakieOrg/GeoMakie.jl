@@ -1,7 +1,6 @@
 # # Projections
 
 using GeoMakie, CairoMakie
-CairoMakie.activate!(px_per_unit = 4) # hide
 
 lons = -180:180
 lats = -90:90
@@ -15,3 +14,8 @@ surface!(ax1, lons, lats, field; shading = NoShading, colormap = (:plasma, 0.45)
 surface!(ax2, lons, lats, field; shading = NoShading, colormap = (:plasma, 0.45))
 
 fig
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

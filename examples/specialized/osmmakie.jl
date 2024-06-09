@@ -2,7 +2,6 @@
 
 using LightOSM, OSMMakie
 using GeoMakie, CairoMakie
-CairoMakie.activate!(px_per_unit = 4) # hide
 
 # This works with GLMakie as well,
 # if you want interactivity!
@@ -50,3 +49,8 @@ ga = GeoAxis(fig[1, 1]; dest="+proj=ortho +lon_0=0 +lat_0=51.5", limits = ((0, 1
 plot = osmplot!(ga, osm; buildings)
 
 fig
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

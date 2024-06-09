@@ -1,10 +1,11 @@
+#=
+# GeoAxis Makie integration
+=#
+
 # Anything in this file was directly taken from Makie/makielayout/blocks/axis.jl
 # TODO, refactor axis.jl to make it easier to extend
 
 import Makie: xautolimits, yautolimits, autolimits, getxlimits, getylimits, getlimits
-
-# Lol, really GeometryBasics?
-Base.convert(::Type{Rect2d}, x::Rect2) = Rect2d(x)
 
 function axis_setup!(axis::GeoAxis)
     # initialize either with user limits, or pick defaults based on scales
@@ -18,11 +19,14 @@ function axis_setup!(axis::GeoAxis)
     scenearea = Makie.sceneareanode!(axis.layoutobservables.computedbbox, finallimits, axis.aspect)
     scene = Scene(topscene, viewport=scenearea)
     axis.scene = scene
-    onany(Makie.update_axis_camera, camera(scene), scene.transformation.transform_func, finallimits, axis.xreversed, axis.yreversed)
+    setfield!(scene, :float32convert, Makie.Float32Convert())
+    onany(scene, scene.transformation.transform_func, finallimits, axis.xreversed, axis.yreversed) do transform_func, finallimits, xreversed, yreversed
+        Makie.update_axis_camera(scene, transform_func, finallimits, xreversed, yreversed)
+    end
     notify(axis.layoutobservables.suggestedbbox)
     Makie.register_events!(axis, scene)
     on(scene, axis.limits) do _
-        reset_limits!(axis)
+        Makie.reset_limits!(axis)
     end
     onany(scene, scene.viewport, targetlimits) do _, _
         Makie.adjustlimits!(axis)
@@ -116,16 +120,18 @@ function Makie.reset_limits!(axis::GeoAxis; xauto = true, yauto = true)
         trans = axis.transform_func[]
         # Fallback to untransformed data limits
         # TODO, is this always correct?
-        rect = data_limits(axis.scene)
-        fxlim, fylim = Makie.limits(rect)
+        transformed_rect = boundingbox(axis.scene)
+        untransformed_rect = Makie.apply_transform(axis.inv_transform_func[], transformed_rect)
+        fxlim, fylim = Makie.limits(untransformed_rect)
         fallback_lims = [fxlim..., fylim...]
         new_lims = [xlims..., ylims...]
         # Replace values that are already transformed with untransformed values
         untrans = map(needs_transform, fallback_lims, new_lims) do needs, fallback, new
             needs ? new : fallback
         end
-        # Now that all values are in source input space, we can transform them again
-        mini, maxi = Makie.apply_transform(trans, [Point2f(untrans[1], untrans[3]), Point2f(untrans[2], untrans[4])])
+        # Now that all values are in source input space, we can transform them again.
+        # We use a rectangle to transform, since that allows us to use Proj's densification.
+        mini, maxi = Makie.apply_transform(trans, Rect2d(Vec2d(untrans[1], untrans[3]), Vec2d(untrans[2] - untrans[1], untrans[4] - untrans[3]))) |> extrema
         trans_lims = [mini[1], maxi[1], mini[2], maxi[2]]
         untrans = map(needs_transform, trans_lims, new_lims) do needs, tlim, new
             needs ? tlim : new
@@ -134,7 +140,7 @@ function Makie.reset_limits!(axis::GeoAxis; xauto = true, yauto = true)
         ylims = (untrans[3], untrans[4])
     end
 
-    axis.targetlimits[] = Makie.BBox(xlims..., ylims...)
+    axis.targetlimits[] = Makie.BBox(xlims..., ylims...) # this is in TRANSFORMED space
     nothing
 end
 
@@ -170,9 +176,9 @@ function get_point_xyz(linear_indx::Int, indices, X, Y, Z)
     y = br_getindex(Y, idx, 2)
     z = Z[linear_indx]
     if z isa Number
-        return Point3f(x, y, z)
+        return Point3d(x, y, z)
     else
-        return Point3f(x, y, 0)
+        return Point3d(x, y, 0)
     end
 end
 
@@ -180,15 +186,15 @@ function get_point_xyz(linear_indx::Int, indices, X, Y)
     idx = indices[linear_indx]
     x = br_getindex(X, idx, 1)
     y = br_getindex(Y, idx, 2)
-    return Point3f(x, y, 0.0)
+    return Point3d(x, y, 0.0)
 end
 
 function _point_iterator(plot::Union{Image,Heatmap,Surface})
     Z = plot[3][]
-    X = to_vector(plot[1][], size(Z, 1), Float32)
-    Y = to_vector(plot[2][], size(Z, 2), Float32)
+    X = to_vector(plot[1][], size(Z, 1), Float64)
+    Y = to_vector(plot[2][], size(Z, 2), Float64)
     indices = CartesianIndices(Z)
-    return Point3f[get_point_xyz(idx, indices, X, Y, Z) for idx in 1:length(Z)]
+    return Point3d[get_point_xyz(idx, indices, X, Y, Z) for idx in 1:length(Z)]
 end
 
 function _point_iterator(list::AbstractVector)
@@ -196,10 +202,10 @@ function _point_iterator(list::AbstractVector)
         # save a copy!
         return _point_iterator(list[1])
     else
-        points = Point3f[]
+        points = Point3d[]
         for elem in list
             for point in _point_iterator(elem)
-                push!(points, to_ndim(Point3f, point, 0))
+                push!(points, to_ndim(Point33d, point, 0))
             end
         end
         return points
@@ -213,26 +219,50 @@ function _point_iterator(plot::Plot)
     return _point_iterator(plot.plots)
 end
 
-function iterate_transformed(plot::Plot)
-    points = _point_iterator(plot)
-    t = Makie.transformation(plot)
-    model = Makie.model_transform(t)
-    trans_func = Makie.transform_func(t)
-    return Makie.iterate_transformed(points, model, to_value(get(plot, :space, :data)), trans_func)
+# function iterate_transformed(plot::Plot)
+#     points = _point_iterator(plot)
+#     t = Makie.transformation(plot)
+#     model = Makie.model_transform(t)
+#     trans_func = Makie.transform_func(t)
+#     return Makie.iterate_transformed(points, model, to_value(get(plot, :space, :data)), trans_func)
+# end
+
+
+function limits_from_transformed_points(points_iterator)
+    isempty(points_iterator) && return Rect3d()
+    first, rest = Iterators.peel(points_iterator)
+    bb = foldl(Makie._update_rect, rest, init = Rect3{Float64}(first, zero(first)))
+    return bb
+end
+
+# include bbox from scaled markers
+function limits_from_transformed_points(positions, scales, rotations, element_bbox)
+    isempty(positions) && return Rect3d()
+
+    first_scale = attr_broadcast_getindex(scales, 1)
+    first_rot = attr_broadcast_getindex(rotations, 1)
+    full_bbox = Ref(first_rot * (element_bbox * first_scale) + first(positions))
+    for (i, pos) in enumerate(positions)
+        scale, rot = attr_broadcast_getindex(scales, i), attr_broadcast_getindex(rotations, i)
+        transformed_bbox = rot * (element_bbox * scale) + pos
+        update_boundingbox!(full_bbox, transformed_bbox)
+    end
+
+    return full_bbox[]
 end
 
 function transformed_limits(scenelike, exclude=(p) -> false)
-    bb_ref = Base.RefValue(Rect3f())
+    bb_ref = Base.RefValue(Rect3d())
     Makie.foreach_plot(scenelike) do plot
         if !exclude(plot)
-            box = Makie.limits_from_transformed_points(iterate_transformed(plot))
+            box = limits_from_transformed_points(Makie.iterate_transformed(plot))
             Makie.update_boundingbox!(bb_ref, box)
         end
     end
     return bb_ref[]
 end
 
-function getlimits(la::GeoAxis, dim)
+function Makie.getlimits(la::GeoAxis, dim)
     # find all plots that don't have exclusion attributes set
     # for this dimension
     if !(dim in (1, 2))
@@ -250,7 +280,7 @@ function getlimits(la::GeoAxis, dim)
         return !to_value(get(plot, :visible, true))
     end
     # get all data limits, minus the excluded plots
-    boundingbox = transformed_limits(la.scene, exclude)
+    boundingbox = Makie.boundingbox(la.scene, exclude)
     # if there are no bboxes remaining, `nothing` signals that no limits could be determined
     Makie.isfinite_rect(boundingbox) || return nothing
 
@@ -292,7 +322,7 @@ Makie.timed_ticklabelspace_reset(ax::GeoAxis, reset_timer::Ref,
     prev_xticklabelspace::Ref, prev_yticklabelspace::Ref, threshold_sec::Real) = nothing
 
 function Makie.update_state_before_display!(ax::GeoAxis)
-    reset_limits!(ax)
+    Makie.reset_limits!(ax)
     return
 end
 
@@ -471,4 +501,55 @@ function Makie.limits!(ax::GeoAxis, xlims, ylims)
     Makie.xlims!(ax, xlims)
     Makie.ylims!(ax, ylims)
     return
+end
+
+function Makie.hidexdecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true,
+    grid = true,#= minorgrid = true, minorticks = true=#)
+    if label
+        ax.xticklabelsvisible[] = false
+    end
+    if ticklabels
+        ax.xticklabelsvisible[] = false
+    end
+    if ticks
+        ax.xticksvisible[] = false
+    end
+    if grid
+        ax.xgridvisible[] = false
+    end
+    #=if minorgrid
+        ax.xminorgridvisible[] = false
+    end
+    if minorticks
+        ax.xminorticksvisible[] = false
+    end=#
+    return
+end
+
+function Makie.hideydecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true,
+    grid = true,#= minorgrid = true, minorticks = true=#)
+    if label
+        ax.yticklabelsvisible[] = false
+    end
+    if ticklabels
+        ax.yticklabelsvisible[] = false
+    end
+    if ticks
+        ax.yticksvisible[] = false
+    end
+    if grid
+        ax.ygridvisible[] = false
+    end
+    #=if minorgrid
+        ax.yminorgridvisible[] = false
+    end
+    if minorticks
+        ax.yminorticksvisible[] = false
+    end=#
+    return
+end
+
+Makie.hidedecorations!(ax::GeoAxis; kw...) = begin
+    hidexdecorations!(ax; kw...)
+    hideydecorations!(ax; kw...)
 end

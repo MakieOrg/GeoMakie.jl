@@ -1,3 +1,10 @@
+#=
+# Plot conversion functions
+
+This mainly deals with default conversion functions and plot types
+for GeoInterface.jl geometries.
+=#
+
 # # Helper functions
 to_point2(a::Vector{<: T}) where T = Point2{T}(a[1], a[2])
 to_point2(a::AbstractVector{T}) where T <: Number = Point2{T}(a[1], a[2])

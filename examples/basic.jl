@@ -1,9 +1,10 @@
 # # Basic examples
-using GeoMakie, GLMakie
-GLMakie.activate!(px_per_unit = 4) # hide
+
+using GeoMakie, CairoMakie # you could use GLMakie too
 
 lons = -180:180
 lats = -90:90
+
 # Create some field of values across `lons` and `lats`
 # This grid can be of any density, but note that the
 # time it takes to plot scales with the grid size!
@@ -31,3 +32,10 @@ ax = GeoAxis(fig[1,1])
 scatter!(slons, slats; color = sfield)
 fig
 # Again, to save, run e.g. `save("scatter_example.png", fig; px_per_unit=2)`.
+#
+
+# ```@cardmeta
+# Title = "Basic examples"
+# Description = "Basic examples of GeoMakie"
+# Cover = fig
+# ```

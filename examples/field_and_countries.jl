@@ -4,7 +4,6 @@
 # BeautifulMakie.jl repository.  It has some really
 # good stuff - check it out!
 using Makie, CairoMakie, GeoMakie
-CairoMakie.activate!(px_per_unit = 4) # hide
 import Downloads
 using GeoMakie.GeoJSON
 using GeometryBasics
@@ -32,7 +31,7 @@ hm1 = surface!(ax, lons, lats, field; shading = NoShading)
 translate!(hm1, 0, 0, -10)
 
 hm2 = poly!(
-    ax, worldCountries;
+    ax, GeoMakie.to_multipoly(worldCountries.geometry);
     color= 1:n,
     colormap = Reverse(:plasma),
     strokecolor = :black,
@@ -42,3 +41,8 @@ hm2 = poly!(
 cb = Colorbar(fig[1,2]; colorrange = (1, n), colormap = Reverse(:plasma), label = "variable, color code", height = Relative(0.65))
 
 fig
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide
