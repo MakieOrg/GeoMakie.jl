@@ -102,6 +102,17 @@ to_multipoly(geom::AbstractVector) = to_multipoly.(GeoInterface.trait.(geom), ge
 to_multipoly(::GeoInterface.PolygonTrait, geom) = GeometryBasics.MultiPolygon([GeoInterface.convert(GeometryBasics, geom)])
 to_multipoly(::GeoInterface.MultiPolygonTrait, geom) = GeoInterface.convert(GeometryBasics, geom)
 
+function to_multipoly(::GeoInterface.GeometryCollectionTrait, geom)
+    geoms = collect(GeoInterface.getgeom(geom))
+    poly_and_multipoly_s = filter(x -> GeoInterface.trait(x) isa GeoInterface.PolygonTrait || GeoInterface.trait(x) isa GeoInterface.MultiPolygonTrait, geoms)
+    if isempty(poly_and_multipoly_s) # geometry is effectively empty
+        return GeometryBasics.MultiPolygon([GeometryBasics.Polygon(Point{2 + GeoInterface.hasz(geom) + GeoInterface.hasm(geom), Float64}[])])
+    else # effectively "unary union" the geometry collection
+        final_multipoly = reduce((x, y) -> GeometryOps.union(x, y; target = GeoInterface.MultiPolygonTrait()), poly_and_multipoly_s)
+        return to_multipoly(final_multipoly)
+    end
+end
+
 to_multilinestring(poly::GeometryBasics.LineString) = GeometryBasics.MultiLineString([poly])
 to_multilinestring(poly::Vector{GeometryBasics.Polygon}) = GeometryBasics.MultiLineString(poly)
 to_multilinestring(mp::GeometryBasics.MultiLineString) = mp
