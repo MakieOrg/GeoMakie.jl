@@ -17,7 +17,7 @@ using GeoMakie, GLMakie
 ```
 =#
 using GeoMakie, CairoMakie # hide
-Makie.set_theme(Attributes(; MeshImage = (; npoints = 300,))) # hide
+Makie.set_theme!(Attributes(; MeshImage = (; npoints = 300,))) # hide
 # ## Affine transform (no nonlinearity)
 fig = Figure()
 ax1 = Axis(fig[1, 1])

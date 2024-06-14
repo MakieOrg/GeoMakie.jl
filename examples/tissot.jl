@@ -41,6 +41,6 @@ f
 #=
 ```@cardmeta
 Description = "Visualizing distortions caused by projections"
-Cover = fig
+Cover = f
 ```
 =#

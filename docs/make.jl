@@ -62,7 +62,6 @@ Documenter.makedocs(;
         deploy_url = "https://geo.makie.org",
         devbranch = "master",
         devurl = "dev",
-        build_vitepress = false,
     ),
     pages=[
         "Introduction" => "introduction.md",
