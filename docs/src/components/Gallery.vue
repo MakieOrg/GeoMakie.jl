@@ -31,7 +31,7 @@ defineProps<{
 }
 
 .gallery-image :deep(img) {
-    height: 225px;
+    height: 260px;
     width: 300px;
     transform: scale(1);
     transition: transform 0.4s ease;

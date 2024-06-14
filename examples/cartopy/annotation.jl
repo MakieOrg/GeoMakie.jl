@@ -32,3 +32,8 @@ translate!(annotation_text, 0, 0, 110)
 translate!(annotation_box, 0, 0, 109)
 fig
 
+#=
+```@cardmeta
+Description = "An annotated plot with license info."
+```
+=#

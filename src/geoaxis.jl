@@ -791,8 +791,8 @@ function compute_protrusions(title, titlesize, titlegap, titlevisible,
     bottom = xaxisprotrusion
     top = xaxisprotrusion
 
-    titleheight = Makie.boundingbox(titlet).widths[2] + titlegap
-    subtitleheight = Makie.boundingbox(subtitlet).widths[2] + subtitlegap
+    titleheight = Makie.boundingbox(titlet, :data).widths[2] + titlegap
+    subtitleheight = Makie.boundingbox(subtitlet, :data).widths[2] + subtitlegap
 
     titlespace = if !titlevisible || Makie.iswhitespace(title)
         0.0f0

@@ -43,3 +43,9 @@ limits!(ga, (-180, 180), (-90, 90))
 ga.title = "The surface of Vesta"
 fig
 
+#=
+```@cardmeta
+Description = "A plot of Vesta's surface, on a nonstandard ellipsoid."
+Cover = fig
+```
+=#

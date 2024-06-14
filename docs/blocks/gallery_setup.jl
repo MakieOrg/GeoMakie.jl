@@ -10,6 +10,16 @@ end
 
 Card(; path = "", caption = "", desc = "", cover_ext = ".png") = Card(path, joinpath(splitdir(path)[1], "covers", path * cover_ext), caption, desc)
 
+function Card(name::String)
+    element = Main.GALLERY_DICT[name]
+    Card(
+        #=href   =# element[:Path], # this is must have!!!
+        #=src    =# get(element, :Cover, "data:image/svg+xml;charset=utf-8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\"/>"),
+        #=caption=# get(element, :Title, ""),
+        #=desc   =# get(element, :Description, ""),
+    )
+end
+
 function Base.show(io::IO, ::MIME"application/json", card::Card)
     print(io,
     """
@@ -36,13 +46,13 @@ function mdify(cards::Vector{Card}; name = "demos", )
     card_json = String(take!(iob))
     return Markdown.MD(
         Markdown.Paragraph(
-            """
+            ["""
             <script setup lang="ts">
             import Gallery from "./components/Gallery.vue";
             const $name = $card_json
             </script>
             <Gallery :images="$name" />
-            """
+            """]
         )
     )
 end

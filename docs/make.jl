@@ -1,8 +1,9 @@
 using Documenter, DocumenterVitepress, Literate
 using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
 
-include("gallery_setup.jl")
-include("example_meta_block.jl")
+includet("blocks/gallery_setup.jl")
+includet("blocks/cardmeta.jl")
+includet("blocks/overview.jl")
 # Set some global settings
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)
@@ -14,34 +15,35 @@ GeoMakie.earth()
 
 using Literate
 
-examples = [
-    "basic.jl",
-    "new.jl",
-    "axis_config.jl",
-    "italy.jl",
-    "histogram.jl",
-    "contours.jl",
-    "world_population.jl",
-    "graph_on_usa.jl",
-    "orthographic.jl",
-    "geostationary_image.jl",
-    "multiple_crs.jl",
-    "rasters.jl",
-    "is_it_a_plane.jl",
-    joinpath("cartopy", "annotation.jl"),
-    joinpath("cartopy", "katrina.jl"),
-    joinpath("cartopy", "arrows.jl"),
-    joinpath("cartopy", "vesta.jl"),
-    joinpath("cartopy", "streamplot.jl"),
-    joinpath("gmt", "antioquia.jl"),
-    "german_lakes.jl",
-    "field_and_countries.jl",
-    "meshimage.jl",
-    "projections.jl",
-    "tissot.jl",
-    "rotating_earth.jl",
+examples = String[
+    # "basic.jl",
+    # "new.jl",
+    # "axis_config.jl",
+    # "italy.jl",
+    # "histogram.jl",
+    # "contours.jl",
+    # "world_population.jl",
+    # "graph_on_usa.jl",
+    # "orthographic.jl",
+    # "geostationary_image.jl",
+    # "multiple_crs.jl",
+    # "rasters.jl",
+    # "is_it_a_plane.jl",
+    # joinpath("cartopy", "annotation.jl"),
+    # joinpath("cartopy", "katrina.jl"),
+    # joinpath("cartopy", "arrows.jl"),
+    # joinpath("cartopy", "vesta.jl"),
+    # joinpath("cartopy", "streamplot.jl"),
+    # joinpath("gmt", "antioquia.jl"),
+    # "german_lakes.jl",
+    # "field_and_countries.jl",
+    # "meshimage.jl",
+    # "projections.jl",
+    # "tissot.jl",
+    # "rotating_earth.jl",
 ]
 example_dir = joinpath(dirname(@__DIR__), "examples")
+mkpath(example_dir)
 for filename in examples
     file = joinpath(example_dir, filename)
     endswith(file, ".jl") || continue
@@ -56,13 +58,13 @@ Documenter.makedocs(;
         deploy_url = "https://geo.makie.org",
         devbranch = "master",
         devurl = "dev",
-        # build_vitepress = false,
+        build_vitepress = false,
     ),
     pages=[
         "Introduction" => "introduction.md",
         "Data" => "data.md",
         # "Examples" => "examples.md",
-        "Examples" => joinpath.(("examples",), replace.(examples, (".jl" => ".md",))),
+        # "Examples" => joinpath.(("examples",), replace.(examples, (".jl" => ".md",))),
         "Developer documentation" => [
             "Nonlinear transforms" => "nonlinear_transforms.md",
             "Architecture" => "architecture.md",
@@ -74,6 +76,7 @@ Documenter.makedocs(;
     authors="Anshul Singhvi and the Makie.jl contributors",
     warnonly = true,
     draft = false,
+    expandfirst = joinpath.(("examples",),first.(splitext.(examples)) .* ".md"),
 )
 
 
