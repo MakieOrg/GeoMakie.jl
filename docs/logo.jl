@@ -1,4 +1,4 @@
-using GLMakie, GeoMakie, Makie
+using CairoMakie, GeoMakie, Makie
 using Makie.Colors
 
 function infer_alphacolor(rgb1, rgb2)
@@ -33,10 +33,11 @@ f, a, p = meshimage(
     -180..180,
     -90..90,
     GeoMakie.earth();
-    axis = (; type = GeoAxis, dest = "+proj=igh")
+    npoints = 360,
+    axis = (; type = GeoAxis, dest = "+proj=igh"),
 )
 hidedecorations!(a; grid = false)
-ip = meshimage!(a, -180..180, -90..90, Makie.logo())
+ip = meshimage!(a, -180..180, -90..90, Makie.logo(); npoints = 1000)
 screen = display(f; px_per_unit=2)
 img =  alpha_colorbuffer(screen)
 save(joinpath(@__DIR__, "src", "assets", "logo.png"), img)
