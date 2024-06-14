@@ -1,4 +1,4 @@
-.heading {
+.gallery-image .heading {
     text-align: center;
     font-size: 2em;
     letter-spacing: 1px;
@@ -31,7 +31,7 @@
     display: inline-block;
     color: white;
     position: relative;
-    background-color: transparent;
+    background-color: white;
     border: 2px solid var(--vp-c-bg-alt);
 }
 

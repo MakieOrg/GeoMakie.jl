@@ -107,7 +107,7 @@ function Documenter.Selectors.runner(::Type{CardMetaBlocks}, node, page, doc)
     end
 
     if haskey(meta, :Cover)
-        set_cover_to_png!(meta)
+        set_cover_to_png!(meta, page, doc)
         # insert the cover image into the page
         if !isnothing(idx)
             MarkdownAST.insert_after!(elements[idx], MarkdownAST.@ast Documenter.RawNode(:html, "<img src=\"$(meta[:Cover])\"/>"))
@@ -122,15 +122,22 @@ function Documenter.Selectors.runner(::Type{CardMetaBlocks}, node, page, doc)
 
 end
 
-function set_cover_to_png!(meta)
+function set_cover_to_png!(meta, page, doc)
     if meta[:Cover] isa Makie.FigureLike
         # convert figure to image
         original_cover_image = Makie.colorbuffer(meta[:Cover])
         ratio = 600 / size(original_cover_image, 1) # get 300px height
         resized_cover_image = ImageTransformations.imresize(original_cover_image; ratio)
+        
+        # Below is the "inline pipeline"
         iob = IOBuffer()
         ImageIO.save(FileIO.Stream{FileIO.format"PNG"}(iob), resized_cover_image)
-        base64str = Base64.base64encode(String(take!(iob)))
-        meta[:Cover] = "data:image/png;base64, " * base64str
+        # We could include this inline, but that seems to be causing issues.
+        # meta[:Cover] = "data:image/png;base64, " * Base64.base64encode(String(take!(iob)))
+        # Instead, we will save to a file and include that.
+        bytes = take!(iob)
+        filename = string(hash(bytes), base = 62) * ".png"
+        write(joinpath(page.workdir, filename), bytes)
+        meta[:Cover] = "/" * joinpath(relpath(page.workdir, doc.user.build), filename)
     end
 end

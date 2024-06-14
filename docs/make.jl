@@ -16,31 +16,31 @@ GeoMakie.earth()
 using Literate
 
 examples = String[
-    # "basic.jl",
-    # "new.jl",
-    # "axis_config.jl",
-    # "italy.jl",
-    # "histogram.jl",
-    # "contours.jl",
-    # "world_population.jl",
-    # "graph_on_usa.jl",
-    # "orthographic.jl",
-    # "geostationary_image.jl",
-    # "multiple_crs.jl",
-    # "rasters.jl",
-    # "is_it_a_plane.jl",
-    # joinpath("cartopy", "annotation.jl"),
-    # joinpath("cartopy", "katrina.jl"),
-    # joinpath("cartopy", "arrows.jl"),
+    "basic.jl",
+    "new.jl",
+    "axis_config.jl",
+    "italy.jl",
+    "histogram.jl",
+    "contours.jl",
+    "world_population.jl",
+    "graph_on_usa.jl",
+    "orthographic.jl",
+    "geostationary_image.jl",
+    "multiple_crs.jl",
+    "rasters.jl",
+    "is_it_a_plane.jl",
+    joinpath("cartopy", "annotation.jl"),
+    joinpath("cartopy", "katrina.jl"),
+    joinpath("cartopy", "arrows.jl"),
     # joinpath("cartopy", "vesta.jl"),
-    # joinpath("cartopy", "streamplot.jl"),
-    # joinpath("gmt", "antioquia.jl"),
-    # "german_lakes.jl",
-    # "field_and_countries.jl",
-    # "meshimage.jl",
-    # "projections.jl",
-    # "tissot.jl",
-    # "rotating_earth.jl",
+    joinpath("cartopy", "streamplot.jl"),
+    joinpath("gmt", "antioquia.jl"),
+    "german_lakes.jl",
+    "field_and_countries.jl",
+    "meshimage.jl",
+    "projections.jl",
+    "tissot.jl",
+    "rotating_earth.jl",
 ]
 example_dir = joinpath(dirname(@__DIR__), "examples")
 mkpath(example_dir)
@@ -78,7 +78,7 @@ Documenter.makedocs(;
     draft = false,
     expandfirst = joinpath.(("examples",),first.(splitext.(examples)) .* ".md"),
 )
-
+empty!(GALLERY_DICT)
 
 deploydocs(; 
     repo="github.com/MakieOrg/GeoMakie.jl", 

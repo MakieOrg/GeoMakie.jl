@@ -41,9 +41,11 @@ function Documenter.Selectors.runner(::Type{OverviewGalleryBlocks}, node, page, 
         desc    = get(element, :Description, "")
         # now, create the necessary HTML for this:
         push!(entries, """
+    <div class="gallery-image">
+
             <div class="img-box">
                 <a href="$(escapehtml(href))">
-                    <img src="$(src)" height="150px" alt="$(escapehtml(href))">
+                    <img src="$(src)" height="150px" alt="$(escapehtml(href))"/>
                     <div class="transparent-box1">
                         <div class="caption">
                             <h2>$(escapehtml(caption))</h2>
@@ -56,16 +58,16 @@ function Documenter.Selectors.runner(::Type{OverviewGalleryBlocks}, node, page, 
                     </div>
                 </a>
             </div>
+        </div>
         """)
     end
 
     main_str = """
-    <div class="gallery-image">
         $(join(entries, "\n"))
-        <style scoped>
-            $(read(joinpath(@__DIR__, "gallery_style.css"), String))
-        </style>
-    </div>
     """
     node.element = Documenter.RawNode(:html, main_str)
+
+    if !isempty(not_found)
+        @warn "The following pages were not found in the gallery:\n$(join(not_found, "\n"))"
+    end
 end
