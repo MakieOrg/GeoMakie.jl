@@ -1,9 +1,9 @@
 using Documenter, DocumenterVitepress, Literate
 using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
 
-includet("blocks/gallery_setup.jl")
-includet("blocks/cardmeta.jl")
-includet("blocks/overview.jl")
+include("blocks/gallery_setup.jl")
+include("blocks/cardmeta.jl")
+include("blocks/overview.jl")
 # Set some global settings
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)
@@ -50,6 +50,7 @@ for filename in examples
     Literate.markdown(file, joinpath(@__DIR__, "src", "examples", first(splitdir(filename))); documenter = true)
 end
 
+empty!(GALLERY_DICT)
 Documenter.makedocs(;
     modules=[GeoMakie],
     doctest=false,
