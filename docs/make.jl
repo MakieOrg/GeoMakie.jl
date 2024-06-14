@@ -1,6 +1,9 @@
 using Documenter, DocumenterVitepress, Literate
 using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
 
+# some strategic imports
+using FHist
+
 include("blocks/gallery_setup.jl")
 include("blocks/cardmeta.jl")
 include("blocks/overview.jl")
