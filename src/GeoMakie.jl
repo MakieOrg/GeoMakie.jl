@@ -5,7 +5,7 @@ module GeoMakie
 # at `__init__`, but that would also invalidate lots of Makie caches.
 # One way might be to define a const array in MakieCore which can be 
 # pushed to by different packages...
-# __precompile__(false)
+__precompile__(false)
 
 using Statistics, LinearAlgebra
 
