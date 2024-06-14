@@ -65,12 +65,12 @@ Documenter.makedocs(;
     ),
     pages=[
         "Introduction" => "introduction.md",
+        "Gallery" => "examples.md",
         "Data" => "data.md",
         "Developer documentation" => [
             "Nonlinear transforms" => "nonlinear_transforms.md",
             "Architecture" => "architecture.md",
             "Adding demos" => "adding_demos.md",
-            "Test example page" => "examples.md",
         ],
         "Examples" => joinpath.(("examples",), replace.(examples, (".jl" => ".md",))),
     ],
