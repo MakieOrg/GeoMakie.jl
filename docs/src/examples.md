@@ -10,25 +10,29 @@ This page is a gallery of various examples.
 
 ```@overviewgallery
 basic
+italy
+field_and_countries
+rotating_earth
+histogram
+contours
+rasters
+multiple_crs
 ```
 
 ## Advanced functionality
 
-```@eval
-# using Main.Gallery
-# mdify([
-#     Card(
-#         path = "tissot",
-#         desc = "Visualizing distortion in projections",
-#         caption = "Tissot's indicatrices"
-#     ),
-#     Card(
-#         path = "world_population",
-#         desc = "A plot of world population",
-#         caption = "World Population"
-#     ),
-# ]; name = "advanced")
-nothing
+```@overviewgallery
+axis_config
+italy
+world_population
+graph_on_usa
+orthographic
+geostationary_image
+is_it_a_plane
+german_lakes
+meshimage
+projections
+tissot
 ```
 
 ## Examples from Cartopy

@@ -41,29 +41,31 @@ function Documenter.Selectors.runner(::Type{OverviewGalleryBlocks}, node, page, 
         desc    = get(element, :Description, "")
         # now, create the necessary HTML for this:
         push!(entries, """
-    <div class="gallery-image">
-
-            <div class="img-box">
-                <a href="$(escapehtml(href))">
-                    <img src="$(src)" height="150px" alt="$(escapehtml(href))"/>
-                    <div class="transparent-box1">
-                        <div class="caption">
-                            <h2>$(escapehtml(caption))</h2>
+        <div class="grid-item">
+            <div class="gallery-image">
+                <div class="img-box">
+                    <a href="$(escapehtml(href))">
+                        <img src="$(src)" height="150px" alt="$(escapehtml(href))"/>
+                        <div class="transparent-box1">
+                            <div class="caption">
+                                <h2>$(escapehtml(caption))</h2>
+                            </div>
                         </div>
-                    </div>
-                    <div class="transparent-box2">
-                        <div class="subcaption">
-                            <p class="opacity-low">$(escapehtml(desc))</p>
+                        <div class="transparent-box2">
+                            <div class="subcaption">
+                                <p class="opacity-low">$(escapehtml(desc))</p>
+                            </div>
                         </div>
-                    </div>
-                </a>
+                    </a>
+                </div>
             </div>
-        </div>
-        """)
+        </div>""")
     end
 
     main_str = """
-        $(join(entries, "\n"))
+    <div class="grid-container">
+    $(join(entries, "\n"))
+    </div>
     """
     node.element = Documenter.RawNode(:html, main_str)
 

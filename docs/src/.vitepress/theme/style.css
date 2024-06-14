@@ -176,6 +176,13 @@ mjx-container > svg {
 * Gallery styling for example gallery
 */
 
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+
 .gallery-image .heading {
   text-align: center;
   font-size: 2em;
