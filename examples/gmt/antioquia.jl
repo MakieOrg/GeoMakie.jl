@@ -34,8 +34,10 @@ a.dest = "+proj=ortho +lon_0=$cx +lat_0=$cy"
 f
 # That looks a lot more like what the GMT example does!
 
-#
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", f) #hide
-nothing #hide
+#=
+```@cardmeta
+Title = "Antioquia"
+Description = "A map of Antioquia"
+Cover = f
+```
+=#

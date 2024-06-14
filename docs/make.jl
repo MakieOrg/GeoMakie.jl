@@ -1,8 +1,12 @@
 using Documenter, DocumenterVitepress, Literate
 using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
 
-include("gallery_setup.jl")
-include("example_meta_block.jl")
+# some strategic imports
+using FHist
+
+include("blocks/gallery_setup.jl")
+include("blocks/cardmeta.jl")
+include("blocks/overview.jl")
 # Set some global settings
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)
@@ -14,7 +18,7 @@ GeoMakie.earth()
 
 using Literate
 
-examples = [
+examples = String[
     "basic.jl",
     "new.jl",
     "axis_config.jl",
@@ -31,7 +35,7 @@ examples = [
     joinpath("cartopy", "annotation.jl"),
     joinpath("cartopy", "katrina.jl"),
     joinpath("cartopy", "arrows.jl"),
-    joinpath("cartopy", "vesta.jl"),
+    # joinpath("cartopy", "vesta.jl"),
     joinpath("cartopy", "streamplot.jl"),
     joinpath("gmt", "antioquia.jl"),
     "german_lakes.jl",
@@ -42,12 +46,14 @@ examples = [
     "rotating_earth.jl",
 ]
 example_dir = joinpath(dirname(@__DIR__), "examples")
+mkpath(example_dir)
 for filename in examples
     file = joinpath(example_dir, filename)
     endswith(file, ".jl") || continue
     Literate.markdown(file, joinpath(@__DIR__, "src", "examples", first(splitdir(filename))); documenter = true)
 end
 
+empty!(GALLERY_DICT)
 Documenter.makedocs(;
     modules=[GeoMakie],
     doctest=false,
@@ -56,26 +62,25 @@ Documenter.makedocs(;
         deploy_url = "https://geo.makie.org",
         devbranch = "master",
         devurl = "dev",
-        # build_vitepress = false,
     ),
     pages=[
         "Introduction" => "introduction.md",
         "Data" => "data.md",
-        # "Examples" => "examples.md",
-        "Examples" => joinpath.(("examples",), replace.(examples, (".jl" => ".md",))),
         "Developer documentation" => [
             "Nonlinear transforms" => "nonlinear_transforms.md",
             "Architecture" => "architecture.md",
             "Adding demos" => "adding_demos.md",
             "Test example page" => "examples.md",
         ],
-        ],
+        "Examples" => joinpath.(("examples",), replace.(examples, (".jl" => ".md",))),
+    ],
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
     warnonly = true,
     draft = false,
+    expandfirst = joinpath.(("examples",),first.(splitext.(examples)) .* ".md"),
 )
-
+empty!(GALLERY_DICT)
 
 deploydocs(; 
     repo="github.com/MakieOrg/GeoMakie.jl", 

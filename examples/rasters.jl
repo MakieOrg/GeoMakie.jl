@@ -35,7 +35,8 @@ fig
 sp.shading = NoShading
 fig
 # See also the Geostationary image and Multiple CRS examples, where we explore how to plot data in different projections.
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
-nothing #hide
+#=
+```@cardmeta
+Description = "Plotting raster (gridded) data on GeoAxis"
+```
+=#

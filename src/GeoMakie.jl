@@ -30,7 +30,7 @@ import GeoFormatTypes
 export GeoInterface
 
 # bring in missing Makie methods required for block definition
-if hasproperty(Makie, :make_block_docstring )
+if :make_block_docstring in names(Makie; all = true)
     @eval using Makie: make_block_docstring
 end
 # fix conflicts

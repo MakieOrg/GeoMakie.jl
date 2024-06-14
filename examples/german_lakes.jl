@@ -11,8 +11,10 @@ ga = GeoAxis(fig[1, 1]; dest = "+proj=merc", limits=((6, 15), (47, 55)))
 poly!(ga, GeoMakie.to_multipoly(geoger.geometry); strokewidth = 0.7, color=:gold, rasterize = 5)
 poly!(ga, GeoMakie.to_multipoly(lakes.geometry); strokewidth = 0.7, color=:blue, rasterize = 5,  xautolimits=false, yautolimits=false)
 fig
-#
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
-nothing #hide
+#=
+```@cardmeta
+Title = "German lakes"
+Description = "A map of lakes and states in Germany"
+Cover = fig
+```
+=#

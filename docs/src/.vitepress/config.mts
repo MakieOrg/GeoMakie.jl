@@ -2,7 +2,6 @@ import { defineConfig } from 'vitepress'
 import { tabsMarkdownPlugin } from 'vitepress-plugin-tabs'
 import mathjax3 from "markdown-it-mathjax3";
 import footnote from "markdown-it-footnote";
-import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -14,14 +13,6 @@ export default defineConfig({
   outDir: 'REPLACE_ME_DOCUMENTER_VITEPRESS', // This is required for MarkdownVitepress to work correctly...
   head: [['link', { rel: 'icon', href: 'REPLACE_ME_DOCUMENTER_VITEPRESS_FAVICON' }]],
   ignoreDeadLinks: true,
-
-  plugins: [
-    viteStaticCopy({
-      targets: [
-        { src: "examples/covers/**", dest: "examples/covers" }
-      ]
-    })
-  ],
 
   markdown: {
     math: true,

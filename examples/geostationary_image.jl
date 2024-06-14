@@ -71,8 +71,9 @@ surface!(
 )
 ```
 =#
-#
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
-nothing #hide
+#=
+```@cardmeta
+Description = "Plotting an image directly from the satellite"
+Cover = fig
+```
+=#

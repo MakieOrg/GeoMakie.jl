@@ -7,6 +7,20 @@ function Makie.convert_arguments(trait::PointBased, mls::AbstractArray{<: Geomet
     return Makie.convert_arguments(trait, _mls2ls.(mls)) # _mls2ls in geojson.jl
 end
 
+Makie.convert_arguments(trait::PointBased, l::GeometryBasics.Line) = (l.points,)
+# Special convert for linesegments because it has special syntax
+function Makie.convert_arguments(::Type{<: LineSegments}, ls::AbstractArray{<: GeometryBasics.Line})
+    return Makie.convert_arguments(LineSegments, getproperty.(getproperty.(ls, :points), :data))
+end
+# Regular convert for all pointbased functions.  Only problem is that it probably
+# will fail for polygons.  Do we care?
+function Makie.convert_arguments(trait::PointBased, ls::AbstractArray{<: GeometryBasics.Line{N, T}}) where {N, T}
+    ret = foldl(ls; init = [Point{N, T}(NaN)]) do acc, l
+        append!(acc, l.points)
+        push!(acc, Point{N, T}(NaN))
+    end
+    return (ret,)
+end
 
 #=
 function Makie.transform_bbox(scenelike, lims::Rect{N, T}) where {N, T}

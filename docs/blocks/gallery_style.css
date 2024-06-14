@@ -1,34 +1,26 @@
-<script setup lang="ts">
-import { withBase } from 'vitepress'
-export interface Props {
-    href: string;
-    src: string;
-    caption: string;
-    desc: string;
+.gallery-image .heading {
+    text-align: center;
+    font-size: 2em;
+    letter-spacing: 1px;
+    padding: 40px;
+    color: black;
 }
 
-defineProps<Props>();
-</script>
+.gallery-image {
+    padding: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
 
-<template>
-    <div class="img-box">
-        <a :href="href">
-            <img :src="withBase(src)" height="150px" alt="">
-            <div class="transparent-box1">
-                <div class="caption">
-                    <h2>{{ caption }}</h2>
-                </div>
-            </div>
-            <div class="transparent-box2">
-                <div class="subcaption">
-                    <p class="opacity-low">{{ desc }}</p>
-                </div>
-            </div>
-        </a>
-    </div>
-</template>
+.gallery-image :deep(img) {
+    height: 260px;
+    width: 300px;
+    transform: scale(1);
+    transition: transform 0.4s ease;
+}
 
-<style scoped>
+
 .img-box {
     box-sizing: content-box;
     border-radius: 14px;
@@ -39,7 +31,7 @@ defineProps<Props>();
     display: inline-block;
     color: white;
     position: relative;
-    background-color: transparent;
+    background-color: white;
     border: 2px solid var(--vp-c-bg-alt);
 }
 
@@ -132,4 +124,3 @@ defineProps<Props>();
 .opacity-low {
     opacity: 0.85;
 }
-</style>

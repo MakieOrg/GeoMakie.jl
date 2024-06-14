@@ -32,7 +32,9 @@ fig
 # And it's back!  Note that `translate!` sets the _absolute_ translation.
 # If you want to translate relatively, use `translate!(Accum, ...)` instead.
 #
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
-nothing #hide
+#=
+```@cardmeta
+Description = "Plotting on the orthographic (irregular) projection"
+Cover = fig
+```
+=#

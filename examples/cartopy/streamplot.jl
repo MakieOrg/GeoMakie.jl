@@ -46,3 +46,9 @@ streamplot(
 )
 # and it looks pretty much the same!
 
+#=
+```@cardmeta
+Description = "A streamplot on gridded data."
+Cover = Makie.current_figure()
+```
+=#

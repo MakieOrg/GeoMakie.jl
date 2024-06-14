@@ -70,3 +70,8 @@ leg = axislegend(
 ga.title = "Hurricane Katrina"
 fig
 
+#=
+```@cardmeta
+Description = "The effect of Hurricane Katrina, via GeometryOps.jl."
+```
+=#
