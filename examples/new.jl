@@ -16,8 +16,9 @@ fig
 # Beware that some plot types will create points which cannot support transformations, though!
 
 # If you encounter this kind of issue, please file a GitHub issue at the GeoMakie.jl repo!
-#
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
-nothing #hide
+#=
+```@cardmeta
+Description = "The new GeoMakie API"
+Cover = fig
+```
+=#

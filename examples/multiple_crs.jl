@@ -28,8 +28,9 @@ fig
 heatmap!(ga, projected_ras)
 fig
 # Success!  You can clearly see how the raster was adapted here.
-#
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
-nothing #hide
+
+#=
+```@cardmeta
+Description = "Plotting multiple CRS in one axis"
+```
+=#

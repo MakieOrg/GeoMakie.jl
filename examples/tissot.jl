@@ -38,7 +38,9 @@ circle_polys = [GO.GI.Polygon([geodesic_circle(Point2d(lon, lat), 500_000, 50)])
 poly!(a, circle_polys; color = Makie.wong_colors(0.7)[2])
 f
 #
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", f) #hide
-nothing #hide
+#=
+```@cardmeta
+Description = "Visualizing distortions caused by projections"
+Cover = fig
+```
+=#

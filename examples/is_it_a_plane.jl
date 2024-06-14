@@ -1,4 +1,4 @@
-# # Geodesic paths - animation
+# # Geodesic paths
 
 # Let's take the great circle flight path from New York (JFK) 
 # to Singapore (SIN) airport. 

@@ -17,8 +17,10 @@ fig
 ax2 = GeoAxis(fig[3, 1]; xticks = -180:2:180)
 fig
 
-#
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
-nothing #hide
+#=
+```@cardmeta
+Title = "Axis configuration"
+Description = "Messing around with the GeoAxis"
+Cover = fig
+```
+=#

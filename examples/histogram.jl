@@ -23,3 +23,10 @@ plot(h)
 plot(h; axis = (; type = GeoAxis))
 # The projection can also be arbitrary!
 plot(h; axis = (; type = GeoAxis, dest = "+proj=tissot +lat_1=60 +lat_2=65"))
+#=
+```@cardmeta
+Title = "Histogram"
+Description = "Plotting histograms of points on a GeoAxis"
+Cover = plot(h; axis = (; type = GeoAxis, dest = "+proj=tissot +lat_1=60 +lat_2=65"))
+```
+=#

@@ -35,8 +35,11 @@ fig
 # In order to control the levels, we need only set the levels for the first filled contour plot:
 cfp.levels[] = -2:5
 fig
-#
-# make cover image #jl
-mkpath("covers") #hide
-save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
-nothing #hide
+
+#=
+```@cardmeta
+Title = "Contours"
+Description = "Contour plots with fills and labels"
+Cover = fig
+```
+=#
