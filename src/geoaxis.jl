@@ -540,9 +540,9 @@ function Makie.initialize_block!(axis::GeoAxis)
         trans = create_transform(tp, sp)
         transform_obs[] = trans
         transform_inv_obs[] = Makie.inverse_transform(trans)
-        # and next for the ticks - this assumes an input CRS in 
+        # and next for the ticks - this assumes an input CRS in
         # PROJ-string format, which is not necessarily the case, but suffices for now.
-        # What this should do, is check using Proj whether the input CRS is equivalent 
+        # What this should do, is check using Proj whether the input CRS is equivalent
         # to EPSG 4326, which is actually quite doable - especially using a cache of some kind.
         # What this is actually doing, is creating a transformation that takes the input CRS
         # and transforms it to the WGS84 CRS, which is how we display the ticks.
@@ -565,9 +565,9 @@ function Makie.initialize_block!(axis::GeoAxis)
     finallimits = map(identity, scene, axis.finallimits; ignore_equal_values=true)
     vp_unchanged = map(identity, scene, scene.viewport; ignore_equal_values=true)
     # This is kind of the main redrawing loop for the axis.  This should really be
-    # factored out into a sync and async function, so that zooming is fluid, but 
+    # factored out into a sync and async function, so that zooming is fluid, but
     # we can figure that out later.
-    # What this does is first calculate limits and ticks, then create spines and 
+    # What this does is first calculate limits and ticks, then create spines and
     # project them.  Those are stored in Observables which are used to produce
     # lineplots later on that form the grid.
     # TODO: implement a minor grid.
@@ -603,7 +603,7 @@ function Makie.initialize_block!(axis::GeoAxis)
         notify(spines_obs)
         return
     end
-    # These are the grid plots from earlier.  
+    # These are the grid plots from earlier.
     longridplot = lines!(scene, lonticks_line_obs; color=axis.xgridcolor, linewidth=axis.xgridwidth,
         visible=axis.xgridvisible, linestyle=axis.xgridstyle, transparency=true)
     translate!(longridplot, 0, 0, 100)
@@ -834,6 +834,16 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
     if Makie.is_open_or_any_parent(axis.scene)
         Makie.reset_limits!(axis)
     end
+    return plot
+end
+
+function Makie.MakieCore._create_plot!(F, attributes::Dict, ax::GeoAxis, args...)
+    source = pop!(attributes, :source, nothing)
+    dest = pop!(attributes, :dest, nothing)
+    plot = Plot{Makie.default_plot_func(F, args)}(args, attributes)
+    isnothing(source) || (plot.kw[:source] = source)
+    isnothing(dest) || (plot.kw[:dest] = dest)
+    Makie.plot!(ax, plot)
     return plot
 end
 
