@@ -1,12 +1,5 @@
 module GeoMakie
 
-# Because we override a MakieCore method here, we can't precompile.
-# However, what we can do is potentially eval the method into Makie 
-# at `__init__`, but that would also invalidate lots of Makie caches.
-# One way might be to define a const array in MakieCore which can be 
-# pushed to by different packages...
-__precompile__(false)
-
 using Statistics, LinearAlgebra
 
 using Reexport
@@ -33,9 +26,8 @@ import GeoInterfaceMakie # to activate GI geometry plotting
 export GeoInterface
 
 # bring in missing Makie methods required for block definition
-if :make_block_docstring in names(Makie; all = true)
-    @eval using Makie: make_block_docstring
-end
+using Makie: make_block_docstring
+
 # fix conflicts
 import Makie: rotate! # use LinearAlgebra.rotate! otherwise
 
@@ -74,16 +66,5 @@ export GeoAxis, automatic
 export datalims, datalims!
 @deprecate datalims Makie.autolimits
 @deprecate datalims! Makie.reset_limits!
-
-function __init__()
-    @eval Makie.MakieCore begin
-        # Since Makie explicitly sets its allow list, this is definitely piracy,
-        # but if we don't do this then passing `source` or `dest` almost universally
-        # errors.
-        function attribute_name_allowlist()
-            (:xautolimits, :yautolimits, :zautolimits, :label, :rasterize, :model, :transformation, :dest, :source, :specular, :matcap, :backlight, :shininess, :interpolate, :diffuse, :dim_conversions)
-        end
-    end
-end
 
 end # module
