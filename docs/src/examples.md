@@ -33,6 +33,7 @@ german_lakes
 meshimage
 projections
 tissot
+healpix
 ```
 
 ## Examples from Cartopy

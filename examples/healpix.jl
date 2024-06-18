@@ -34,3 +34,10 @@ meshimage!(ax, mini[1]..maxi[1], mini[2]..maxi[2], reverse(img; dims = 1); npoin
 lines!(ax, GeoMakie.coastlines(); color = :black, xautolimits = false, yautolimits = false)
 fig
 # Note how the meshimage looks a bit pixelated there - that is because of the mollweide projection!
+
+#=
+```@cardmeta
+Description = "Spherical pixelizations from Healpix.jl"
+Cover=fig
+```
+=#

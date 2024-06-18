@@ -31,6 +31,7 @@ examples = String[
     "geostationary_image.jl",
     "multiple_crs.jl",
     "rasters.jl",
+    "healpix.jl",
     "is_it_a_plane.jl",
     joinpath("cartopy", "annotation.jl"),
     joinpath("cartopy", "katrina.jl"),
