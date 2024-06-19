@@ -1,6 +1,8 @@
 # Adding demos
 
-To add a demo / example, you can add a Julia file to the folder in `examples` which best fits its purpose.  You must also add the name of the file to the overview gallery blocks in `examples.md`.
+To add a demo / example, you can add a Julia file to the folder in `examples` which best fits its purpose.  You must also add the name of the file to the overview gallery blocks in `docs/src/examples.md`, and the whitelist array in `docs/src/make.jl`.  
+
+[This PR](https://github.com/MakieOrg/GeoMakie.jl/pull/246) is an example of how to do this.
 
 ## File structure
 
