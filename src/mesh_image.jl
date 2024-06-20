@@ -22,19 +22,20 @@ the provided image.  Its conversion trait is `Image` (TODO: change this to Discr
 
 For now, it only accepts RGB images.  This could be changed in the future.
 
-## Attributes
-$(Makie.ATTRIBUTES)
 """
-@recipe(MeshImage) do scene
-    Attributes(
-        npoints = 100,
-        space = :data,
-    )
+@recipe MeshImage (x, y, img) begin
+    """
+    The number of points the mesh should have per side.  
+    Can be an Integer or a 2-tuple of integers representing number of points per side.
+    """
+    npoints = 100
+    MakieCore.mixin_generic_plot_attributes()...
+    MakieCore.mixin_colormap_attributes()...
 end
 
 # this inherits all conversions for `Image`,
 # if no specialized conversion for `MeshImage` is found.
-Makie.conversion_trait(::Type{<: MeshImage}) = ImageLike()
+Makie.conversion_trait(::Type{<: MeshImage}) = Makie.ImageLike()
 # There really is no difference between this and Image, 
 # except the implementation under the hood.
 
@@ -58,9 +59,9 @@ function Makie.plot!(plot::MeshImage)
         if npoints != old_npoints[]
             # We need a new StructArray to hold all the points.
             # TODO: resize the old structarray instead!
-            points_observable.val = Vector{Point2f}(undef, npoints^2)
+            points_observable.val = Vector{Point2f}(undef, first(npoints) * last(npoints))
             # This constructs an efficient triangulation of a rectangle (all images are rectangles).
-            rect = GeometryBasics.Tesselation(Rect2f(0, 0, 1, 1), (npoints, npoints))
+            rect = GeometryBasics.Tesselation(Rect2f(0, 0, 1, 1), (first(npoints), last(npoints)))
             # This decomposes that Tesselation to actual triangles, with integer index values.
             faces_observable.val = GeometryBasics.decompose(Makie.GLTriangleFace, rect)
             # This holds the UVs for the mesh.  These are reversed, so that the image is plotted correctly.
@@ -68,8 +69,9 @@ function Makie.plot!(plot::MeshImage)
         end
 
         # These are the ranges for the points.
-        xs = LinRange(extrema(x_in)..., npoints)
-        ys = LinRange(extrema(y_in)..., npoints)
+        # `first` and `last` are used to get the number of points per side, if that's provided as a tuple.
+        xs = LinRange(extrema(x_in)..., first(npoints))
+        ys = LinRange(extrema(y_in)..., last(npoints))
         poval = points_observable[]
         # The array is in a grid, so we have to update them on a grid as well.
         for (linear_ind, cartesian_ind) in enumerate(CartesianIndices((npoints, npoints)))
@@ -100,6 +102,7 @@ function Makie.plot!(plot::MeshImage)
         plot, 
         final_mesh; 
         color = plot[3], 
+        MakieCore.colormap_attributes(plot)...,
         shading = NoShading, 
         transformation = Transformation() # since the points are pre transformed, we don't need to transform them again
     )
