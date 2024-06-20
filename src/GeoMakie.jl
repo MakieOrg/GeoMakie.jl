@@ -14,6 +14,7 @@ using Reexport
 using GeometryBasics, Colors, ImageIO
 
 using Makie
+using Makie.MakieCore
 
 import Makie: convert_arguments, convert_attribute, to_value, automatic
 using Makie, Makie.FileIO, Makie.GridLayoutBase, Makie.DocStringExtensions
