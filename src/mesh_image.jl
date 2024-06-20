@@ -7,8 +7,8 @@ This file contains the implementation of the `MeshImage` recipe.
 using Makie: GeometryBasics
 
 """
-    meshimage([xs, ys,] zs)
-    meshimage!(ax, [xs, ys,] zs)
+    meshimage([xs, ys,] img)
+    meshimage!(ax, [xs, ys,] img)
 
 Plots an image on a mesh.
 
@@ -18,9 +18,10 @@ but a smaller mesh can still represent the inherent
 nonlinearity of the space.
 
 This basically plots a mesh with uv coordinates, and textures it by
-the provided image.  Its conversion trait is `Image` (TODO: change this to DiscreteSurfaceLike).
+the provided image.  Its conversion trait is `ImageLike`.
 
-For now, it only accepts RGB images.  This could be changed in the future.
+!!! tip
+    You can control the density of the mesh by the `npoints` attribute.
 
 """
 @recipe MeshImage (x, y, img) begin
