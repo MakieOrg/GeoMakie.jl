@@ -59,7 +59,7 @@ function Makie.plot!(plot::MeshImage)
     old_npoints = Ref(0)
 
     # Handle the transformation
-    onany(plot, plot[1], plot[2], plot.transformation.transform_func, plot.npoints, plot.space, plot.z_level; update=true) do x_in, y_in, tfunc, npoints, space
+    onany(plot, plot.converted[1], plot.converted[2], plot.transformation.transform_func, plot.npoints, plot.space, plot.z_level; update=true) do x_in, y_in, tfunc, npoints, space, z_level
         # If `npoints` changed, then re-construct the mesh.
         if npoints != old_npoints[]
             # We need a new StructArray to hold all the points.
@@ -105,7 +105,7 @@ function Makie.plot!(plot::MeshImage)
     mesh!(
         plot, 
         final_mesh; 
-        color = plot[3], # pass on the color directly
+        color = plot.converted[3], # pass on the color directly
         MakieCore.colormap_attributes(plot)..., # pass on all colormap attributes
         shading = NoShading, #
         transformation = Transformation(
