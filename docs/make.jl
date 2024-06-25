@@ -4,9 +4,7 @@ using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
 # some strategic imports to avoid world age issues
 using FHist
 
-include("blocks/gallery_setup.jl")
-include("blocks/cardmeta.jl")
-include("blocks/overview.jl")
+include(joinpath(@__DIR__, "GeoMakieDocumenterBlocks", "src", "GeoMakieDocumenterBlocks.jl"))
 # Set some global settings
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)
