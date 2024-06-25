@@ -10,7 +10,14 @@ import .GeoMakieDocumenterBlocks: GALLERY_DICT
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)
 # Rasters should download into the artifacts folder (so they can be cached :D)
-get!(ENV, "RASTERDATASOURCES_PATH", joinpath(first(Base.DEPOT_PATH), "artifacts"))
+raster_data_sources_path = joinpath(first(Base.DEPOT_PATH), "artifacts")
+if haskey(ENV, "CI")
+    # override the given setting so we don't run into path not created problems.
+    ENV["RASTERDATASOURCES_PATH"] = raster_data_sources_path
+else
+    # on local machine, so respect the given setting if it exists.
+    get!(ENV, "RASTERDATASOURCES_PATH", raster_data_sources_path)
+end
 # invoke some geomakie things to be sure it works
 GeoMakie.coastlines()
 GeoMakie.earth()
