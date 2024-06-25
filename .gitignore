@@ -22,3 +22,5 @@ docs/build/
 node_modules/
 docs/package-lock.json
 test_images/
+
+docs/GeoMakieDocumenterBlocks/Manifest.toml
