@@ -80,12 +80,12 @@ function Makie.plot!(plot::MeshImage)
         poval = points_observable[]
         # The array is in a grid, so we have to update them on a grid as well.
         for (linear_ind, cartesian_ind) in enumerate(CartesianIndices((npoints, npoints)))
-            p = Point2f(xs[cartesian_ind[1]], ys[cartesian_ind[2]])
+            p = Point3d(xs[cartesian_ind[1]], ys[cartesian_ind[2]], z_level)
             poval[linear_ind] = Makie.to_ndim(
                 Point3d, 
                 Makie.apply_transform(
                     tfunc, 
-                    Makie.to_ndim(Point3d, p, z_level), 
+                    p,
                     space
                 ), 
                 0.0
