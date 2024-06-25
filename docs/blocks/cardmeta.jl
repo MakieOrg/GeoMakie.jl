@@ -1,3 +1,16 @@
+#=
+# The `cardmeta` pipeline
+
+Cardmeta blocks add metadata to a demo file.  
+
+The pipeline has two parts:
+- The actual cardmeta block which moves things around
+- The initial transformer which moves all cardmeta blocks to the end of the page
+
+The reason we need to move the block to the end is so that it is evaluated
+after all other blocks in the page.
+=#
+
 using Documenter
 using ImageTransformations, ImageIO, Base64, FileIO # for resize
 import Documenter: MarkdownAST
@@ -99,6 +112,7 @@ function Documenter.Selectors.runner(::Type{CardMetaBlocks}, node, page, doc)
                     rethrow(e)
                 end
             end
+            
             if contents isa Makie.FigureLike
                 meta[:Cover] = contents
                 break
@@ -139,5 +153,30 @@ function set_cover_to_png!(meta, page, doc)
         filename = string(hash(bytes), base = 62) * ".png"
         write(joinpath(page.workdir, filename), bytes)
         meta[:Cover] = "/" * joinpath(relpath(page.workdir, doc.user.build), filename)
+    end
+end
+
+
+
+abstract type MoveCardMeta <: Documenter.Builder.DocumentPipeline end
+
+Documenter.Selectors.order(::Type{MoveCardMeta}) = 1.2 # after doctest, before expand templates.
+
+function _is_cardmeta_block(x)
+    return x.element isa MarkdownAST.CodeBlock && Base.contains("@cardmeta", x.element.info)
+end
+
+function Documenter.Selectors.runner(::Type{MoveCardMeta}, doc::Documenter.Document)
+    # Main.@infiltrate
+    for (filename, page) in doc.blueprint.pages
+        cardmeta_blocks = filter(_is_cardmeta_block, collect(page.mdast.children))
+        if !isempty(cardmeta_blocks) # some cardmeta block was detected
+            # move the cardmeta block from wherever it is to the end of the page.
+            MarkdownAST.insert_after!(last(page.mdast.children), first(cardmeta_blocks))
+        else
+            # do nothing for now - potentially inject an extra cardmeta block at the end
+            # of every page.
+            # MarkdownAST.@ast MarkdownAST.CodeBlock("@cardmeta", "")
+        end
     end
 end

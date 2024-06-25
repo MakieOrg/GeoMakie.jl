@@ -14,7 +14,7 @@ GALLERY_DICT = Dict{String, Any}()
 function Documenter.Selectors.runner(::Type{OverviewGalleryBlocks}, node, page, doc)
     @assert node.element isa MarkdownAST.CodeBlock
     x = node.element
-    @assert contains(x.info, "@overviewgallery")
+    @assert Base.contains(x.info, "@overviewgallery")
     @assert !isempty(chomp(x.code)) "The `@overviewgallery` block must have at least one page name."
     # Main.@infiltrate
     # Bail early if in draft mode
