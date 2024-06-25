@@ -53,7 +53,7 @@ function Documenter.Selectors.runner(::Type{CardMetaBlocks}, node, page, doc)
         # wants to hide. We should probably warn, but it is common enough that
         # we will silently skip for now.
         if Documenter.isassign(ex)
-            if !(ex.args[1] in (:Title, :Description, :Cover, :Authors, :Date))
+            if !(ex.args[1] in (:Title, :Description, :Cover, :Authors, :Date, :Tags))
                 source = Documenter.locrepr(page.source, lines)
                 @warn(
                     "In $source: `@cardmeta` block has an unsupported " *
