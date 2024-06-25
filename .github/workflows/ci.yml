@@ -81,7 +81,7 @@ jobs:
           DISPLAY: ':0'
           DATADEPS_ALWAYS_ACCEPT: 'true'
           RASTERDATASOURCES_PATH: '~/.julia/artifacts/RasterDataSources'
-      - uses: julia-actions/julia-docdeploy
+      - uses: julia-actions/julia-docdeploy@v1
         with:
           prefix: xvfb-run
           install-package: false
