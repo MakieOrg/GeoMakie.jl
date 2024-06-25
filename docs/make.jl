@@ -5,6 +5,7 @@ using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
 using FHist
 
 include(joinpath(@__DIR__, "GeoMakieDocumenterBlocks", "src", "GeoMakieDocumenterBlocks.jl"))
+import .GeoMakieDocumenterBlocks: GALLERY_DICT
 # Set some global settings
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)

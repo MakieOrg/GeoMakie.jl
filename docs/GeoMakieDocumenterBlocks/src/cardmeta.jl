@@ -163,7 +163,7 @@ abstract type MoveCardMeta <: Documenter.Builder.DocumentPipeline end
 Documenter.Selectors.order(::Type{MoveCardMeta}) = 1.2 # after doctest, before expand templates.
 
 function _is_cardmeta_block(x)
-    return x.element isa MarkdownAST.CodeBlock && Base.contains("@cardmeta", x.element.info)
+    return x.element isa MarkdownAST.CodeBlock && Base.occursin("@cardmeta", x.element.info)
 end
 
 function Documenter.Selectors.runner(::Type{MoveCardMeta}, doc::Documenter.Document)
@@ -173,10 +173,10 @@ function Documenter.Selectors.runner(::Type{MoveCardMeta}, doc::Documenter.Docum
         if !isempty(cardmeta_blocks) # some cardmeta block was detected
             # move the cardmeta block from wherever it is to the end of the page.
             MarkdownAST.insert_after!(last(page.mdast.children), first(cardmeta_blocks))
-        else
+        elseif Base.occursin("examples", splitdir(page.build)[1]) # only inject cardmeta if in examples dir
             # do nothing for now - potentially inject an extra cardmeta block at the end
             # of every page.
-            # MarkdownAST.@ast MarkdownAST.CodeBlock("@cardmeta", "")
+            MarkdownAST.insert_after!(last(page.mdast.children), MarkdownAST.@ast MarkdownAST.CodeBlock("@cardmeta", ""))
         end
     end
 end

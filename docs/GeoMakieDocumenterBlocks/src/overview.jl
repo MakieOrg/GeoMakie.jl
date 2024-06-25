@@ -9,8 +9,6 @@ abstract type OverviewGalleryBlocks <: Documenter.Expanders.ExpanderPipeline end
 Documenter.Selectors.order(::Type{OverviewGalleryBlocks}) = 12.0
 Documenter.Selectors.matcher(::Type{OverviewGalleryBlocks}, node, page, doc) = Documenter.iscode(node, r"^@overviewgallery")
 
-GALLERY_DICT = Dict{String, Any}()
-
 function Documenter.Selectors.runner(::Type{OverviewGalleryBlocks}, node, page, doc)
     @assert node.element isa MarkdownAST.CodeBlock
     x = node.element
