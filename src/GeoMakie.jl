@@ -28,6 +28,8 @@ using Geodesy
 using Proj
 import GeoFormatTypes
 
+import GeoInterfaceMakie # to activate GI geometry plotting
+
 export GeoInterface
 
 # bring in missing Makie methods required for block definition

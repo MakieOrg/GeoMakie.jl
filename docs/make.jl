@@ -1,17 +1,16 @@
 using Documenter, DocumenterVitepress, Literate
 using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
 
-# some strategic imports
+# some strategic imports to avoid world age issues
 using FHist
 
-include("blocks/gallery_setup.jl")
-include("blocks/cardmeta.jl")
-include("blocks/overview.jl")
+include(joinpath(@__DIR__, "GeoMakieDocumenterBlocks", "src", "GeoMakieDocumenterBlocks.jl"))
+import .GeoMakieDocumenterBlocks: GALLERY_DICT
 # Set some global settings
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)
 # Rasters should download into the artifacts folder (so they can be cached :D)
-ENV["RASTERDATASOURCES_PATH"] = joinpath(first(Base.DEPOT_PATH), "artifacts")
+get!(ENV, "RASTERDATASOURCES_PATH", joinpath(first(Base.DEPOT_PATH), "artifacts"))
 # invoke some geomakie things to be sure it works
 GeoMakie.coastlines()
 GeoMakie.earth()
