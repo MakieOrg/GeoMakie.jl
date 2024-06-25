@@ -1,5 +1,13 @@
 # # Basic examples
 
+#=
+```@cardmeta
+Title = "Basic examples"
+Description = "Basic examples of GeoMakie"
+Cover = fig
+```
+=#
+
 using GeoMakie, CairoMakie # you could use GLMakie too
 
 lons = -180:180
@@ -33,9 +41,3 @@ scatter!(slons, slats; color = sfield)
 fig
 # Again, to save, run e.g. `save("scatter_example.png", fig; px_per_unit=2)`.
 #
-
-# ```@cardmeta
-# Title = "Basic examples"
-# Description = "Basic examples of GeoMakie"
-# Cover = fig
-# ```
