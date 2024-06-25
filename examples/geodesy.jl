@@ -3,7 +3,8 @@
 # GeoMakie integrates Makie's transformation interface and Geodesy.jl.
 # Let's get a Raster and set our data up:
 using Makie, GeoMakie, CairoMakie
-using Rasters, Dates
+using Rasters, ArchGDAL, RasterDataSources
+using Dates
 
 # First, load the Raster.
 tmax_stack = Rasters.RasterSeries(WorldClim{Climate}, :tmax; month = 1:12) .|> x -> x[:, :, 1]
@@ -18,15 +19,15 @@ x, y, z = Makie.convert_arguments(Makie.ContinuousSurface(), current_raster)
 # We want any place with missing data to show up as black, so we replace all NaNs with 0.
 # For the type of data we're using, and the type of visualization, this is a reasonable assumption.
 transform_z = replace(z, NaN => 0.0)
-# Now, we use a utility from CairoMakie to transform this grid of xs, ys, and zs into a matrix with representation
-surface_mesh = Makie.surface2mesh(x, y, transform_z .* 100)
+
 # Let's now construct the plot.
 f_ax_pl, title = with_theme(theme_black()) do
     f = Figure()
-    ax = GeoAxis(f[1, 1]; source=GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84()))
-    pl = surface!(current_raster; nan_color=:black, axis=(; type=GeoAxis))
+    ax = LScene(f[1, 1])
+    pl = meshimage!(ax, current_raster; nan_color=:black)
+    pl.transformation.transform_func[] = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
     title = Label(f[begin-1, :], "Title", fontsize = 20, font = :bold, tellwidth = false)
-    return f, ax, pl, title
+    return (Makie.FigureAxisPlot(f, ax, pl), title)
 end
 f_ax_pl
 # Having done all this construction, we set the transformation function:
