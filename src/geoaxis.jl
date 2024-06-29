@@ -679,16 +679,24 @@ function Makie.initialize_block!(axis::GeoAxis)
     # scatter!(axis.blockscene, latpoints, markersize=7, color=(:blue, 0.5))
 
     lattex = text!(axis.blockscene, lat_points_px;
-        text=lat_text, space=:pixel, align=(:center, :center),
-        font=axis.xticklabelfont, color=axis.xticklabelcolor,
-        fontsize=axis.xticklabelsize, visible=axis.xticklabelsvisible,
+        text=lat_text, 
+        space=:pixel, 
+        align=(:center, :center),
+        font=axis.xticklabelfont, 
+        color=axis.xticklabelcolor,
+        fontsize=axis.xticklabelsize, 
+        visible=axis.xticklabelsvisible,
     )
 
     lontex = text!(axis.blockscene, lon_points_px;
-        text=lon_text, space=:pixel, align=(:center, :center),
+        text=lon_text, 
+        space=:pixel, 
+        align=(:center, :center),
         font=axis.yticklabelfont,
         color=axis.yticklabelcolor,
-        fontsize=axis.yticklabelsize, visible=axis.yticklabelsvisible,)
+        fontsize=axis.yticklabelsize, 
+        visible=axis.yticklabelsvisible,
+        )
 
     fonts = theme(axis.blockscene, :fonts)
     # Finally calculate protrusions and report all bounding boxes
