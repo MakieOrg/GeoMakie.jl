@@ -121,13 +121,17 @@ function Documenter.Selectors.runner(::Type{CardMetaBlocks}, node, page, doc)
     end
 
     if haskey(meta, :Cover)
-        set_cover_to_png!(meta, page, doc)
-        # insert the cover image into the page
+
+        cover_img_bytes, mime = get_image_and_mime(meta[:Cover])
+
         if !isnothing(idx)
-            MarkdownAST.insert_after!(elements[idx], MarkdownAST.@ast Documenter.RawNode(:html, "<img src=\"$(meta[:Cover])\"/>"))
+            MarkdownAST.insert_after!(elements[idx], MarkdownAST.@ast Documenter.RawNode(:html, image_node(cover_img_bytes, mime)))
         end
+
+        set_cover_to_image!(meta, meta[:Cover], cover_img, mime, page, doc)
+        # insert the cover image into the page
+        
     end
- 
 
     # Authors and Date are for the transformer and can be applied within this block, the first four 
     # params need to go to the gallery/card object though.
@@ -136,27 +140,59 @@ function Documenter.Selectors.runner(::Type{CardMetaBlocks}, node, page, doc)
 
 end
 
-function set_cover_to_png!(meta, page, doc)
-    if meta[:Cover] isa Makie.FigureLike
-        # convert figure to image
-        original_cover_image = Makie.colorbuffer(meta[:Cover])
-        ratio = 600 / size(original_cover_image, 1) # get 300px height
-        resized_cover_image = ImageTransformations.imresize(original_cover_image; ratio)
-        
-        # Below is the "inline pipeline"
-        iob = IOBuffer()
-        ImageIO.save(FileIO.Stream{FileIO.format"PNG"}(iob), resized_cover_image)
-        # We could include this inline, but that seems to be causing issues.
-        # meta[:Cover] = "data:image/png;base64, " * Base64.base64encode(String(take!(iob)))
-        # Instead, we will save to a file and include that.
-        bytes = take!(iob)
-        filename = string(hash(bytes), base = 62) * ".png"
-        write(joinpath(page.workdir, filename), bytes)
-        meta[:Cover] = "/" * joinpath(relpath(page.workdir, doc.user.build), filename)
+
+function image_node(cover_bytes, ::MIME"file")
+    return """<img src="$cover_bytes"/>"""
+end
+
+
+
+get_image_and_mime(fap::Makie.FigureLike) = get_image_and_mime(Makie.get_scene(fap))
+get_image_and_mime(scene::Makie.Scene) = get_image_and_mime(Makie.getscreen(scene))
+function get_image_and_mime(screen::Makie.MakieScreen)
+    MIMES_IN_ORDER = [
+        MIME"image/svg+xml"(),
+        # MIME"application/pdf"(),
+        # MIME"application/postscript"(),
+        MIME"image/png"()
+    ]
+    iob = IOBuffer()
+    for mime in MIMES_IN_ORDER
+        if Makie.backend_showable(screen, mime)
+            Makie.backend_show(screen, iob, mime, getfield(screen, :scene))
+            bytes = String(take!(iob))
+            return (bytes, mime)
+        end
     end
 end
 
 
+function set_cover_to_image!(meta, cover, cover_img, mime::MIME, page, doc)
+    image = 123
+end
+function set_cover_to_image!(meta, cover::Makie.FigureLike, cover_img, mime::MIME"image/png", page, doc)
+    # convert figure to image
+    original_cover_image = FileIO.load
+    ratio = 600 / size(original_cover_image, 1) # get 300px height
+    resized_cover_image = ImageTransformations.imresize(original_cover_image; ratio)
+    
+    # Below is the "inline pipeline"
+    iob = IOBuffer()
+    FileIO.save(FileIO.Stream{FileIO.format"PNG"}(iob), resized_cover_image)
+    # We could include this inline, but that seems to be causing issues.
+    # meta[:Cover] = "data:image/png;base64, " * Base64.base64encode(String(take!(iob)))
+    # Instead, we will save to a file and include that.
+    bytes = take!(iob)
+    filename = string(hash(bytes), base = 62) * ".png"
+    write(joinpath(page.workdir, filename), bytes)
+    meta[:Cover] = "/" * joinpath(relpath(page.workdir, doc.user.build), filename)
+end
+
+function set_cover_to_image!(meta, cover::Makie.FigureLike, cover_img, mime::MIME"image/svg+xml", page, doc)
+    filename = string(hash(cover_img), base = 62) * ".svg"
+    write(joinpath(page.workdir, filename), bytes)
+    meta[:Cover] = "/" * joinpath(relpath(page.workdir, doc.user.build), filename)
+end
 
 abstract type MoveCardMeta <: Documenter.Builder.DocumentPipeline end
 
