@@ -69,12 +69,12 @@ jobs:
             using Pkg
             Pkg.add([
               PackageSpec(path = pwd()),
-              PackageSpec(name = "DocumenterVitepress", rev = "master"), 
+              PackageSpec(name = "DocumenterVitepress", rev = "la/better_layout"), 
               # PackageSpec(name = "Makie", rev = "master"), 
               # PackageSpec(name = "MakieCore", rev = "master"), 
               # PackageSpec(name = "CairoMakie", rev = "master"), 
               PackageSpec(name = "Rasters", rev = "la/compacts"),
-              PackageSpec(name = "ArchGDAL", rev = "master")
+              PackageSpec(name = "ArchGDAL", rev = "master"),
             ])
             Pkg.instantiate()'
         env:
