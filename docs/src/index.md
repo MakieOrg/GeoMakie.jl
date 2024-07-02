@@ -61,6 +61,9 @@ Projections are accepted as [PROJ-strings](https://proj.org/operations/projectio
 using CairoMakie, GeoMakie
 
 fig = Figure()
+ga = GeoAxis(
+    fig[1, 1]; # any cell of the figure's layout
+    dest = "+proj=wintri", # the CRS in which you want to plot
 )
 lines!(ga, GeoMakie.coastlines()) # plot coastlines from Natural Earth as a reference
 # You can plot your data the same way you would in Makie
