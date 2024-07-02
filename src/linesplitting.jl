@@ -44,21 +44,21 @@ module LineSplitting
 		split_lines = GeometryBasics.LineString.(split_coords) 
 	end
 
-	function split(tmp::Vector{<:GeometryBasics.LineString}, lon0::Real)
+	function split(tmp::AbstractVector{<:GeometryBasics.LineString}, lon0::Real)
 		[split(a,lon0) for a in tmp]
 	end
 
 	###
 	split(tmp::GeometryBasics.LineString,dest::Observable) = @lift(split(tmp, $(dest)))
 
-	function split(tmp::Vector{<:GeometryBasics.LineString},dest::Observable)
+	function split(tmp::AbstractVector{<:GeometryBasics.LineString},dest::Observable)
 		@lift([split(a,$(dest)) for a in tmp])
 	end
 
 	###
 	split(tmp::GeometryBasics.LineString,ax::GeoAxis) = split(tmp, ax.dest)
 	
-	function split(tmp::Vector{<:GeometryBasics.LineString},ax::GeoAxis)
+	function split(tmp::AbstractVector{<:GeometryBasics.LineString},ax::GeoAxis)
 		[split(a,ax.dest) for a in tmp]
 	end
 	
@@ -74,7 +74,7 @@ module LineSplitting
 		end
 	end
 
-	function split(tmp::Vector{<:GeometryBasics.LineString},dest::String)
+	function split(tmp::AbstractVector{<:GeometryBasics.LineString},dest::String)
 		[split(a,dest) for a in tmp]
 	end
 
