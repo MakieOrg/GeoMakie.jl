@@ -84,8 +84,8 @@ end
 ```
 
 ```@example MAIN
-lon_0=-160
-(x,y,c)=cshift(lons, lats, field,lon_0)
+lon_0 = -160
+(lons_shift, field_shift) = cshift(lons, field, lon_0)
 ```
 
 ```@example MAIN
