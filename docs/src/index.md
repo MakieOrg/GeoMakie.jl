@@ -91,8 +91,8 @@ lon_0 = -160
 ```@example MAIN
 fig = Figure()
 ax = GeoAxis(fig[1,1]; dest = "+proj=eqearth +lon_0=$(lon_0)")
-surface!(ax, x, y, c, colormap=:balance)
-lines!.(ax, GeoMakie.coastlines(ax),color=:black,overdraw = true)
+surface!(ax, lons_shift, lats, field_shift, colormap=:balance)
+lines!.(ax, GeoMakie.coastlines(ax), color=:black, overdraw = true)
 fig
 ```
 
