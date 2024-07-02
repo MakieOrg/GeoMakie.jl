@@ -11,9 +11,13 @@
 # also supports `meshimage`, but the quality of the image will be worse
 # unless your mesh is very fine (`npoints > 1000` usually).
 
+#=
+```julia
 using GeoMakie, GLMakie
-GLMakie.activate!(px_per_unit = 4)
-
+```
+=#
+using GeoMakie, CairoMakie # hide
+Makie.set_theme!(Attributes(; MeshImage = (; npoints = 300,))) # hide
 # ## Affine transform (no nonlinearity)
 fig = Figure()
 ax1 = Axis(fig[1, 1])
@@ -45,6 +49,13 @@ fig
 
 # m1 = meshimage!(ax1, -100..100, -40..40, (Makie.logo()); npoints = 300)
 m1 = meshimage!(ax1, -166..169, -90..90, (Makie.logo()); npoints = 400)
+hidedecorations!(ax1)
 fig
 
-hidedecorations!(ax1; )
+
+#=
+```@cardmeta
+Description = "The meshimage recipe"
+Cover = fig
+```
+=#

@@ -6,7 +6,7 @@
 /dev/
 /docs/build/
 /docs/site/
-/docs/src/examples.md
+/docs/src/examples
 /docs/Manifest.toml
 stuff.jl
 .vscode
@@ -16,5 +16,11 @@ src/oldsrc
 src/experimental
 
 docs/src/images
-docs/src/examples
+docs/src/examples/
+docs/node_modules
+docs/build/
+node_modules/
+docs/package-lock.json
 test_images/
+
+docs/GeoMakieDocumenterBlocks/Manifest.toml

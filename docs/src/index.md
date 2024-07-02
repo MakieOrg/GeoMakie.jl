@@ -1,75 +1,78 @@
-# GeoMakie.jl
-GeoMakie.jl is a Julia package for plotting geospatial data on a given map projection. It is based on the [Makie.jl plotting ecosystem](https://docs.makie.org/stable/).
+```@raw html
+---
+# https://vitepress.dev/reference/default-theme-home-page
+layout: home
 
-The package [ClimateBase.jl](https://juliaclimate.github.io/ClimateBase.jl/dev/) builds upon GeoMakie.jl to create a seamless workflow between analyzing/manipulating climate data, and plotting them.
+hero:
+  name: "GeoMakie"
+  text: ""
+  tagline: Geographic plots for Makie
+  image:
+    src: /logo.png
+    alt: Makie logo deformed on an Interrupted Goode Homolosine projection.
+  actions:
+    - theme: brand
+      text: Introduction
+      link: /introduction
+    - theme: alt
+      text: View on Github
+      link: https://github.com/MakieOrg/GeoMakie.jl
+    - theme: alt
+      text: Examples
+      link: /examples
 
-## Installation
+features:
+  - icon: <img width="64" height="64" src="https://rawcdn.githack.com/JuliaLang/julia-logo-graphics/f3a09eb033b653970c5b8412e7755e3c7d78db9e/images/juliadots.iconset/icon_512x512.png" alt="Julia code"/>
+    title: Pure Julia code
+    details: Fast, understandable, extensible functions
+    link: /introduction
+  - icon: <img width="64" height="64" src="https://rawcdn.githack.com/JuliaGeo/juliageo.github.io/4788480c2a5f7ae36df67a4b142e3a963024ac91/img/juliageo.svg" />
+    title: Full integration with GeoInterface
+    details: Use any GeoInterface.jl-compatible geometry
+    link: https://juliageo.org/GeoInterface.jl/stable
+  - title: Projections via Proj.jl
+    details: Plot in any projection, with data coming from any projection!
+    link: /examples/multiple_crs
+---
 
-This package is **in development** and may **break**, although we are currently working on a long-term stable interface.
 
-You can install it from the REPL like so:
-```julia
-]add GeoMakie
+<p style="margin-bottom:2cm"></p>
+
+<div class="vp-doc" style="width:80%; margin:auto">
+
 ```
 
-## GeoAxis
-Using GeoMakie.jl is straightforward, although it does assume basic knowledge of the Makie.jl ecosystem.
+# What is GeoMakie.jl?
 
-GeoMakie.jl provides an axis for plotting geospatial data, `GeoAxis`. Both are showcased in the examples below.
+GeoMakie.jl is a Julia package for plotting geospatial data on a given map projection. It is built on top of the [Makie.jl plotting ecosystem](https://docs.makie.org/stable/).
+
+GeoMakie provides a `GeoAxis` type which handles CRS and projections, and various utilities and integrations to handle plotting geometries.  `GeoAxis` should work seamlessly with any Makie plotting function, and can be used as a drop-in replacement for `Makie.Axis`.
+
+## Quick start
 
 
-## Gotchas
+## Quick start
 
-When plotting a projection which has a limited domain (in either longitude or latitude), if your limits are not inside that domain, the axis will appear blank.  To fix this, simply correct the limits - you can even do it on the fly, using the `xlims!(ax, low, high)` or `ylims!(ax, low, high)` functions.
+The main entry point to GeoMakie is the function `GeoAxis(fig[i, j]; kw_args...)`.  It creates an axis which accepts nonlinear projections, but is otherwise identical in usage to Makie's `Axis`.
+Projections are accepted as [PROJ-strings](https://proj.org/operations/projections/index.html), and can be set through the `source="+proj=latlong +datum=WGS84"` and `dest="+proj=eqearth"` keyword arguments to `GeoAxis`.
 
-## Examples
 
-### Surface example
-```@example MAIN
-using GeoMakie, CairoMakie
-
-lons = -180:180
-lats = -90:90
-field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
+```@example quickstart
+using CairoMakie, GeoMakie
 
 fig = Figure()
-ax = GeoAxis(fig[1,1])
-surface!(ax, lons, lats, field; shading = NoShading)
+)
+lines!(ga, GeoMakie.coastlines()) # plot coastlines from Natural Earth as a reference
+# You can plot your data the same way you would in Makie
+scatter!(ga, -120:15:120, -60:7.5:60; color = -60:7.5:60, strokecolor = (:black, 0.2))
 fig
 ```
 
-### Scatter example
-```@example MAIN
-using GeoMakie, CairoMakie
-
-lons = -180:180
-lats = -90:90
-slons = rand(lons, 2000)
-slats = rand(lats, 2000)
-sfield = [exp(cosd(l)) + 3(y/90) for (l,y) in zip(slons, slats)]
-
-fig = Figure()
-ax = GeoAxis(fig[1,1])
-scatter!(slons, slats; color = sfield)
-fig
-```
-
-### Map projections
-The default projection is given by the arguments `source = "+proj=longlat +datum=WGS84", dest = "+proj=eqearth"`, so that if a different one is needed, for example a `wintri` projection one can do it as follows:
-```@example MAIN
-using GeoMakie, CairoMakie
-
-lons = -180:180
-lats = -90:90
-field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
-
-fig = Figure()
-ax = GeoAxis(fig[1,1]; dest = "+proj=wintri")
-surface!(ax, lons, lats, field; shading = NoShading)
-fig
-```
+As you can see, the axis automatically transforms your input from the `source`
+CRS (default `"+proj=longlat +datum=WGS84"`) to the `dest` CRS.
 
 ### Changing central longitude
+
 Be careful! Each data point is transformed individually.
 However, when using `surface` or `contour` plots this can lead to errors when the longitudinal dimension "wraps" around the planet.
 
@@ -84,6 +87,10 @@ end
 ```
 
 ```@example MAIN
+lons = -180:180
+lats = -90:90
+field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
+
 lon_0 = -160
 (lons_shift, field_shift) = cshift(lons, field, lon_0)
 ```
@@ -96,50 +103,35 @@ lines!.(ax, GeoMakie.coastlines(ax), color=:black, overdraw = true)
 fig
 ```
 
-### Countries loaded with GeoJSON
-```@example MAIN
-using GeoMakie, CairoMakie
+You can also use quite a few other plot types and projections:
+```@example quickstart
+fieldlons = -180:180; fieldlats = -90:90
+field = [exp(cosd(lon)) + 3(lat/90) for lon in fieldlons, lat in fieldlats]
 
-# First, make a surface plot
-lons = -180:180
-lats = -90:90
-field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
+img = rotr90(GeoMakie.earth())
+land = GeoMakie.land()
 
-fig = Figure()
-ax = GeoAxis(fig[1,1])
-sf = surface!(ax, lons, lats, field; shading = NoShading)
-cb1 = Colorbar(fig[1,2], sf; label = "field", height = Relative(0.65))
+fig = Figure(size = (1000, 1000))
 
-using GeoMakie.GeoJSON
-countries_file = GeoMakie.assetpath("vector", "countries.geo.json")
-countries = GeoJSON.read(read(countries_file, String))
+ga1 = GeoAxis(fig[1, 1]; dest = "+proj=ortho", title = "Orthographic\n "); lines!(ga1, GeoMakie.coastlines())
+ga2 = GeoAxis(fig[1, 2]; dest = "+proj=moll", title = "Image of Earth\n ")
+ga3 = GeoAxis(fig[2, 1]; title = "Plotting polygons")
+ga4 = GeoAxis(fig[2, 2]; dest = "+proj=natearth", title = "Auto limits") # you can plot geodata on regular axes too
 
-n = length(countries)
-hm = poly!(ax, countries; color= 1:n, colormap = :dense,
-    strokecolor = :black, strokewidth = 0.5,
-)
-translate!(hm, 0, 0, 100) # move above surface plot
+surface!(ga1, fieldlons, fieldlats, field; colormap = :rainbow_bgyrm_35_85_c69_n256, shading = NoShading)
+image!(ga2, -180..180, -90..90, img; interpolate = false) # this must be included
+poly!(ga3, land[50:100]; color = 1:51, colormap = (:plasma, 0.5))
+poly!(ga4, land[22]);
+
+ylims!(ga3, (-90, 90)) # you can manipulate the axes as usual for Makie!
 
 fig
 ```
 
-## Gotchas
-
-With **CairoMakie**, we recommend that you use `image!(ga, ...)` or `heatmap!(ga, ...)` to plot images or scalar fields into `ga::GeoAxis`.
-
-However, with **GLMakie**, which is much faster, these methods do not work; if you have used them, you will see an empty axis.  If you want to plot an image `img`, you can use a surface in the following way:
-`surface!(ga, lonmin..lonmax, latmin..latmax, ones(size(img)...); color = img, shading = NoShading)`.
-
-To plot a scalar field, simply use `surface!(ga, lonmin..lonmax, latmin..latmax, field)`.  The `..` notation denotes an interval which Makie will automatically sample from to obtain the x and y points for the surface.
+See the documentation for examples and basic usage!
 
 
-
-## API
-
-```@docs
-GeoMakie.geoformat_ticklabels
-Makie.reset_limits!
-GeoMakie.interset_spine_and_rect
-GeoMakie.geo2basic
-GeoMakie.meshimage
+```@raw html
+</div>
 ```
+

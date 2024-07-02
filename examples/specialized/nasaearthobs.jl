@@ -1,7 +1,6 @@
 # # NASA Earth Observations animation
 
 using GeoMakie, CairoMakie
-CairoMakie.activate!(px_per_unit = 4) # hide
 using ProgressMeter # for recording
 
 # acquire data
@@ -43,3 +42,9 @@ record(fig, "NASA_Earth_Observations.mp4"; framerate = 60) do io
         recordframe!(io)
     end
 end
+
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", fig) #hide
+nothing #hide

@@ -7,6 +7,10 @@ Makie.set_theme!(Theme(
 ))
 
 @testset "GeoMakie" begin
+    @testset "MeshImage" begin
+        include("meshimage.jl")
+    end
+    
     @testset "Basics" begin
         lons = -180:180
         lats = -90:90
@@ -30,41 +34,4 @@ Makie.set_theme!(Theme(
         @test GeoMakie.coastlines(ga) isa Vector
         @test GeoMakie.coastlines(ga)[1] isa Observable
     end
-    
-    # @testset "Examples" begin
-    #     geomakie_path = dirname(dirname(pathof(GeoMakie)))
-    #     examples = readdir(joinpath(geomakie_path, "examples"); join = true)
-    #     filenames = filter(x-> isfile(x) && endswith(x, ".jl"), examples)
-
-    #     test_path = mkpath(joinpath(geomakie_path, "test_images"))
-    #     cd(test_path) do
-    #         for filename in filenames
-    #             example_name = splitext(splitdir(filename)[2])[1]
-    #             printstyled("Running ", bold = true, color = :cyan)
-    #             println(example_name)
-
-    #             @testset "$example_name" begin
-    #                 @test begin
-    #                     print(rpad("Include: ", 9))
-    #                     @time include(filename)
-    #                     true
-    #                 end
-    #                 @test begin
-    #                     savepath = "$example_name.png"
-    #                     print(rpad("PNG: ", 9))
-    #                     @time CairoMakie.save(savepath, Makie.current_figure(); px_per_unit=2);
-    #                     isfile(savepath) && filesize(savepath) > 1000
-
-    #                 end
-    #                 @test begin
-    #                     savepath = "$example_name.pdf"
-    #                     print(rpad("PDF: ", 9))
-    #                     @time CairoMakie.save(savepath, Makie.current_figure());
-    #                     isfile(savepath) && filesize(savepath) > 1000
-    #                 end
-    #                 haskey(ENV, "CI") && rm("$example_name.pdf")
-    #             end
-    #         end
-    #     end
-    # end
 end

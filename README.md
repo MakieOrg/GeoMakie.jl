@@ -51,15 +51,17 @@ land = GeoMakie.land()
 
 fig = Figure(size = (1000, 1000))
 
-ga1 = GeoAxis(fig[1, 1]; dest = "+proj=ortho", lonlims = (-90, 90), title = "Orthographic\n "); lines!(ga1, GeoMakie.coastlines())
+ga1 = GeoAxis(fig[1, 1]; dest = "+proj=ortho", title = "Orthographic\n ")
 ga2 = GeoAxis(fig[1, 2]; dest = "+proj=moll", title = "Image of Earth\n ")
 ga3 = GeoAxis(fig[2, 1]; title = "Plotting polygons")
 ga4 = GeoAxis(fig[2, 2]; dest = "+proj=natearth", title = "Auto limits") # you can plot geodata on regular axes too
 
 surface!(ga1, fieldlons, fieldlats, field; colormap = :rainbow_bgyrm_35_85_c69_n256, shading = NoShading)
+lines!(ga1, GeoMakie.coastlines())
+
 image!(ga2, -180..180, -90..90, img; interpolate = false) # this must be included
 poly!(ga3, land[50:100]; color = 1:51, colormap = (:plasma, 0.5))
-poly!(ga4, land[22]); datalims!(ga4)
+poly!(ga4, land[22]);
 
 fig
 ```

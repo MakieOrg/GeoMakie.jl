@@ -1,7 +1,8 @@
 # # Most projections
 
+# This page shows most projections, without replacement, as they are 
+# without tweaks in GeoMakie.
 using GeoMakie, CairoMakie
-CairoMakie.activate!(px_per_unit = 4) # hide
 
 projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=aea +lat_1=29.5 +lat_2=42.5", "+proj=aeqd", "+proj=airy", "+proj=aitoff",
@@ -31,7 +32,7 @@ projections = ["+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
 "+proj=vitk1 +lat_1=45 +lat_2=55", "+proj=wag1", "+proj=wag2", "+proj=wag3", "+proj=wag4",
 "+proj=wag5", "+proj=wag6", "+proj=wag7", "+proj=webmerc +datum=WGS84", "+proj=weren",
 "+proj=wink1", "+proj=wink2", "+proj=wintri"]
-let k = 1
+fig = let k = 1
     fig = Figure(size=(1500, 1500))
     @time for i in 1:10, j in 1:3
         try
@@ -50,3 +51,12 @@ let k = 1
     end
     fig
 end
+resize!(fig, 1500, 4000)
+fig
+
+#=
+```@cardmeta
+Description = "A comprehensive list of all projections in GeoMakie"
+Cover = fig
+```
+=#

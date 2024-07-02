@@ -1,7 +1,6 @@
 ```@setup nonlinear-transformations
-using Makie, GLMakie, GeoMakie
+using Makie, GeoMakie
 using Makie.FileIO
-GLMakie.activate!(px_per_unit = 4)
 ```
 # Nonlinear transformations
 

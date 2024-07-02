@@ -3,7 +3,6 @@
 using NetCDF, GeoMakie
 const Node = Observable
 using CairoMakie # hide
-CairoMakie.activate!(px_per_unit = 4) # hide
 
 # Open the NetCDF file
 f = NetCDF.open("/Users/anshul/Downloads/CERES_EBAF-TOA_Ed4.1_Subset_200003-201910.nc"; readdimvar = true)
@@ -44,3 +43,8 @@ end
 record(scene, "test.mp4", 0:10:180; framerate = 2) do i
     pm[] = i
 end
+#
+# make cover image #jl
+mkpath("covers") #hide
+save("covers/$(splitext(basename(@__FILE__))[1]).png", figure) #hide
+nothing #hide

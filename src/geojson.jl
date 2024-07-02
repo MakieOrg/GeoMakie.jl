@@ -1,3 +1,9 @@
+#=
+# GeoInterface.jl integration
+
+This code has some utilities to work with GeoJSON and GeoInterface geometries.
+=#
+
 using GeoInterface
 using GeometryBasics
 
@@ -88,10 +94,32 @@ end
 
 
 
-to_multipoly(poly::Polygon) = GeometryBasics.MultiPolygon([poly])
-to_multipoly(poly::Vector{Polygon}) = GeometryBasics.MultiPolygon(poly)
-to_multipoly(mp::MultiPolygon) = mp
-to_multipoly(any) = GeometryBasics.MultiPolygon(any)
+to_multipoly(poly::GeometryBasics.Polygon) = GeometryBasics.MultiPolygon([poly])
+to_multipoly(poly::Vector{GeometryBasics.Polygon}) = GeometryBasics.MultiPolygon(poly)
+to_multipoly(mp::GeometryBasics.MultiPolygon) = mp
+to_multipoly(geom) = to_multipoly(GeoInterface.trait(geom), geom)
+to_multipoly(geom::AbstractVector) = to_multipoly.(GeoInterface.trait.(geom), geom)
+to_multipoly(::GeoInterface.PolygonTrait, geom) = GeometryBasics.MultiPolygon([GeoInterface.convert(GeometryBasics, geom)])
+to_multipoly(::GeoInterface.MultiPolygonTrait, geom) = GeoInterface.convert(GeometryBasics, geom)
+
+function to_multipoly(::GeoInterface.GeometryCollectionTrait, geom)
+    geoms = collect(GeoInterface.getgeom(geom))
+    poly_and_multipoly_s = filter(x -> GeoInterface.trait(x) isa GeoInterface.PolygonTrait || GeoInterface.trait(x) isa GeoInterface.MultiPolygonTrait, geoms)
+    if isempty(poly_and_multipoly_s) # geometry is effectively empty
+        return GeometryBasics.MultiPolygon([GeometryBasics.Polygon(Point{2 + GeoInterface.hasz(geom) + GeoInterface.hasm(geom), Float64}[])])
+    else # effectively "unary union" the geometry collection
+        final_multipoly = reduce((x, y) -> GeometryOps.union(x, y; target = GeoInterface.MultiPolygonTrait()), poly_and_multipoly_s)
+        return to_multipoly(final_multipoly)
+    end
+end
+
+to_multilinestring(poly::GeometryBasics.LineString) = GeometryBasics.MultiLineString([poly])
+to_multilinestring(poly::Vector{GeometryBasics.Polygon}) = GeometryBasics.MultiLineString(poly)
+to_multilinestring(mp::GeometryBasics.MultiLineString) = mp
+to_multilinestring(geom) = to_multilinestring(GeoInterface.trait(geom), geom)
+to_multilinestring(geom::AbstractVector) = to_multilinestring.(GeoInterface.trait.(geom), geom)
+to_multilinestring(::GeoInterface.LineStringTrait, geom) = GeometryBasics.MultiLineString([GeoInterface.convert(GeometryBasics, geom)])
+to_multilinestring(::GeoInterface.MultiLineStringTrait, geom) = GeoInterface.convert(GeometryBasics, geom)
 
 
 # GeoJSON-specific overrides for clarity
@@ -101,3 +129,17 @@ function geo2basic(fc::GeoJSON.FeatureCollection)
 end
 
 geo2basic(feature::GeoJSON.Feature) = geo2basic(GeoInterface.geometry(feature))
+
+function _mls2ls(mls::GeometryBasics.MultiLineString{N, T}) where {N, T}
+    points = Vector{Point{N, T}}()
+    sizehint!(
+        points, 
+        sum(GeometryBasics.GeoInterface.npoint, mls.linestrings) #= length of individual linestrings =# + 
+        length(mls.linestrings) #= NaN points between linestrings =#
+    )
+    for ls in mls
+        append!(points, GeometryBasics.coordinates(ls))
+        push!(points, Point{N, T}(NaN))
+    end
+    return GeometryBasics.LineString(points)
+end

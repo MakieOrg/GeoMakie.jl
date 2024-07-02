@@ -1,8 +1,14 @@
+#=
+# MeshImage
+
+This file contains the implementation of the `MeshImage` recipe.
+=#
+
 using Makie: GeometryBasics
 
 """
-    meshimage([xs, ys,] zs)
-    meshimage!(ax, [xs, ys,] zs)
+    meshimage([xs, ys,] img)
+    meshimage!(ax, [xs, ys,] img)
 
 Plots an image on a mesh.
 
@@ -12,34 +18,38 @@ but a smaller mesh can still represent the inherent
 nonlinearity of the space.
 
 This basically plots a mesh with uv coordinates, and textures it by
-the provided image.  Its conversion trait is `Image` (TODO: change this to DiscreteSurfaceLike).
+the provided image.  Its conversion trait is `ImageLike`.
 
-For now, it only accepts RGB images.  This could be changed in the future.
+!!! tip
+    You can control the density of the mesh by the `npoints` attribute.
 
-## Attributes
-$(Makie.ATTRIBUTES)
 """
-@recipe(MeshImage) do scene
-    Attributes(
-        npoints = 100,
-        space = :data,
-    )
+@recipe MeshImage (x, y, img) begin
+    """
+    The number of points the mesh should have per side.  
+    Can be an Integer or a 2-tuple of integers representing number of points per side.
+    """
+    npoints = 100
+    "The z-coordinate given to each mesh point.  Useful in 3D transformations."
+    z_level = 0.0
+    "Sets the lighting algorithm used. Options are `NoShading` (no lighting), `FastShading` (AmbientLight + PointLight) or `MultiLightShading` (Multiple lights, GLMakie only). Note that this does not affect RPRMakie."
+    shading = NoShading
+    MakieCore.mixin_generic_plot_attributes()...
+    MakieCore.mixin_colormap_attributes()...
 end
 
 # this inherits all conversions for `Image`,
 # if no specialized conversion for `MeshImage` is found.
-Makie.conversion_trait(::Type{<: MeshImage}) = Image
+Makie.conversion_trait(::Type{<: MeshImage}) = Makie.ImageLike()
 # There really is no difference between this and Image, 
-# except the implementation under the hood.  As such
-# I chose not to use the conversion trait in case someone
-# implemented a convert for images only...
+# except the implementation under the hood.
 
 # This is the recipe implementation.
 
 function Makie.plot!(plot::MeshImage)
     # Initialize some Observables which will hold data.
     # For right now, they point to some undefined place in memory.
-    points_observable = Observable{Vector{Point2f}}()
+    points_observable = Observable{Vector{Point3d}}()
     faces_observable = Observable{Vector{Makie.GLTriangleFace}}()#=GeometryBasics.QuadFace{Int}=#
     uv_observable = Observable{Vector{Vec2f}}()
 
@@ -49,14 +59,14 @@ function Makie.plot!(plot::MeshImage)
     old_npoints = Ref(0)
 
     # Handle the transformation
-    onany(plot, plot[1], plot[2], plot.transformation.transform_func, plot.npoints, plot.space; update=true) do x_in, y_in, tfunc, npoints, space
+    onany(plot, plot.converted[1], plot.converted[2], plot.transformation.transform_func, plot.npoints, plot.space, plot.z_level; update=true) do x_in, y_in, tfunc, npoints, space, z_level
         # If `npoints` changed, then re-construct the mesh.
         if npoints != old_npoints[]
             # We need a new StructArray to hold all the points.
             # TODO: resize the old structarray instead!
-            points_observable.val = Vector{Point2f}(undef, npoints^2)
+            points_observable.val = Vector{Point3d}(undef, first(npoints) * last(npoints))
             # This constructs an efficient triangulation of a rectangle (all images are rectangles).
-            rect = GeometryBasics.Tesselation(Rect2f(0, 0, 1, 1), (npoints, npoints))
+            rect = GeometryBasics.Tesselation(Rect2f(0, 0, 1, 1), (first(npoints), last(npoints)))
             # This decomposes that Tesselation to actual triangles, with integer index values.
             faces_observable.val = GeometryBasics.decompose(Makie.GLTriangleFace, rect)
             # This holds the UVs for the mesh.  These are reversed, so that the image is plotted correctly.
@@ -64,13 +74,22 @@ function Makie.plot!(plot::MeshImage)
         end
 
         # These are the ranges for the points.
-        xs = LinRange(extrema(x_in)..., npoints)
-        ys = LinRange(extrema(y_in)..., npoints)
+        # `first` and `last` are used to get the number of points per side, if that's provided as a tuple.
+        xs = LinRange(extrema(x_in)..., first(npoints))
+        ys = LinRange(extrema(y_in)..., last(npoints))
         poval = points_observable[]
         # The array is in a grid, so we have to update them on a grid as well.
         for (linear_ind, cartesian_ind) in enumerate(CartesianIndices((npoints, npoints)))
-            p = Point2f(xs[cartesian_ind[1]], ys[cartesian_ind[2]])
-            poval[linear_ind] = Makie.apply_transform(tfunc, p, space)
+            p = Point3d(xs[cartesian_ind[1]], ys[cartesian_ind[2]], z_level)
+            poval[linear_ind] = Makie.to_ndim(
+                Point3d, 
+                Makie.apply_transform(
+                    tfunc, 
+                    p,
+                    space
+                ), 
+                0.0
+            )
         end
         # Finally, we notify the points observable that it has an update.
         notify(points_observable)
@@ -81,10 +100,9 @@ function Makie.plot!(plot::MeshImage)
         end
     end
 
-    # TODO: figure out how to mutate a mesh's points in place
-
-    # You may have noticed that nowhere above did we actually create a mesh.  Let's remedy that now!
-    final_mesh = lift(points_observable, faces_observable, uv_observable; ignore_equal_values = true#=, priority = -100=#) do points, faces, uv
+    # You may have noticed that nowhere above did we actually create a mesh.  
+    # Let's remedy that now!
+    final_mesh = lift(plot, points_observable, faces_observable, uv_observable; ignore_equal_values = true#=, priority = -100=#) do points, faces, uv
         return GeometryBasics.Mesh(
             GeometryBasics.meta(points; uv=uv), # each point gets a UV, they're interpolated on faces
             faces
@@ -95,9 +113,13 @@ function Makie.plot!(plot::MeshImage)
     mesh!(
         plot, 
         final_mesh; 
-        color = plot[3], 
-        shading = NoShading, 
-        transformation = Transformation() # since the points are pre transformed, we don't need to transform them again
+        color = plot.converted[3], # pass on the color directly
+        MakieCore.colormap_attributes(plot)..., # pass on all colormap attributes
+        shading = NoShading, #
+        transformation = Transformation(
+            plot.transformation;     # connect up the model matrix to the parent's model matrix
+            transform_func = nothing # do NOT connect the transform func, since we've already done that
+        )
     )
     # TODO: get a `:transformed` space out so we don't need this `transformation` hack
 end

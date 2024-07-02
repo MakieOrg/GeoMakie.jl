@@ -2,7 +2,6 @@
 
 # This example was contributed by Martijn Visser (@visr)
 using Makie, CairoMakie, GeoMakie
-CairoMakie.activate!(px_per_unit = 4) # hide
 
 using GeoMakie: GeoJSON
 using GeometryBasics
@@ -39,3 +38,9 @@ begin
     scatter!(ga, pop_geo; color=popisqrt, markersize=msize)
     fig
 end
+#=
+```@cardmeta
+Description = "Scatter plot of population per city"
+Cover = Makie.current_figure()
+```
+=#
