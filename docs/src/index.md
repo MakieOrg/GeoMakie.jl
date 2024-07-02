@@ -76,10 +76,10 @@ However, when using `surface` or `contour` plots this can lead to errors when th
 To fix this issue, the recommended approach is that you (1) change the central longitude of the map transformation (`dest`), and (2) `circshift` your data accordingly for `lons` and `field`.
 
 ```@example MAIN
-cshift(lons, lats, field,lon_0)=begin
-   nn=sum((lons.-lon_0).>180)
-   ([(lons[end-nn+1:end].-360)...,lons[1:end-nn]...],
-   	lats,circshift(field,(nn,0)))
+function cshift(lons, field, lon_0)
+   shift = @. lons - lon_0 > 180
+   nn = sum(shift)
+   (circshift(lons - 360shift, nn), circshift(field, (nn, 0)))
 end
 ```
 
