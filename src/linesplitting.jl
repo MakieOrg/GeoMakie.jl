@@ -18,7 +18,8 @@ coastlines(ga::GeoAxis)=split(coastlines(),ga)
 module LineSplitting
 
 	import GeometryBasics
-	import Makie: Observable, @lift
+	import GeoInterface as GI, GeometryOps as GO
+	import Makie: Observable, @lift, lift
 	import GeoMakie: GeoAxis
 
     # Since we're overriding Base.split, we must import it
@@ -45,25 +46,27 @@ module LineSplitting
 	end
 
 	function split(tmp::AbstractVector{<:GeometryBasics.LineString}, lon0::Real)
-		[split(a,lon0) for a in tmp]
+		[split(a, lon0) for a in tmp]
 	end
 
 	###
 	split(tmp::GeometryBasics.LineString,dest::Observable) = @lift(split(tmp, $(dest)))
 
-	function split(tmp::AbstractVector{<:GeometryBasics.LineString},dest::Observable)
-		@lift([split(a,$(dest)) for a in tmp])
+	function split(tmp::AbstractVector{<:GeometryBasics.LineString}, dest::Observable)
+		@lift([split(a, $(dest)) for a in tmp])
 	end
 
 	###
-	split(tmp::GeometryBasics.LineString,ax::GeoAxis) = split(tmp, ax.dest)
+	split(tmp::GeometryBasics.LineString, ax::GeoAxis) = split(tmp, ax.dest)
 	
-	function split(tmp::AbstractVector{<:GeometryBasics.LineString},ax::GeoAxis)
-		[split(a,ax.dest) for a in tmp]
+	function split(tmp::AbstractVector{<:GeometryBasics.LineString}, ax::GeoAxis)
+		lift(ax.scene, ax.dest) do dest
+			[split(a, dest) for a in tmp]
+		end
 	end
 	
 	###
-	function split(tmp::GeometryBasics.LineString,dest::String)
+	function split(tmp::GeometryBasics.LineString, dest::String)
 		if occursin("+lon_0",dest)
 			tmp1=split(dest)
 			tmp2=findall(occursin.(Ref("+lon_0"),tmp1))[1]
