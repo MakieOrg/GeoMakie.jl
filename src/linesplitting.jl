@@ -24,25 +24,24 @@ module LineSplitting
 
     # Since we're overriding Base.split, we must import it
 	import Base.split
-			
-	getlon(p::GeometryBasics.Point) = p[1]
 
 	###
 	function split(tmp::GeometryBasics.LineString, lon0::Real)
-		lon0<0.0 ? lon1=lon0+180 : lon1=lon0-180 
-
+		# lon1 is the "antimeridian" relative to the central longitude `lon0`
+		lon1 = lon0 < 0.0 ? lon0+180 : lon0-180 
+		# GeometryBasics handles line nodes as polygons.
 		linenodes = GeometryBasics.coordinates(tmp)  # get coordinates of line nodes
 		# Find nodes that are on either side of lon0
-		cond = getlon.(linenodes) .>= lon1
+		cond = GI.x.(linenodes) .>= lon1
 		# Find interval starts and ends
 		end_cond = diff(cond)  # nonzero values denote ends of intervals
 		end_inds = findall(!=(0), end_cond)
 		start_inds = [firstindex(linenodes);  end_inds .+ 1]  # starts of intervals
 		end_inds = [end_inds; lastindex(linenodes)]  # ends of intervals
-		# do the splitting
-		split_coords = view.(Ref(linenodes), UnitRange.(start_inds, end_inds))  # For each start-end pair, get those coords
+		# do the splitting (TODO: this needs to inject a point at the appropriate place)
+		split_coords = @. view((linenodes,), UnitRange(start_inds, end_inds))  # For each start-end pair, get those coords
 		# reconstruct lines from points
-		split_lines = GeometryBasics.LineString.(split_coords) 
+		split_lines = GeometryBasics.MultiLineString(GeometryBasics.LineString.(split_coords))
 	end
 
 	function split(tmp::AbstractVector{<:GeometryBasics.LineString}, lon0::Real)
