@@ -1,3 +1,8 @@
+name = "GeoMakieDocumenterBlocks"
+uuid = "69faa270-cb74-4184-9a19-c7dca82a31fd"
+authors = ["Anshul Singhvi"]
+version = "0.0.1"
+
 [deps]
 Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 DisplayAs = "0b91fe84-8a4c-11e9-3e1d-67c38462b6d6"
@@ -8,3 +13,12 @@ ImageTransformations = "02fcd773-0e25-5acc-982a-7f6622650795"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
 MarkdownAST = "d0879d2d-cac2-40c8-9cee-1863dc0c7391"
+
+[compat]
+DisplayAs = "0.1"
+Documenter = "1"
+FileIO = "1"
+ImageIO = "0.6"
+ImageTransformations = "0.10"
+Makie = "0.21"
+MarkdownAST = "0.1.2"
