@@ -21,8 +21,6 @@ abstract type CardMetaBlocks <: Documenter.Expanders.ExpanderPipeline end
 Documenter.Selectors.order(::Type{CardMetaBlocks}) = 12.0
 Documenter.Selectors.matcher(::Type{CardMetaBlocks}, node, page, doc) = Documenter.iscode(node, r"^@cardmeta")
 
-GALLERY_DICT = Dict{String, Any}()
-
 function Documenter.Selectors.runner(::Type{CardMetaBlocks}, node, page, doc)
     # Bail early if in draft mode
     if Documenter.is_draft(doc, page)
@@ -36,9 +34,10 @@ function Documenter.Selectors.runner(::Type{CardMetaBlocks}, node, page, doc)
     # to be evaluated in the same module in order to have access to local variables.
     page_name = first(splitext(last(splitdir(page.source))))
     page_link_path = first(splitext(relpath(page.build, doc.user.build)))
+    @info "Running Cardmeta for $page_name"
+    gallery_dict = doc.plugins[findfirst(x -> x isa ExampleConfig, doc.plugins)].gallery_dict
 
-    global GALLERY_DICT
-    meta = get!(GALLERY_DICT, page_name, Dict{Symbol, Any}())
+    meta = get!(gallery_dict, page_name, Dict{Symbol, Any}())
     meta[:Path] = page_link_path
     # The sandboxed module -- either a new one or a cached one from this page.
     current_mod = Documenter.get_sandbox_module!(page.globals.meta, "atexample", page_name)
@@ -97,7 +96,6 @@ function Documenter.Selectors.runner(::Type{CardMetaBlocks}, node, page, doc)
     end
     get!(meta, :Title, title)
 
-
     # Cover - check for e.g. `fig`, `f`, `figure`
     if !haskey(meta, :Cover) # no default was assigned
         for potential_name in (:fig, :f, :figure)
@@ -121,11 +119,11 @@ function Documenter.Selectors.runner(::Type{CardMetaBlocks}, node, page, doc)
     end
 
     if haskey(meta, :Cover)
-        set_cover_to_png!(meta, page, doc)
-        # insert the cover image into the page
         if !isnothing(idx)
-            MarkdownAST.insert_after!(elements[idx], MarkdownAST.@ast Documenter.RawNode(:html, "<img src=\"$(meta[:Cover])\"/>"))
+            MarkdownAST.insert_after!(elements[idx], MarkdownAST.@ast Documenter.RawNode(:html, "<img src=\"$(get_image_url(page, doc, meta[:Cover]))\"/>"))
         end
+        set_cover_to_image!(meta, page, doc)
+        # insert the cover image into the page
     end
  
 
@@ -136,47 +134,43 @@ function Documenter.Selectors.runner(::Type{CardMetaBlocks}, node, page, doc)
 
 end
 
-function set_cover_to_png!(meta, page, doc)
-    if meta[:Cover] isa Makie.FigureLike
-        # convert figure to image
-        original_cover_image = Makie.colorbuffer(meta[:Cover])
-        ratio = 600 / size(original_cover_image, 1) # get 300px height
-        resized_cover_image = ImageTransformations.imresize(original_cover_image; ratio)
-        
-        # Below is the "inline pipeline"
-        iob = IOBuffer()
-        ImageIO.save(FileIO.Stream{FileIO.format"PNG"}(iob), resized_cover_image)
-        # We could include this inline, but that seems to be causing issues.
-        # meta[:Cover] = "data:image/png;base64, " * Base64.base64encode(String(take!(iob)))
-        # Instead, we will save to a file and include that.
-        bytes = take!(iob)
-        filename = string(hash(bytes), base = 62) * ".png"
-        write(joinpath(page.workdir, filename), bytes)
-        meta[:Cover] = "/" * joinpath(relpath(page.workdir, doc.user.build), filename)
-    end
+function get_image_url(page, doc, fig::Makie.FigureLike)
+    image = Makie.colorbuffer(fig)
+    iob = IOBuffer()
+    ImageIO.save(FileIO.Stream{FileIO.format"PNG"}(iob), image)
+    # We could include this inline, but that seems to be causing issues.
+    # meta[:Cover] = "data:image/png;base64, " * Base64.base64encode(String(take!(iob)))
+    # Instead, we will save to a file and include that.
+    bytes = take!(iob)
+    filename = string(hash(bytes), base = 62) * ".png"
+    path = joinpath(page.workdir, filename)
+    write(path, bytes)
+    return "/" * joinpath(relpath(page.workdir, doc.user.build), filename)
 end
 
+get_image_url(page, doc, s::String) = s
 
-
-abstract type MoveCardMeta <: Documenter.Builder.DocumentPipeline end
-
-Documenter.Selectors.order(::Type{MoveCardMeta}) = 1.2 # after doctest, before expand templates.
-
-function _is_cardmeta_block(x)
-    return x.element isa MarkdownAST.CodeBlock && Base.occursin("@cardmeta", x.element.info)
+function set_cover_to_image!(meta, page, doc)
+    return set_cover_to_image!(meta, page, doc, meta[:Cover])
 end
 
-function Documenter.Selectors.runner(::Type{MoveCardMeta}, doc::Documenter.Document)
-    # Main.@infiltrate
-    for (filename, page) in doc.blueprint.pages
-        cardmeta_blocks = filter(_is_cardmeta_block, collect(page.mdast.children))
-        if !isempty(cardmeta_blocks) # some cardmeta block was detected
-            # move the cardmeta block from wherever it is to the end of the page.
-            MarkdownAST.insert_after!(last(page.mdast.children), first(cardmeta_blocks))
-        elseif Base.occursin("examples", splitdir(page.build)[1]) # only inject cardmeta if in examples dir
-            # do nothing for now - potentially inject an extra cardmeta block at the end
-            # of every page.
-            MarkdownAST.insert_after!(last(page.mdast.children), MarkdownAST.@ast MarkdownAST.CodeBlock("@cardmeta", ""))
-        end
-    end
+set_cover_to_image!(meta, page, doc, cover::String) = cover
+
+function set_cover_to_image!(meta, page, doc, cover::Makie.FigureLike)
+    # convert figure to image
+    original_cover_image = Makie.colorbuffer(meta[:Cover])
+    ratio = 600 / size(original_cover_image, 1) # get 300px height
+    resized_cover_image = ImageTransformations.imresize(original_cover_image; ratio)
+    
+    # Below is the "inline pipeline"
+    iob = IOBuffer()
+    ImageIO.save(FileIO.Stream{FileIO.format"PNG"}(iob), resized_cover_image)
+    # We could include this inline, but that seems to be causing issues.
+    # meta[:Cover] = "data:image/png;base64, " * Base64.base64encode(String(take!(iob)))
+    # Instead, we will save to a file and include that.
+    bytes = take!(iob)
+    filename = string(hash(bytes), base = 62) * ".png"
+    write(joinpath(page.workdir, filename), bytes)
+    meta[:Cover] = "/" * joinpath(relpath(page.workdir, doc.user.build), filename)
 end
+
