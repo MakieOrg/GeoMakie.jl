@@ -49,8 +49,8 @@ examples = String[
     "field_and_countries.jl",
     "meshimage.jl",
     "projections.jl",
-    "tissot.jl",
-    "rotating_earth.jl",
+    # "tissot.jl",
+    # "rotating_earth.jl",
 ]
 example_dir = joinpath(dirname(@__DIR__), "examples")
 mkpath(example_dir)
