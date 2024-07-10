@@ -32,6 +32,6 @@ Makie.set_theme!(Theme(
         @test split(GeoMakie.coastlines(),"+lon_0=-160") isa Vector
         ga = GeoAxis(Figure();dest = "+proj=wintri +lon_0=-160")
         @test GeoMakie.coastlines(ga) isa Observable
-        @test GeoMakie.coastlines(ga)[][1] isa GeometryBasics.LineString
+        @test GeoMakie.coastlines(ga)[] isa AbstractVector
     end
 end

@@ -74,6 +74,38 @@ fig
 As you can see, the axis automatically transforms your input from the `source`
 CRS (default `"+proj=longlat +datum=WGS84"`) to the `dest` CRS.
 
+### Changing central longitude
+
+Be careful! Each data point is transformed individually.
+However, when using `surface` or `contour` plots this can lead to errors when the longitudinal dimension "wraps" around the planet.
+
+To fix this issue, the recommended approach is that you (1) change the central longitude of the map transformation (`dest`), and (2) `circshift` your data accordingly for `lons` and `field`.
+
+```@example MAIN
+function cshift(lons, field, lon_0)
+   shift = @. lons - lon_0 > 180
+   nn = sum(shift)
+   (circshift(lons - 360shift, nn), circshift(field, (nn, 0)))
+end
+```
+
+```@example MAIN
+lons = -180:180
+lats = -90:90
+field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
+
+lon_0 = -160
+(lons_shift, field_shift) = cshift(lons, field, lon_0)
+```
+
+```@example MAIN
+fig = Figure()
+ax = GeoAxis(fig[1,1]; dest = "+proj=eqearth +lon_0=$(lon_0)")
+surface!(ax, lons_shift, lats, field_shift, colormap=:balance)
+lines!.(ax, GeoMakie.coastlines(ax), color=:black, overdraw = true)
+fig
+```
+
 You can also use quite a few other plot types and projections:
 ```@example quickstart
 fieldlons = -180:180; fieldlats = -90:90
