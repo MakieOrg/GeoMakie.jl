@@ -36,6 +36,7 @@ function Documenter.Selectors.runner(::Type{CardMetaBlocks}, node, page, doc)
     # to be evaluated in the same module in order to have access to local variables.
     page_name = first(splitext(last(splitdir(page.source))))
     page_link_path = first(splitext(relpath(page.build, doc.user.build)))
+    @info "Running Cardmeta for $page_name"
 
     global GALLERY_DICT
     meta = get!(GALLERY_DICT, page_name, Dict{Symbol, Any}())
