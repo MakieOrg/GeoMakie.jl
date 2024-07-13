@@ -21,17 +21,18 @@ function Documenter.Selectors.runner(::Type{OverviewGalleryBlocks}, node, page, 
         Documenter.create_draft_result!(node; blocktype="@example")
         return
     end
+    gallery_dict = doc.plugins[findfirst(x -> x isa ExampleConfig, doc.plugins)].gallery_dict
 
     not_found = String[]
     entries = String[]
     # find the blocks and use them as strings
     for pagename in split(x.code, '\n')
-        if !haskey(Main.GALLERY_DICT, pagename)
+        if !haskey(gallery_dict, pagename)
             push!(not_found, pagename)
             continue
         end
         # obtain the element
-        element = Main.GALLERY_DICT[pagename]
+        element = gallery_dict[pagename]
         # obtain properties from the element, with defaults if not found from the cardmeta blocks
         href    = element[:Path] # this is must have!!!
         src     = get(element, :Cover, "data:image/svg+xml;charset=utf-8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\"/>")

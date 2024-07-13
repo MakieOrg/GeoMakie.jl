@@ -4,8 +4,8 @@ using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
 # some strategic imports to avoid world age issues
 using FHist
 
-include(joinpath(@__DIR__, "GeoMakieDocumenterBlocks", "src", "GeoMakieDocumenterBlocks.jl"))
-import .GeoMakieDocumenterBlocks: GALLERY_DICT
+include(joinpath(dirname(@__DIR__), "GeoMakieDocumenterBlocks", "src", "GeoMakieDocumenterBlocks.jl"))
+
 # Set some global settings
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)
@@ -60,7 +60,6 @@ for filename in examples
     Literate.markdown(file, joinpath(@__DIR__, "src", "examples", first(splitdir(filename))); documenter = true)
 end
 
-empty!(GALLERY_DICT)
 Documenter.makedocs(;
     modules=[GeoMakie],
     doctest=false,
@@ -81,13 +80,13 @@ Documenter.makedocs(;
         ],
         "Examples" => joinpath.(("examples",), replace.(examples, (".jl" => ".md",))),
     ],
+    plugins = Documenter.Plugin[GeoMakieDocumenterBlocks.ExampleConfig(),],
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
     warnonly = true,
     draft = false,
     expandfirst = joinpath.(("examples",),first.(splitext.(examples)) .* ".md"),
 )
-empty!(GALLERY_DICT)
 
 deploydocs(; 
     repo="github.com/MakieOrg/GeoMakie.jl", 
