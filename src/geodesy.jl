@@ -12,7 +12,7 @@ function Makie.apply_transform(f::Geodesy.ECEFfromLLA, pt::V) where V <: VecType
     # The convention in Makie is that x is longitude, y is latitude, and z is altitude if present.
     # However, the `LLA` coordinate space expects x to be latitude and y to be longitude,
     # so we have to manually swap the coordinates.
-    return V((f(LLA(pt[2], pt[1], pt[3])) ./ 2.5f3)...)
+    return V((f(LLA(pt[2], pt[1], pt[3])))...)
     # Enterprising observers will note the division by 2,500.  This is to "normalize" the sphere; 
     # Geodesy.jl outputs in meters, which would make the sphere hilariously large. 
     # This also fits well with Makie's limit finding, which works in input space, and not transformed space.
@@ -20,7 +20,7 @@ end
 
 # If a Point2f is passed, we decide to handle that by assuming altitude to be 0.  
 function Makie.apply_transform(f::Geodesy.ECEFfromLLA, pt::V) where V <: VecTypes{2, T} where {T}
-    return Makie.apply_transform(f, Point3f(pt[1], pt[2], 0))
+    return Makie.apply_transform(f, Point3d(pt[1], pt[2], 0))
 end
 
 # This is a necessary dispatch for all vectors of points.
@@ -36,11 +36,11 @@ end
 Makie.inverse_transform(f::Geodesy.ECEFfromLLA) = Base.inv(f)
 # and its application:
 function Makie.apply_transform(f::Geodesy.LLAfromECEF, pt::V) where V <: VecTypes{3, T} where {T}
-    return V((f(ECEF(pt[1], pt[2], pt[3]) .* 2.5f3))...) # invert the previous scale factor
+    return V((f(ECEF(pt[1], pt[2], pt[3])))...) # invert the previous scale factor
 end
 
 function Makie.apply_transform(f::Geodesy.LLAfromECEF, pt::V) where V <: VecTypes{N, T} where {N, T}
-    return Makie.apply_transform(f, to_ndim(Point3f, pt, 0))
+    return Makie.apply_transform(f, to_ndim(Point3d, pt, 0))
 end
 
 # This is a necessary dispatch for all vectors of points.
@@ -88,4 +88,30 @@ end
 # f, a, p = lines(Point3f.(rand(10), rand(10), 0))
 # p.transformation.transform_func[] = trans3
 # f
+
+#=
+transf2 = Makie.PointTrans{3}() do p
+    ϕ, θ, r = p
+    sθ, cθ = sincos(deg2rad(θ))
+    sϕ, cϕ = sincos(deg2rad(ϕ))
+    Point3(r * cθ * cϕ, r * sθ * cϕ, r * sϕ)
+end
+
+f, a, p = meshimage(0..360, 0..180, GeoMakie.earth(); z_level = 100, axis = (; type = LScene));
+
+lats = -180:180
+lons = -90:90
+grid = Point2f.(lons, lats')
+transformed_grid = Makie.apply_transform(transf, grid)
+# transformed_grid = Geodesy.ECEFfromLLA(WGS84()).(splat(LLA).(grid)) .|> Point3f
+
+f, a, p = surface(first.(transformed_grid), getindex.(transformed_grid, 2), last.(transformed_grid); color = rand(100, 100), axis = (; type = LScene))
+f, a, p = surface(first.(grid), last.(grid), ones(100, 100); color = rand(100, 100), axis = (; type = LScene))
+lp = lines!(a, Point3f.(1:10, 1:10, 110); color = :red, linewidth = 2)
+p.transformation.transform_func[] = transf
+lp.transformation.transform_func[] = transf2
+f
+
+=#
+
 
