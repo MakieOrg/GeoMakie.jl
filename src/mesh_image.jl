@@ -77,7 +77,7 @@ function Makie.plot!(plot::MeshImage)
         # `first` and `last` are used to get the number of points per side, if that's provided as a tuple.
         xs = LinRange(extrema(x_in)..., first(npoints))
         ys = LinRange(extrema(y_in)..., last(npoints))
-        poval = points_observable[]
+        poval = points_observable.val
         # The array is in a grid, so we have to update them on a grid as well.
         for (linear_ind, cartesian_ind) in enumerate(CartesianIndices((npoints, npoints)))
             p = Point3d(xs[cartesian_ind[1]], ys[cartesian_ind[2]], z_level)
@@ -117,8 +117,8 @@ function Makie.plot!(plot::MeshImage)
         MakieCore.colormap_attributes(plot)..., # pass on all colormap attributes
         shading = NoShading, #
         transformation = Transformation(
-            plot.transformation;     # connect up the model matrix to the parent's model matrix
-            transform_func = nothing # do NOT connect the transform func, since we've already done that
+            plot.transformation;      # connect up the model matrix to the parent's model matrix
+            transform_func = identity # do NOT connect the transform func, since we've already done that.  identity provides a custom transform func, while `nothing` signals that you don't care.
         )
     )
     # TODO: get a `:transformed` space out so we don't need this `transformation` hack
