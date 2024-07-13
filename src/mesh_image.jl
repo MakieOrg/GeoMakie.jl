@@ -132,3 +132,4 @@ function Makie.data_limits(plot::MeshImage)
     maxi = Vec3f(last.(mini_maxi)..., 0)
     return Rect3f(mini, maxi .- mini)
 end
+# Boundingbox needs to iterate though, so it's fine to not override that.

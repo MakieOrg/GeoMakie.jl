@@ -11,4 +11,3 @@ Makie.update_cam!(a.scene, cc)
 p.transformation.transform_func[] = transf
 lp.transformation.transform_func[] = transf
 f
-
