@@ -4,8 +4,8 @@ using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
 # some strategic imports to avoid world age issues
 using FHist
 
-include(joinpath(dirname(@__DIR__), "GeoMakieDocumenterBlocks", "src", "GeoMakieDocumenterBlocks.jl"))
-
+# include(joinpath(dirname(@__DIR__), "GeoMakieDocumenterBlocks", "src", "GeoMakieDocumenterBlocks.jl"))
+using OhMyCards
 # Set some global settings
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)
@@ -85,7 +85,8 @@ Documenter.makedocs(;
     authors="Anshul Singhvi and the Makie.jl contributors",
     warnonly = true,
     draft = false,
-    expandfirst = joinpath.(("examples",),first.(splitext.(examples)) .* ".md"),
+    plugins = [OhMyCards.ExampleConfig(),],
+    expandfirst = joinpath.(("examples",),["basic"] .* ".md"),
 )
 
 deploydocs(; 
