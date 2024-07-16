@@ -80,7 +80,6 @@ Documenter.makedocs(;
         ],
         "Examples" => joinpath.(("examples",), replace.(examples, (".jl" => ".md",))),
     ],
-    plugins = Documenter.Plugin[GeoMakieDocumenterBlocks.ExampleConfig(),],
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
     warnonly = true,
