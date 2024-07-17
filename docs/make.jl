@@ -85,7 +85,7 @@ Documenter.makedocs(;
     warnonly = true,
     draft = false,
     plugins = [OhMyCards.ExampleConfig(),],
-    expandfirst = joinpath.(("examples",),["basic"] .* ".md"),
+    expandfirst = joinpath.(("examples",), examples .* ".md"),
 )
 
 deploydocs(; 
