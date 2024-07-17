@@ -74,7 +74,8 @@ jobs:
               # PackageSpec(name = "MakieCore", rev = "master"), 
               # PackageSpec(name = "CairoMakie", rev = "master"), 
               PackageSpec(name = "Rasters", rev = "la/compacts"),
-              PackageSpec(name = "ArchGDAL", rev = "master")
+              PackageSpec(name = "ArchGDAL", rev = "master"),
+              PackageSpec(url = "https://github.com/asinghvi17/OhMyCards.jl", rev = "main"),
             ])
             Pkg.instantiate()'
         env:

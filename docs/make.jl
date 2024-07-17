@@ -4,8 +4,8 @@ using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
 # some strategic imports to avoid world age issues
 using FHist
 
-include(joinpath(dirname(@__DIR__), "GeoMakieDocumenterBlocks", "src", "GeoMakieDocumenterBlocks.jl"))
-
+# include(joinpath(dirname(@__DIR__), "GeoMakieDocumenterBlocks", "src", "GeoMakieDocumenterBlocks.jl"))
+using OhMyCards
 # Set some global settings
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)
@@ -36,20 +36,20 @@ examples = String[
     "orthographic.jl",
     # "geostationary_image.jl",
     # "multiple_crs.jl",
-    # "rasters.jl",
-    # "healpix.jl",
+    "rasters.jl",
+    "healpix.jl",
     # "is_it_a_plane.jl",
-    # joinpath("cartopy", "annotation.jl"),
-    # joinpath("cartopy", "katrina.jl"),
-    # joinpath("cartopy", "arrows.jl"),
+    joinpath("cartopy", "annotation.jl"),
+    joinpath("cartopy", "katrina.jl"),
+    joinpath("cartopy", "arrows.jl"),
     # # joinpath("cartopy", "vesta.jl"),
-    # joinpath("cartopy", "streamplot.jl"),
-    # joinpath("gmt", "antioquia.jl"),
-    # "german_lakes.jl",
-    # "field_and_countries.jl",
-    # "meshimage.jl",
+    joinpath("cartopy", "streamplot.jl"),
+    joinpath("gmt", "antioquia.jl"),
+    "german_lakes.jl",
+    "field_and_countries.jl",
+    "meshimage.jl",
     # "projections.jl",
-    # "tissot.jl",
+    "tissot.jl",
     # "rotating_earth.jl",
 ]
 example_dir = joinpath(dirname(@__DIR__), "examples")
@@ -80,12 +80,13 @@ Documenter.makedocs(;
         ],
         "Examples" => joinpath.(("examples",), replace.(examples, (".jl" => ".md",))),
     ],
-    plugins = Documenter.Plugin[GeoMakieDocumenterBlocks.ExampleConfig(),],
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
     warnonly = true,
     draft = false,
-    expandfirst = joinpath.(("examples",),first.(splitext.(examples)) .* ".md"),
+    plugins = [OhMyCards.ExampleConfig(),],
+    expandfirst = joinpath.(("examples",), replace.(examples, (".jl" => ".md",))),
+
 )
 
 deploydocs(; 

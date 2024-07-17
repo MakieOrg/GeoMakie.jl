@@ -50,9 +50,6 @@ GeoMakie provides a `GeoAxis` type which handles CRS and projections, and variou
 
 ## Quick start
 
-
-## Quick start
-
 The main entry point to GeoMakie is the function `GeoAxis(fig[i, j]; kw_args...)`.  It creates an axis which accepts nonlinear projections, but is otherwise identical in usage to Makie's `Axis`.
 Projections are accepted as [PROJ-strings](https://proj.org/operations/projections/index.html), and can be set through the `source="+proj=latlong +datum=WGS84"` and `dest="+proj=eqearth"` keyword arguments to `GeoAxis`.
 
@@ -108,6 +105,8 @@ fig
 
 You can also use quite a few other plot types and projections:
 ```@example quickstart
+using GeoMakie, CairoMakie
+
 fieldlons = -180:180; fieldlats = -90:90
 field = [exp(cosd(lon)) + 3(lat/90) for lon in fieldlons, lat in fieldlats]
 
