@@ -35,7 +35,7 @@ examples = String[
     "graph_on_usa.jl",
     "orthographic.jl",
     # "geostationary_image.jl",
-    "multiple_crs.jl",
+    # "multiple_crs.jl",
     "rasters.jl",
     "healpix.jl",
     # "is_it_a_plane.jl",
