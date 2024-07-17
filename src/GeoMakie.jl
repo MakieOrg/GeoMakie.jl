@@ -26,7 +26,9 @@ import GeoInterfaceMakie # to activate GI geometry plotting
 export GeoInterface
 
 # bring in missing Makie methods required for block definition
-using Makie: make_block_docstring
+@static if :make_block_docstring in names(Makie; all = true)
+    @eval using Makie: make_block_docstring
+end
 
 # fix conflicts
 import Makie: rotate! # use LinearAlgebra.rotate! otherwise
