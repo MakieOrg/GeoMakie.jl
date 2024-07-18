@@ -15,8 +15,11 @@ using Makie: Format
 using Makie.GridLayoutBase: Side
 
 using GeoJSON, NaturalEarth # for data
+
+import GeometryOps as GO, GeoInterface as GI
 using GeoInterface: GeoInterface, coordinates, getfeature
 using GeometryBasics: Polygon, MultiPolygon
+
 using Geodesy
 using Proj
 import GeoFormatTypes
