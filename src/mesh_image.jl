@@ -56,7 +56,7 @@ function Makie.plot!(plot::MeshImage)
     # A sentinel so we can see if `npoints` changed.  If it did, we have to
     # recreate the mesh, which is slightly time-consuming.  If not, though,
     # then we only have to change the texture (image) which is cheaper.
-    old_npoints = Ref(0)
+    old_npoints = Ref{Any}(0)
 
     # Handle the transformation
     onany(plot, plot.converted[1], plot.converted[2], plot.transformation.transform_func, plot.npoints, plot.space, plot.z_level; update=true) do x_in, y_in, tfunc, npoints, space, z_level
@@ -79,7 +79,7 @@ function Makie.plot!(plot::MeshImage)
         ys = LinRange(extrema(y_in)..., last(npoints))
         poval = points_observable.val
         # The array is in a grid, so we have to update them on a grid as well.
-        for (linear_ind, cartesian_ind) in enumerate(CartesianIndices((npoints, npoints)))
+        for (linear_ind, cartesian_ind) in enumerate(CartesianIndices((first(npoints), last(npoints))))
             p = Point3d(xs[cartesian_ind[1]], ys[cartesian_ind[2]], z_level)
             poval[linear_ind] = Makie.to_ndim(
                 Point3d, 
