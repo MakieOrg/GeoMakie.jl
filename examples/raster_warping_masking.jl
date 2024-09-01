@@ -6,19 +6,26 @@ Cover = fig
 
 using CairoMakie, GeoMakie
 using Rasters, ArchGDAL,NaturalEarth, FileIO
-import GeoInterface as GI, GeometryOps as GO
 
+# ## Background setup
 # Set up the background.  First, load the image,
-## blue_marble_image = FileIO.load(FileIO.query(download("https://eoimages.gsfc.nasa.gov/images/imagerecords/76000/76487/world.200406.3x5400x2700.jpg"))) |> rotr90 .|> RGBA{Makie.Colors.N0f8} # need to make sure this is RGBA
+blue_marble_image = FileIO.load(FileIO.query(download("https://eoimages.gsfc.nasa.gov/images/imagerecords/76000/76487/world.200406.3x5400x2700.jpg"))) |> rotr90 .|> RGBA{Makie.Colors.N0f8}
 # Your other choice is:
 blue_marble_image = GeoMakie.earth() |> rotr90 .|> RGBA{Makie.Colors.N0f8}
+# For the purposes of this example, we'll use the Natural Earth background image,
+# since it's significantly smaller and the poor CI machine can't handle huge images.
 
-
-# and wrap it as a Raster for easy masking.
-blue_marble_raster = Raster(blue_marble_image, (X(LinRange(-180, 180, size(blue_marble_image, 1))), Y(LinRange(-90, 90, size(blue_marble_image, 2)))))
+# We wrap the image as a Raster for easy masking.
+blue_marble_raster = Raster(
+    blue_marble_image, # the contents
+    ( # the dimensions go in this tuple.  `X` and `Y` are defined by the Rasters ecosystem.
+        X(LinRange(-180, 180, size(blue_marble_image, 1))), 
+        Y(LinRange(-90, 90, size(blue_marble_image, 2)))
+    )
+)
 # Construct a mask of land using Natural Earth land polygons
 land_mask = Rasters.boolmask(NaturalEarth.naturalearth("land", 10); to = blue_marble_raster)
-
+#
 land_raster = deepcopy(blue_marble_raster)
 land_raster[(!).(land_mask)] .= RGBA{Makie.Colors.N0f8}(0.0, 0.0, 0.0, 0.0)
 land_raster
@@ -26,6 +33,8 @@ land_raster
 sea_raster = deepcopy(blue_marble_raster)
 sea_raster[land_mask] .= RGBA{Makie.Colors.N0f8}(0.0, 0.0, 0.0, 0.0)
 sea_raster
+
+# ## Constructing fake data
 
 # Now, we construct fake data.
 field = [exp(cosd(x)) + 3(y/90) for x in -180:180, y in -90:90]
@@ -49,6 +58,7 @@ transformed = Rasters.warp(
     )
 )
 
+# ## Plotting the data
 
 fig = Figure(size = (1000, 1000))
 ax = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=0 +lat_0=0")
@@ -71,5 +81,30 @@ center_y = mean(last.(xy_matrix))
 
 # We'll use the `ortho` projection, which is centered on the point we just found.
 ax.dest = "+proj=ortho +lon_0=$(center_x) +lat_0=$(center_y)"
+
+fig
+
+# ## Plotting on the 3D globe
+
+# Super bonus points: plot the data on the globe
+
+using Geodesy
+
+fig = Figure(size = (1000, 1000));
+
+ax = LScene(fig[1, 1])
+
+sea_plot = meshimage!(ax, sea_raster; npoints = 300)
+
+land_plot = meshimage!(ax, land_raster; npoints = 300)
+
+data_plot = surface!(ax, transformed; shading = NoShading)
+
+land_plot.z_level[] = 1
+data_plot[:depth_shift] = -0.00
+
+sea_plot.transformation.transform_func[] = Geodesy.ECEFfromLLA(Geodesy.WGS84())
+land_plot.transformation.transform_func[] = Geodesy.ECEFfromLLA(Geodesy.WGS84())
+data_plot.transformation.transform_func[] = Geodesy.ECEFfromLLA(Geodesy.WGS84())
 
 fig
