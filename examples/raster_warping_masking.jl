@@ -48,8 +48,7 @@ transformed = Rasters.warp(
     ras,
     Dict(
         "r" => "bilinear", 
-        # see https://gdal.org/en/latest/programs/gdalwarp.html
-        "ct" => """
+        "ct" => #= see https://gdal.org/en/latest/programs/gdalwarp.html =# """
         +proj=pipeline
         +step +proj=affine +xoff=$(30) +yoff=$(-36) +s11=$(rotmat[1,1]) +s12=$(rotmat[1,2]) +s21=$(rotmat[2,1]) +s22=$(rotmat[2,2])
         """,
@@ -90,7 +89,8 @@ fig
 
 using Geodesy
 
-fig = Figure(size = (1000, 1000));
+# fig = Figure(size = (1000, 1000));
+fig = Figure()
 
 ax = LScene(fig[1, 1])
 
@@ -100,8 +100,7 @@ land_plot = meshimage!(ax, land_raster; npoints = 300)
 
 data_plot = surface!(ax, transformed; shading = NoShading)
 
-land_plot.z_level[] = 1
-data_plot[:depth_shift] = -0.00
+land_plot.z_level[] = 1000
 
 sea_plot.transformation.transform_func[] = Geodesy.ECEFfromLLA(Geodesy.WGS84())
 land_plot.transformation.transform_func[] = Geodesy.ECEFfromLLA(Geodesy.WGS84())
