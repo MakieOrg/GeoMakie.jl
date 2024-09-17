@@ -73,7 +73,7 @@ jobs:
               # PackageSpec(name = "Makie", rev = "master"), 
               # PackageSpec(name = "MakieCore", rev = "master"), 
               # PackageSpec(name = "CairoMakie", rev = "master"), 
-              PackageSpec(name = "Rasters", rev = "la/compacts"),
+              PackageSpec(name = "Rasters", rev = "main"),
               PackageSpec(name = "ArchGDAL", rev = "master"),
               PackageSpec(url = "https://github.com/asinghvi17/OhMyCards.jl", rev = "main"),
             ])

@@ -37,6 +37,7 @@ examples = String[
     # "geostationary_image.jl",
     # "multiple_crs.jl",
     "rasters.jl",
+    "raster_warping_masking.jl",
     "healpix.jl",
     # "is_it_a_plane.jl",
     joinpath("cartopy", "annotation.jl"),
@@ -85,8 +86,6 @@ Documenter.makedocs(;
     warnonly = true,
     draft = false,
     plugins = [OhMyCards.ExampleConfig(),],
-    expandfirst = joinpath.(("examples",), replace.(examples, (".jl" => ".md",))),
-
 )
 
 deploydocs(; 

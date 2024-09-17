@@ -34,6 +34,13 @@ the provided image.  Its conversion trait is `ImageLike`.
     z_level = 0.0
     "Sets the lighting algorithm used. Options are `NoShading` (no lighting), `FastShading` (AmbientLight + PointLight) or `MultiLightShading` (Multiple lights, GLMakie only). Note that this does not affect RPRMakie."
     shading = NoShading
+    """
+    Sets a transform for uv coordinates, which controls how the image is mapped to its rectangular area. The attribute can be `I`,
+    `scale::VecTypes{2}`, `(translation::VecTypes{2}, scale::VecTypes{2})`, any of `:rotr90`, `:rotl90`, `:rot180`, `:swapxy`/`:transpose`, `:flip_x`, `:flip_y`, `:flip_xy`, or
+    most generally a `Makie.Mat{2, 3, Float32}` or `Makie.Mat3f` as returned by `Makie.uv_transform()`. They can also be changed by passing a tuple `(op3, op2,
+    op1)`.
+    """
+    uv_transform = Makie.LinearAlgebra.I
     MakieCore.mixin_generic_plot_attributes()...
     MakieCore.mixin_colormap_attributes()...
 end
@@ -56,7 +63,7 @@ function Makie.plot!(plot::MeshImage)
     # A sentinel so we can see if `npoints` changed.  If it did, we have to
     # recreate the mesh, which is slightly time-consuming.  If not, though,
     # then we only have to change the texture (image) which is cheaper.
-    old_npoints = Ref(0)
+    old_npoints = Ref{Any}(0)
 
     # Handle the transformation
     onany(plot, plot.converted[1], plot.converted[2], plot.transformation.transform_func, plot.npoints, plot.space, plot.z_level; update=true) do x_in, y_in, tfunc, npoints, space, z_level
@@ -79,7 +86,7 @@ function Makie.plot!(plot::MeshImage)
         ys = LinRange(extrema(y_in)..., last(npoints))
         poval = points_observable.val
         # The array is in a grid, so we have to update them on a grid as well.
-        for (linear_ind, cartesian_ind) in enumerate(CartesianIndices((npoints, npoints)))
+        for (linear_ind, cartesian_ind) in enumerate(CartesianIndices((first(npoints), last(npoints))))
             p = Point3d(xs[cartesian_ind[1]], ys[cartesian_ind[2]], z_level)
             poval[linear_ind] = Makie.to_ndim(
                 Point3d, 
@@ -119,7 +126,8 @@ function Makie.plot!(plot::MeshImage)
         transformation = Transformation(
             plot.transformation;      # connect up the model matrix to the parent's model matrix
             transform_func = identity # do NOT connect the transform func, since we've already done that.  identity provides a custom transform func, while `nothing` signals that you don't care.
-        )
+        ),
+        uv_transform = plot.uv_transform
     )
     # TODO: get a `:transformed` space out so we don't need this `transformation` hack
 end
