@@ -553,3 +553,15 @@ Makie.hidedecorations!(ax::GeoAxis; kw...) = begin
     hidexdecorations!(ax; kw...)
     hideydecorations!(ax; kw...)
 end
+
+# Legend API
+
+function Makie.get_plots(ax::GeoAxis)
+    return Makie.get_plots(ax.scene)[3:end] 
+end
+
+function Makie.Legend(fig_or_scene, axis::GeoAxis, title = nothing; merge = false, unique = false, kwargs...)
+    plots, labels = Makie.get_labeled_plots(axis, merge = merge, unique = unique)
+    isempty(plots) && error("There are no plots with labels in the given axis that can be put in the legend. Supply labels to plotting functions like `plot(args...; label = \"My label\")`")
+    Makie.Legend(fig_or_scene, plots, labels, title; kwargs...)
+end
