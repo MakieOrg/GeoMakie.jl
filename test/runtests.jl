@@ -34,4 +34,13 @@ Makie.set_theme!(Theme(
         @test GeoMakie.coastlines(ga) isa Observable
         @test GeoMakie.coastlines(ga)[] isa AbstractVector
     end
+
+    @testset "Legend" begin
+        fig = Figure()
+        ga = GeoAxis(fig[1, 1])
+        lines!(ga, 1:10, 1:10; label = "series 1")
+        scatter!(ga, 1:19, 2:20; label= "series 2")
+        @test_nowarn Legend(fig[1, 2], ga)
+        fig
+    end
 end
