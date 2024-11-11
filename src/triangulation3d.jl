@@ -20,7 +20,14 @@ using GeometryOps.ExactPredicates.StaticArrays: SVector
     return ExactPredicates.inp(cross, cross) # Will be 0 if collinear, positive otherwise
 end
 
-function Makie.poly_convert(polygon::GeometryBasics.Polygon{3}, transform_func = identity)
+# This should be removed once https://github.com/MakieOrg/Makie.jl/pull/4584 is merged!
+# TODO
+
+# We don't want to override the general case poly_convert for all polygons, because that's piracy,
+# but we _can_ override it for the specific case of a 3D polygon that is being transformed by a function
+# that is a subtype of Union{<: Proj.Transformation, <: GeoMakie.Geodesy.ECEFfromLLA}
+function Makie.poly_convert(polygon::GeometryBasics.Polygon, transform_func::Union{<: Proj.Transformation, <: GeoMakie.Geodesy.ECEFfromLLA})
+
     outer = GeometryBasics.metafree(GeometryBasics.coordinates(polygon.exterior))
     PT = Makie.float_type(outer)
     points = [Makie.apply_transform(transform_func, outer)]
@@ -29,6 +36,12 @@ function Makie.poly_convert(polygon::GeometryBasics.Polygon{3}, transform_func =
         inner_points = GeometryBasics.metafree(GeometryBasics.coordinates(inner))
         append!(points_flat, inner_points)
         push!(points, Makie.apply_transform(transform_func, inner_points))
+    end
+
+    # Shortcut if the transformation is 2D -> 2D
+    if points isa Vector{Vector{<: Makie.VecTypes{2}}}
+        faces = GeometryBasics.earcut_triangulate(points)
+        return GeometryBasics.Mesh(points_flat, faces)
     end
 
     # We assume the polygon lies on a plane, and thus seek to find that plane,
@@ -54,7 +67,8 @@ function Makie.poly_convert(polygon::GeometryBasics.Polygon{3}, transform_func =
     projected_polygon = map(ring -> map(p -> Point2{Float64}(dot(p, x), dot(p, y)), ring), points)
 
     # Now, call earcut_triangulate on the projected polygon, which is 2D
-    return GeometryBasics.earcut_triangulate(projected_polygon)
+    faces = GeometryBasics.earcut_triangulate(projected_polygon)
+    return GeometryBasics.Mesh(points_flat, faces)
 end
 
 function extract_three_unique_and_independent_points(points::Vector{Vector{PT}}) where PT <: Makie.VecTypes
