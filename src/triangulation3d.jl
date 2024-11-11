@@ -39,7 +39,7 @@ function Makie.poly_convert(polygon::GeometryBasics.Polygon, transform_func::Uni
     end
 
     # Shortcut if the transformation is 2D -> 2D
-    if points isa Vector{Vector{<: Makie.VecTypes{2}}}
+    if points isa Vector{<: Vector{<: Makie.VecTypes{2}}}
         faces = GeometryBasics.earcut_triangulate(points)
         return GeometryBasics.Mesh(points_flat, faces)
     end
@@ -98,11 +98,11 @@ function extract_three_unique_and_independent_points(points::Vector{Vector{PT}})
     end
 
     # Account for collinear points
-    if _collinear(Point3{Float64}(p1), Point3{Float64}(p2), Point3{Float64}(p3)) == 0 # collinear, all the points lie on the same line
+    if _collinear(Makie.to_ndim(Point3d, p1, 0.0), Makie.to_ndim(Point3d, p2, 0.0), Makie.to_ndim(Point3d, p3, 0.0)) == 0 # collinear, all the points lie on the same line
         if length(points[1]) <= 3
             error("Polygon has only three points and they are all collinear, we can't triangulate this!")
         end
-        new_point_idx = findfirst(p -> _collinear(Point3{Float64}(p1), Point3{Float64}(p2), Point3{Float64}(p)) != 0, points[1])
+        new_point_idx = findfirst(p -> _collinear(Makie.to_ndim(Point3d, p1, 0.0), Makie.to_ndim(Point3d, p2, 0.0), Makie.to_ndim(Point3d, p), 0.0) != 0, points[1])
         if isnothing(new_point_idx)
             error("All points in the polygon are collinear, we can't triangulate this!")
         end
