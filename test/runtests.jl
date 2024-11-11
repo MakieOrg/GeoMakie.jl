@@ -1,10 +1,12 @@
 using GeoMakie, GeometryBasics, CairoMakie, Test
+import Makie.SpecApi as S
 
 Makie.set_theme!(Theme(
     Heatmap = (rasterize = 5,),
     Image   = (rasterize = 5,),
     Surface = (rasterize = 5,),
 ))
+
 
 @testset "GeoMakie" begin
     @testset "MeshImage" begin
@@ -42,5 +44,19 @@ Makie.set_theme!(Theme(
         scatter!(ga, 1:19, 2:20; label= "series 2")
         @test_nowarn Legend(fig[1, 2], ga)
         fig
+    end
+
+    @testset "Plotlists get transformed" begin
+        fig = Figure()
+        ax = GeoAxis(fig[1,1])
+        plotspecs = [S.Lines(Point2f.(1:10, 1:10)), S.Scatter(Point2f.(1:10, 1:10))]
+
+        p1 = plotlist!(ax, plotspecs)
+
+        @test p1.transformation.transform_func[] isa GeoMakie.Proj.Transformation
+
+        for plot in p1.plots
+            @test plot.transformation.transform_func[] isa GeoMakie.Proj.Transformation
+        end
     end
 end
