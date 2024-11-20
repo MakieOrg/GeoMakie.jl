@@ -57,16 +57,18 @@ struct GeodesyGlobeTransform{CoordType, T} <: GlobeTransform
 end
 
 
-function GeodesyGlobeTransform(dest::Geodesy.Ellipsoid, src::Type{Geodesy.LLA})
-    return GeodesyGlobeTransform{src}(Geodesy.ECEFfromLLA(dest), zlevel)
+function GeodesyGlobeTransform(dest::Geodesy.Ellipsoid, src::Type{Geodesy.LLA}, zlevel)
+    transf = Geodesy.ECEFfromLLA(dest)
+    return GeodesyGlobeTransform{src, typeof(transf)}(transf, zlevel)
 end
 
 
-function GeodesyGlobeTransform(dest::Geodesy.Ellipsoid, src::Type{Geodesy.UTM})
-    return GeodesyGlobeTransform{src}(Geodesy.ECEFfromUTM(dest), zlevel)
+function GeodesyGlobeTransform(dest::Geodesy.Ellipsoid, src::Type{Geodesy.UTM}, zlevel)
+    transf = Geodesy.ECEFfromUTM(dest)
+    return GeodesyGlobeTransform{src, typeof(transf)}(transf, zlevel)
 end
 
-function GeodesyGlobeTransform(dest::Geodesy.Ellipsoid, src::Type{Geodesy.UTMZ})
+function GeodesyGlobeTransform(dest::Geodesy.Ellipsoid, src::Type{Geodesy.UTMZ}, zlevel)
     return GeodesyGlobeTransform{src}(Geodesy.ECEFfromUTMZ(dest), zlevel)
 end
 
