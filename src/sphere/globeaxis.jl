@@ -24,14 +24,16 @@ For now, a simple implementation is to have a single globe.  We can always decid
 
 
 Makie.@Block GlobeAxis <: Makie.AbstractAxis begin
+    @forwarded_layout
     scene::Scene
+    lscene::LScene
     globe_limits::Observable{Rect3d}
-    mouseeventhandle::Makie.MouseEventHandle
-    scrollevents::Observable{Makie.ScrollEvent}
-    keysevents::Observable{Makie.KeysEvent}
+    # mouseeventhandle::Makie.MouseEventHandle
+    # scrollevents::Observable{Makie.ScrollEvent}
+    # keysevents::Observable{Makie.KeysEvent}
     # interactions::Dict{Symbol, Tuple{Bool, Any}}
     elements::Dict{Symbol, Any}
-    final_ellipsoid::Observable{Geodesy.Ellipsoid}
+    ellipsoid::Observable{Geodesy.Ellipsoid}
     transform_func::Observable{Any}
     inv_transform_func::Observable{Any}
     @attributes begin
@@ -63,6 +65,8 @@ Makie.@Block GlobeAxis <: Makie.AbstractAxis begin
 
 
         # appearance controls
+        "Controls if the axis is visible.  This is a regular 3D OldAxis for now."
+        show_axis::Bool = true
         "The set of fonts which text in the axis should use.s"
         fonts = (; regular = "TeX Gyre Heros Makie")
         "The axis title string."
@@ -235,8 +239,15 @@ Makie.@Block GlobeAxis <: Makie.AbstractAxis begin
     end
 end
 
-function Makie.initialize_block!(axis::GlobeAxis; scenekw = NamedTuple())
+_geodesy_ellipsoid_from(g::Geodesy.Ellipsoid) = g
+_geodesy_ellipsoid_from(g::Geodesy.Datum) = Geodesy.ellipsoid(g)
+_geodesy_ellipsoid_from(n::NamedTuple{(:a, :f), Tuple{Float64, Float64}}) = Geodesy.ellipsoid(; n...)
 
+function Makie.initialize_block!(axis::GlobeAxis; ellipsoid = Geodesy.wgs84_ellipsoid, scenekw = NamedTuple())
+
+    # axis.show_axis = true
+    # TODO: set up globe ellipsoid ahead of time.
+    setfield!(axis, :ellipsoid, Observable{Geodesy.Ellipsoid}(_geodesy_ellipsoid_from(ellipsoid))) # TODO: change this to Geodesy.Datum, allow for a Geodesy.FlexibleDatum type that takes an ellipsoid.
     # Set up transformations first, so that the scene can be set up
     # and linked to those.
     transform_obs = Observable{Any}(identity; ignore_equal_values=true)
@@ -246,72 +257,93 @@ function Makie.initialize_block!(axis::GlobeAxis; scenekw = NamedTuple())
     setfield!(axis, :transform_func, transform_obs)
     setfield!(axis, :inv_transform_func, transform_inv_obs)
 
-    scene = axis_setup!(axis, transform_obs; scenekw)
+    lscene = LScene(axis.layout[1, 1]; show_axis = axis.show_axis, scenekw)
+    scene = lscene.scene
+    setfield!(axis, :scene, scene)
+    setfield!(axis, :lscene, lscene)
 
+    # set up the camera for the axis
+    cc = cameracontrols(scene)
+    cc.settings.mouse_translationspeed[] = 0.0
+    cc.settings.zoom_shift_lookat[] = false
+    cc.lookat[] = Makie.Vec3f(0, 0, 0) # center the camera on the globe
+    # TODO: decide - should we use cam3d_cad or oldcam3d here?
+    Makie.update_cam!(scene, cc)
+
+    setfield!(axis, :globe_limits, Observable{Rect3d}(Makie.boundingbox(axis.scene)))
+    setfield!(axis, :elements, Dict{Symbol, Any}())
+
+    return
 
 end
 
-function reset_limits!(axis::GlobeAxis)
-    notify(axis.scene.theme.limits)
-    center!(axis.scene)
+function Makie.reset_limits!(axis::GlobeAxis; kwargs...)
+    Makie.reset_limits!(axis.lscene; kwargs...)
     return
 end
 tightlimits!(::GlobeAxis) = nothing # TODO implement!?  By getting the bbox of the sphere / ellipsoid and using that to compute the camera eyeposition / lookat / fov
 
-function axis_setup!(axis::GlobeAxis, transform_obs::Observable; scenekw = NamedTuple())
+# function axis_setup!(axis::GlobeAxis, transform_obs::Observable; scenekw = NamedTuple())
 
-    topscene = axis.blockscene
+#     topscene = axis.blockscene
 
-    # pick a camera and draw axis.
-    scenekw = merge((clear = false, camera=cam3d!), scenekw)
-    axis.scene = Scene(blockscene, lift(round_to_IRect2D, blockscene, axis.layoutobservables.computedbbox); transformation = Makie.Transformation(topscene.transformation; transform_func = transform_obs), scenekw...)
-    # Axis should not have a transform func, but all other plots should!
-    _ax = axis.scene[OldAxis]
-    isnothing(_ax) || (_ax.transformation = Makie.Transformation(axis.scene; transform_func = identity))
+#     # pick a camera and draw axis.
+#     scenekw = merge((clear = false, camera=Makie.cam3d!), scenekw)
+#     axis.scene = Scene(topscene, lift(Makie.round_to_IRect2D, topscene, axis.layoutobservables.computedbbox); transformation = Makie.Transformation(topscene.transformation; transform_func = transform_obs), scenekw...)
+#     # Axis should not have a transform func, but all other plots should!
+#     _ax = axis.scene[Makie.OldAxis]
+#     isnothing(_ax) || (_ax.transformation = Makie.Transformation(axis.scene; transform_func = identity))
 
-    on(blockscene, axis.show_axis) do show_axis
-        ax = axis.scene[OldAxis]
-        if show_axis
-            if isnothing(ax)
-                # Add axis on first plot!, if requested
-                # update limits when scene limits change
-                limits = lift(blockscene, axis.scene.theme.limits) do lims
-                    if lims === automatic
-                        dl = boundingbox(axis.scene, p -> Makie.isaxis(p) || Makie.not_in_data_space(p))
-                        if any(isinf, widths(dl)) || any(isinf, Makie.origin(dl))
-                            Rect3d((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
-                        else
-                            dl
-                        end
-                    else
-                        lims
-                    end
-                end
-                Makie.axis3d!(axis.scene, limits)
-                # Make sure axis is always in pos 1
-                sort!(axis.scene.plots, by=!Makie.isaxis)
-            else
-                ax.visible = true
-            end
-        else
-            if !isnothing(ax)
-                ax.visible = false
-            end
-        end
-    end
-    notify(axis.show_axis)
+#     on(topscene, axis.show_axis) do show_axis
+#         ax = axis.scene[Makie.OldAxis]
+#         if show_axis
+#             if isnothing(ax)
+#                 # Add axis on first plot!, if requested
+#                 # update limits when scene limits change
+#                 limits = lift(topscene, axis.scene.theme.limits) do lims
+#                     if lims === Makie.automatic
+#                         dl = boundingbox(axis.scene, p -> Makie.isaxis(p) || Makie.not_in_data_space(p))
+#                         if any(isinf, widths(dl)) || any(isinf, Makie.origin(dl))
+#                             Rect3d((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+#                         else
+#                             dl
+#                         end
+#                     else
+#                         lims
+#                     end
+#                 end
+#                 Makie.axis3d!(axis.scene, limits)
+#                 # Make sure axis is always in pos 1
+#                 sort!(axis.scene.plots, by=!Makie.isaxis)
+#             else
+#                 ax.visible = true
+#             end
+#         else
+#             if !isnothing(ax)
+#                 ax.visible = false
+#             end
+#         end
+#     end
+#     notify(axis.show_axis)
 
-    return axis.scene
-end
+#     return axis.scene
+# end
 
 
 # This is where we override the stuff to make it our stuff.
-function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
+function Makie.plot!(axis::GlobeAxis, plot::Makie.AbstractPlot)
     source = pop!(plot.kw, :source, axis.source)
-    transformfunc = lift(create_transform, axis.dest, source)
-    trans = Transformation(transformfunc; get(plot.kw, :transformation, Attributes())...)
+    zlevel = pop!(plot.kw, :zlevel, 0)
+    # @show plot.kw
+    transformfunc = lift(create_globe_transform, axis.ellipsoid, source, zlevel)
+    trans = Makie.Transformation(transformfunc; get(plot.kw, :transformation, Attributes())...)
     plot.kw[:transformation] = trans
+
     Makie.plot!(axis.scene, plot)
+
+    # reassign popped observables back to attributes, so that they can be called by the user...
+    # plot.attributes.attributes[:source] = source
+    # plot.attributes.attributes[:zlevel] = zlevel
     # some area-like plots basically always look better if they cover the whole plot area.
     # adjust the limit margins in those cases automatically.
     # However, for spheres, we want to keep user zoom level if possible.
@@ -321,12 +353,14 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
     end
     return plot
 end
-function Makie.MakieCore._create_plot!(F, attributes::Dict, ax::GeoAxis, args...)
-    source = pop!(attributes, :source, nothing)
-    dest = pop!(attributes, :dest, nothing)
+function Makie.MakieCore._create_plot!(F, attributes::Dict, ax::GlobeAxis, args...)
+    source = pop!(attributes, :source, ax.source)
+    zlevel = pop!(attributes, :zlevel, 0)
+    # dest = pop!(attributes, :dest, nothing)
     plot = Plot{Makie.default_plot_func(F, args)}(args, attributes)
-    isnothing(source) || (plot.kw[:source] = source)
-    isnothing(dest) || (plot.kw[:dest] = dest)
+    plot.kw[:source] = source
+    plot.kw[:zlevel] = zlevel
+    # isnothing(dest) || (plot.kw[:dest] = dest)
     Makie.plot!(ax, plot)
     return plot
 end
