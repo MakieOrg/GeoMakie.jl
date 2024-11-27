@@ -332,12 +332,15 @@ tightlimits!(::GlobeAxis) = nothing # TODO implement!?  By getting the bbox of t
 
 # This is where we override the stuff to make it our stuff.
 function Makie.plot!(axis::GlobeAxis, plot::Makie.AbstractPlot)
+    # deal with setting the transform_func correctly
     source = pop!(plot.kw, :source, axis.source)
     zlevel = pop!(plot.kw, :zlevel, 0)
     # @show plot.kw
     transformfunc = lift(create_globe_transform, axis.ellipsoid, source, zlevel)
     trans = Makie.Transformation(transformfunc; get(plot.kw, :transformation, Attributes())...)
     plot.kw[:transformation] = trans
+
+    reset_limits = to_value(pop!(plot.kw, :reset_limits, true))
 
     Makie.plot!(axis.scene, plot)
 
@@ -348,7 +351,7 @@ function Makie.plot!(axis::GlobeAxis, plot::Makie.AbstractPlot)
     # adjust the limit margins in those cases automatically.
     # However, for spheres, we want to keep user zoom level if possible.
     # Makie.needs_tight_limits(plot) && Makie.tightlimits!(axis)
-    if Makie.is_open_or_any_parent(axis.scene)
+    if Makie.is_open_or_any_parent(axis.scene) && reset_limits
         Makie.reset_limits!(axis)
     end
     return plot
