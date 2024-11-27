@@ -823,15 +823,24 @@ end
 
 # This is where we override the stuff to make it our stuff.
 function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
+    # deal with setting the transform_func correctly
     source = pop!(plot.kw, :source, axis.source)
     transformfunc = lift(create_transform, axis.dest, source)
-    trans = Transformation(transformfunc; get(plot.kw, :transformation, Attributes())...)
+
+    trans = Makie.Transformation(transformfunc; get(plot.kw, :transformation, Attributes())...)
     plot.kw[:transformation] = trans
+
+    # remove the reset_limits kwarg if there is one, this determines whether to automatically reset limits
+    # on plot insertion
+    reset_limits = to_value(pop!(plot.kw, :reset_limits, true))
+    
+    # actually plot
     Makie.plot!(axis.scene, plot)
+
     # some area-like plots basically always look better if they cover the whole plot area.
     # adjust the limit margins in those cases automatically.
-    Makie.needs_tight_limits(plot) && Makie.tightlimits!(axis)
-    if Makie.is_open_or_any_parent(axis.scene)
+    Makie.needs_tight_limits(plot) && reset_limits && Makie.tightlimits!(axis)
+    if Makie.is_open_or_any_parent(axis.scene) && reset_limits
         Makie.reset_limits!(axis)
     end
     return plot
