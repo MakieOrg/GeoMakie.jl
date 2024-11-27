@@ -22,6 +22,8 @@ jobs:
         with:
           version: ${{ matrix.version }}
       - uses: julia-actions/julia-downgrade-compat@v1
+        with:
+          skip: Statistics, Downloads
 #        if: ${{ matrix.version == '1.6' }}
         with:
           skip: Pkg,TOML
