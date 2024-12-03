@@ -26,7 +26,7 @@ end
 # We don't want to override the general case poly_convert for all polygons, because that's piracy,
 # but we _can_ override it for the specific case of a 3D polygon that is being transformed by a function
 # that is a subtype of Union{<: Proj.Transformation, <: GeoMakie.Geodesy.ECEFfromLLA}
-function Makie.poly_convert(polygon::GeometryBasics.Polygon, transform_func::Union{<: Proj.Transformation, <: GeoMakie.Geodesy.ECEFfromLLA})
+function Makie.poly_convert(polygon::GeometryBasics.Polygon, transform_func::Union{<: Proj.Transformation, <: GeoMakie.Geodesy.ECEFfromLLA, <: GlobeTransform})
 
     outer = GeometryBasics.metafree(GeometryBasics.coordinates(polygon.exterior))
     PT = Makie.float_type(outer)

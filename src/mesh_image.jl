@@ -123,7 +123,7 @@ function Makie.plot!(plot::MeshImage)
         color = plot.converted[3], # pass on the color directly
         MakieCore.colormap_attributes(plot)..., # pass on all colormap attributes
         shading = NoShading, #
-        transformation = Transformation(
+        transformation = Makie.Transformation(
             plot.transformation;      # connect up the model matrix to the parent's model matrix
             transform_func = identity # do NOT connect the transform func, since we've already done that.  identity provides a custom transform func, while `nothing` signals that you don't care.
         ),
