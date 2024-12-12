@@ -47,3 +47,24 @@ end
 
     end
 end
+
+@testset "Protrusions are correctly updated when visible = false" begin
+
+    f, a, p = meshimage(-180..180, -90..90, GeoMakie.earth() |> rotr90; figure = (; figure_padding = 0), axis = (; type = GeoAxis, dest = "+proj=longlat +type=crs"))
+
+    w = widths(a.finallimits[])
+    colsize!(f.layout, 1, Aspect(1, w[1] / w[2]))
+    resize_to_layout!(f)
+
+    Makie.update_state_before_display!(f)
+    original_prots = a.layoutobservables.protrusions[]
+    Makie.hidedecorations!(a)
+    Makie.update_state_before_display!(f)
+    new_prots = a.layoutobservables.protrusions[]
+
+    @test new_prots.left == 0
+    @test new_prots.right == 0
+    @test new_prots.top == 0
+    @test new_prots.bottom == 0
+
+end
