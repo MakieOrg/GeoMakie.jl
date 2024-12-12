@@ -882,8 +882,8 @@ function Makie.MakieCore._create_plot!(F, attributes::Dict, ax::GeoAxis, args...
     return plot
 end
 
-# TODO implement
-Makie.tightlimits!(axis::GeoAxis) = nothing
+
+# ## Makie generic axis/block API
 
 # this is generally false, but I want to deviate from that here.
 Makie.needs_tight_limits(axis::GeoAxis, ::Surface) = true
