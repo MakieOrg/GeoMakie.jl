@@ -885,4 +885,7 @@ end
 # TODO implement
 Makie.tightlimits!(axis::GeoAxis) = nothing
 
+# this is generally false, but I want to deviate from that here.
+Makie.needs_tight_limits(axis::GeoAxis, ::Surface) = true
+
 Makie.get_scene(ga::GeoAxis) = ga.scene

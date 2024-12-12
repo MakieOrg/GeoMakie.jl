@@ -50,3 +50,10 @@ function Makie.transform_bbox(scenelike, lims::Rect{N, T}) where {N, T}
 end
 =#
 
+
+# `needs_tight_limits`` should dispatch on axes too
+# because what looks bad on one axis (regular Axis)
+# will look good on a GeoAxis
+# and vice versa
+
+Makie.needs_tight_limits(axis::Makie.AbstractAxis, plot::Makie.Plot) = Makie.needs_tight_limits(plot)
