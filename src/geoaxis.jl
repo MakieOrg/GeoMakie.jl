@@ -701,22 +701,42 @@ function Makie.initialize_block!(axis::GeoAxis)
     fonts = theme(axis.blockscene, :fonts)
     # Finally calculate protrusions and report all bounding boxes
     # to the layout system.
-    approx_x_protrusion = map(axis.blockscene, axis.yticklabelfont, axis.yticklabelsize, lat_text) do font, size, lat_text
-        max_height = 0.0f0
-        for str in lat_text
-            bb = Makie.text_bb(str, to_font(fonts, font), size)
-            max_height = max(max_height, widths(bb)[2])
+    approx_x_protrusion = map(
+        axis.blockscene, 
+        axis.yticklabelfont, axis.yticklabelsize, axis.yticklabelpad, lat_text, axis.yticklabelsvisible
+        ) do ticklabel_font, ticklabel_size, ticklabel_pad, text, ticklabelsvisible
+        ret = 0.0f0
+
+        if ticklabelsvisible
+            max_height = 0.0
+            for str in text
+                bb = Makie.text_bb(str, Makie.to_font(fonts, ticklabel_font), ticklabel_size)
+                max_height = max(max_height, widths(bb)[2])
+            end
+            ret += max_height# + ticklabel_pad
         end
-        return max_height
+
+        return ret
     end
 
-    approx_y_protrusion = map(axis.blockscene, axis.yticklabelfont, axis.yticklabelsize, lon_text) do font, size, lon_text
-        max_width = 0.0f0
-        for str in lon_text
-            bb = Makie.text_bb(str, to_font(fonts, font), size)
-            max_width = max(max_width, widths(bb)[1])
+    approx_y_protrusion = map(
+        axis.blockscene, 
+        axis.xticklabelfont, axis.xticklabelsize, axis.xticklabelpad, lon_text, axis.xticklabelsvisible,
+        ) do ticklabel_font, ticklabel_size, ticklabel_pad, text, ticklabelsvisible
+
+        ret = 0.0f0
+
+        if ticklabelsvisible
+            max_width = 0.0
+            for str in text
+                bb = Makie.text_bb(str, Makie.to_font(fonts, ticklabel_font), ticklabel_size)
+                max_width = max(max_width, widths(bb)[1])
+            end
+            ret += max_width #+ ticklabel_pad
         end
-        return max_width
+
+        return ret
+
     end
 
     elements = Dict{Symbol,Any}()
@@ -773,7 +793,8 @@ function Makie.initialize_block!(axis::GeoAxis)
     xaxis = (; protrusion=approx_y_protrusion)
     map!(compute_protrusions, axis.blockscene, axis.layoutobservables.protrusions, axis.title, axis.titlesize,
         axis.titlegap, axis.titlevisible,
-        xaxis.protrusion, yaxis.protrusion,
+        xaxis.protrusion, 
+        yaxis.protrusion,
         axis.subtitle, axis.subtitlevisible, axis.subtitlesize, axis.subtitlegap,
         axis.titlelineheight, axis.subtitlelineheight, subtitlet, titlet)
 
