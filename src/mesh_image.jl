@@ -51,6 +51,9 @@ Makie.conversion_trait(::Type{<: MeshImage}) = Makie.ImageLike()
 # There really is no difference between this and Image, 
 # except the implementation under the hood.
 
+# We also define that `meshimage` needs tight limits when plotted...
+Makie.needs_tight_limits(::MeshImage) = true
+
 # This is the recipe implementation.
 
 function Makie.plot!(plot::MeshImage)
