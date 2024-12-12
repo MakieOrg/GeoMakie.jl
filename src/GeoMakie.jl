@@ -45,7 +45,6 @@ const Text = Makie.Text
 Base.convert(::Type{Rect{N, Float64}}, x::Rect{N}) where N = Rect{N, Float64}(x)
 
 include("makie_piracy.jl")
-include("triangulation3d.jl")
 include("geojson.jl") # GeoJSON/GeoInterface support
 include("conversions.jl")
 include("data.jl")
@@ -60,6 +59,8 @@ include("makie-axis.jl")
 # some basic recipes
 include("mesh_image.jl")
 include("linesplitting.jl")
+
+include("triangulation3d.jl")
 
 @reexport using Colors, Makie
 export Proj
