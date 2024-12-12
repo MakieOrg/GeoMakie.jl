@@ -273,6 +273,11 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
     end
 end
 
+# Makie generic object API
+Makie.transform_func(ax::GeoAxis) = ax.transform_func[]
+
+# Spines
+
 const SpinePoint = NamedTuple{(:input, :projected, :dir, :intersect_dir),Tuple{Point2d,Point2d,Point2d,Point2d}}
 
 struct Spines
