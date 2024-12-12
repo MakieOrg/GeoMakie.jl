@@ -281,7 +281,7 @@ function Makie.reset_limits!(axis::GlobeAxis; kwargs...)
     Makie.reset_limits!(axis.lscene; kwargs...)
     return
 end
-tightlimits!(::GlobeAxis) = nothing # TODO implement!?  By getting the bbox of the sphere / ellipsoid and using that to compute the camera eyeposition / lookat / fov
+Makie.tightlimits!(::GlobeAxis) = nothing # TODO implement!?  By getting the bbox of the sphere / ellipsoid and using that to compute the camera eyeposition / lookat / fov
 
 # function axis_setup!(axis::GlobeAxis, transform_obs::Observable; scenekw = NamedTuple())
 

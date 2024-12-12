@@ -68,3 +68,22 @@ end
     @test new_prots.bottom == 0
 
 end
+
+@testset "Aspect ratio is equal to Axis with DataAspect" begin
+    # Create two figures, one with regular axis and one with geoaxis
+    # the transformation in both cases is the identity
+    f1, a1, p1 = meshimage(-180..180, -90..90, GeoMakie.earth() |> rotr90; figure = (; figure_padding = 0), axis = (; aspect = DataAspect()));
+    f2, a2, p2 = meshimage(-180..180, -90..90, GeoMakie.earth() |> rotr90; figure = (; figure_padding = 0), axis = (; type = GeoAxis, dest = "+proj=longlat +type=crs"));
+
+    Makie.tightlimits!(a1)
+    hidedecorations!(a1)
+    hidedecorations!(a2)
+
+    Makie.update_state_before_display!(f1)
+    Makie.update_state_before_display!(f2)
+
+    Makie.resize_to_layout!(f1)
+    Makie.resize_to_layout!(f2)
+
+    @test a1.scene.viewport[] == a2.scene.viewport[]
+end
