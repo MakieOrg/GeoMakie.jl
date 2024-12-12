@@ -861,6 +861,7 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
     # some area-like plots basically always look better if they cover the whole plot area.
     # adjust the limit margins in those cases automatically.
     Makie.needs_tight_limits(plot) && reset_limits && Makie.tightlimits!(axis)
+    
     if Makie.is_open_or_any_parent(axis.scene) && reset_limits
         Makie.reset_limits!(axis)
     end

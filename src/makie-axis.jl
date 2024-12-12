@@ -16,10 +16,14 @@ function axis_setup!(axis::GeoAxis)
     setfield!(axis, :targetlimits, targetlimits)
     setfield!(axis, :finallimits, finallimits)
     topscene = axis.blockscene
+
     scenearea = Makie.sceneareanode!(axis.layoutobservables.computedbbox, finallimits, axis.aspect)
+
     scene = Scene(topscene, viewport=scenearea)
-    axis.scene = scene
     setfield!(scene, :float32convert, Makie.Float32Convert())
+
+    axis.scene = scene
+
     onany(scene, scene.transformation.transform_func, finallimits, axis.xreversed, axis.yreversed) do transform_func, finallimits, xreversed, yreversed
         Makie.update_axis_camera(scene, transform_func, finallimits, xreversed, yreversed)
     end
@@ -564,4 +568,45 @@ function Makie.Legend(fig_or_scene, axis::GeoAxis, title = nothing; merge = fals
     plots, labels = Makie.get_labeled_plots(axis, merge = merge, unique = unique)
     isempty(plots) && error("There are no plots with labels in the given axis that can be put in the legend. Supply labels to plotting functions like `plot(args...; label = \"My label\")`")
     Makie.Legend(fig_or_scene, plots, labels, title; kwargs...)
+end
+
+
+
+# Taken from makielayout/helpers.jl
+
+"""
+    tightlimits!(la::Axis)
+
+Sets the autolimit margins to zero on all sides.
+"""
+function Makie.tightlimits!(la::GeoAxis)
+    la.xautolimitmargin = (0, 0)
+    la.yautolimitmargin = (0, 0)
+    reset_limits!(la)
+end
+
+function Makie.tightlimits!(la::GeoAxis, sides::Union{Left, Right, Bottom, Top}...)
+    for s in sides
+        Makie.tightlimits!(la, s)
+    end
+end
+
+function Makie.tightlimits!(la::GeoAxis, ::Left)
+    la.xautolimitmargin = Base.setindex(la.xautolimitmargin[], 0.0, 1)
+    autolimits!(la)
+end
+
+function Makie.tightlimits!(la::GeoAxis, ::Right)
+    la.xautolimitmargin = Base.setindex(la.xautolimitmargin[], 0.0, 2)
+    autolimits!(la)
+end
+
+function Makie.tightlimits!(la::GeoAxis, ::Bottom)
+    la.yautolimitmargin = Base.setindex(la.yautolimitmargin[], 0.0, 1)
+    autolimits!(la)
+end
+
+function Makie.tightlimits!(la::GeoAxis, ::Top)
+    la.yautolimitmargin = Base.setindex(la.yautolimitmargin[], 0.0, 2)
+    autolimits!(la)
 end
