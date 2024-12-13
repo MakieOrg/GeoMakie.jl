@@ -40,6 +40,8 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
+      - name: Run Julia
+        run: julia --project=. -e 'using Pkg; Pkg.add([PackageSpec(name, rev = "breaking-0.22") for name in ("MakieCore", "Makie", "CairoMakie", "GLMakie", "WGLMakie")])'
       - uses: julia-actions/julia-runtest@v1
         env: 
           DISPLAY: ':0'
