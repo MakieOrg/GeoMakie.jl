@@ -15,7 +15,7 @@ function project_line_points(scene, plot::T, positions::AbstractArray{<: Makie.V
     space = (plot.space[])::Symbol
     model = (plot.model[])::Mat4d
     # Standard transform from input space to clip space
-    points = Makie.apply_transform(transform_func(plot), positions, space)::Vector{Point{N, FT}}
+    points = Makie.apply_transform(transform_func(plot), positions, space)::AbstractVector{Point{N, FT}}
     f32convert = Makie.f32_convert_matrix(scene.float32convert, space)
     transform = Makie.space_to_clip(scene.camera, space) * model * f32convert
     clip_points = map(points) do point
