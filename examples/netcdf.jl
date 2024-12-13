@@ -29,17 +29,22 @@ sort_idx = sortperm(lon)
 lon = lon[sort_idx]
 temp = temp[sort_idx,:]
 
-# Plot the data as a heatmap with coastlines and a colorbar
+# Plot the data as a heatmap with coastlines and a colorbar.
+#
+# First, create a figure, and a GeoAxis inside it:
 fig = Figure(size=(900,500))
 ax = GeoAxis(fig[1,1]; dest="+proj=longlat +datum=WGS84", xgridwidth=0.15, ygridwidth=0.15)
-sp = GeoMakie.heatmap!(ax, lon, lat, temp; colormap=cgrad(:viridis))
+## then, plot a heatmap with the data we used!
+sp = heatmap!(ax, lon, lat, temp; colormap=cgrad(:viridis))
+## finally, plot some coastlines to give the plot context
 lines!(ax, GeoMakie.coastlines(); color = :black, linewidth=1.0)
+## and a colorbar
 cb = Colorbar(fig[1, 2], sp, width=30, height=Relative(0.7), label="Sea Surface Temperature (K)")
 fig
 
 #=
 ```@cardmeta
 Cover = fig
-Description = "Plotting data from a netCDF file"
+Description = "Plotting data from a netCDF file via NCDatasets.jl"
 ```
 =#
