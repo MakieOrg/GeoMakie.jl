@@ -153,5 +153,5 @@ Return a PROJ-compatible string from a GeoFormatTypes CRS object.
 """
 function gft2str end
 gft2str(crs::GeoFormatTypes.EPSG{1}) = String("EPSG:$(GeoFormatTypes.val(crs))")
-gft2str(crs::GeoFormatTypes.CoordinateReferenceSystemFormat) = string(GeoFormatTypes.val(crs))
-gft2str(crs::GeoFormatTypes.WellKnownText{GeoFormatTypes.CRS}) = string(GeoFormatTypes.val(crs))
+gft2str(crs::GeoFormatTypes.CoordinateReferenceSystemFormat) = Base.convert(String, crs)
+gft2str(crs::GeoFormatTypes.WellKnownText{GeoFormatTypes.CRS}) = Base.convert(String, crs)

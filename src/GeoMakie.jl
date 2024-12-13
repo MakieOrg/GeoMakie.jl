@@ -60,6 +60,8 @@ include("makie-axis.jl")
 include("mesh_image.jl")
 include("linesplitting.jl")
 
+include("triangulation3d.jl")
+
 @reexport using Colors, Makie
 export Proj
 

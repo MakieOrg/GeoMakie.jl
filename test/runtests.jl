@@ -1,4 +1,5 @@
 using GeoMakie, GeometryBasics, CairoMakie, Test
+import Makie.SpecApi as S
 
 Makie.set_theme!(Theme(
     Heatmap = (rasterize = 5,),
@@ -6,10 +7,11 @@ Makie.set_theme!(Theme(
     Surface = (rasterize = 5,),
 ))
 
+
 @testset "GeoMakie" begin
-    @testset "MeshImage" begin
-        include("meshimage.jl")
-    end
+    @testset "MeshImage" include("meshimage.jl")
+
+    @testset "GeoAxis" include("geoaxis.jl")
     
     @testset "Basics" begin
         lons = -180:180
@@ -35,12 +37,4 @@ Makie.set_theme!(Theme(
         @test GeoMakie.coastlines(ga)[] isa AbstractVector
     end
 
-    @testset "Legend" begin
-        fig = Figure()
-        ga = GeoAxis(fig[1, 1])
-        lines!(ga, 1:10, 1:10; label = "series 1")
-        scatter!(ga, 1:19, 2:20; label= "series 2")
-        @test_nowarn Legend(fig[1, 2], ga)
-        fig
-    end
 end
