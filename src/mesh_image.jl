@@ -114,23 +114,31 @@ function Makie.plot!(plot::MeshImage)
     # Let's remedy that now!
     final_mesh = lift(plot, points_observable, faces_observable, uv_observable; ignore_equal_values = true#=, priority = -100=#) do points, faces, uv
         return GeometryBasics.Mesh(
-            GeometryBasics.meta(points; uv=uv), # each point gets a UV, they're interpolated on faces
-            faces
+            points, 
+            faces;
+            uv = uv, # each point gets a UV, they're interpolated on faces
         )
     end
 
     # Finally, we plot the mesh.
+    shared_attrs = Makie.shared_attributes(plot, Makie.Mesh)
+
+    haskey(shared_attrs, :color) && pop!(shared_attrs, :color)
+    haskey(shared_attrs, :shading) && pop!(shared_attrs, :shading)
+    haskey(shared_attrs, :transformation) && pop!(shared_attrs, :transformation)
+    haskey(shared_attrs, :uv_transform) && pop!(shared_attrs, :uv_transform)
+
     mesh!(
         plot, 
         final_mesh; 
         color = plot.converted[3], # pass on the color directly
-        MakieCore.colormap_attributes(plot)..., # pass on all colormap attributes
         shading = NoShading, #
         transformation = Makie.Transformation(
             plot.transformation;      # connect up the model matrix to the parent's model matrix
             transform_func = identity # do NOT connect the transform func, since we've already done that.  identity provides a custom transform func, while `nothing` signals that you don't care.
         ),
-        uv_transform = plot.uv_transform
+        uv_transform = plot.uv_transform,
+        shared_attrs...
     )
     # TODO: get a `:transformed` space out so we don't need this `transformation` hack
 end
