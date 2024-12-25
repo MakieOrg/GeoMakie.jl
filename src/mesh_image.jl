@@ -113,11 +113,18 @@ function Makie.plot!(plot::MeshImage)
     # You may have noticed that nowhere above did we actually create a mesh.  
     # Let's remedy that now!
     final_mesh = lift(plot, points_observable, faces_observable, uv_observable; ignore_equal_values = true#=, priority = -100=#) do points, faces, uv
-        return GeometryBasics.Mesh(
-            points, 
-            faces;
-            uv = uv, # each point gets a UV, they're interpolated on faces
-        )
+        @static if hasproperty(GeometryBasics, :metafree) # pre v0.5
+            return GeometryBasics.Mesh(
+                GeometryBasics.meta(points; uv=uv), # each point gets a UV, they're interpolated on faces
+                faces
+            )
+        else # post v0.5 / Makie v0.22
+            return GeometryBasics.Mesh(
+                points, 
+                faces;
+                uv = uv, # each point gets a UV, they're interpolated on faces
+            )
+        end
     end
 
     # Finally, we plot the mesh.
