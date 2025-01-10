@@ -13,9 +13,6 @@ function Makie.apply_transform(f::Geodesy.ECEFfromLLA, pt::V) where V <: VecType
     # However, the `LLA` coordinate space expects x to be latitude and y to be longitude,
     # so we have to manually swap the coordinates.
     return V((f(LLA(pt[2], pt[1], pt[3])))...)
-    # Enterprising observers will note the division by 2,500.  This is to "normalize" the sphere; 
-    # Geodesy.jl outputs in meters, which would make the sphere hilariously large. 
-    # This also fits well with Makie's limit finding, which works in input space, and not transformed space.
 end
 
 # If a Point2f is passed, we decide to handle that by assuming altitude to be 0.  
@@ -36,7 +33,7 @@ end
 Makie.inverse_transform(f::Geodesy.ECEFfromLLA) = Base.inv(f)
 # and its application:
 function Makie.apply_transform(f::Geodesy.LLAfromECEF, pt::V) where V <: VecTypes{3, T} where {T}
-    return V((f(ECEF(pt[1], pt[2], pt[3])))...) # invert the previous scale factor
+    return V((f(ECEF(pt[1], pt[2], pt[3])))...)
 end
 
 function Makie.apply_transform(f::Geodesy.LLAfromECEF, pt::V) where V <: VecTypes{N, T} where {N, T}
