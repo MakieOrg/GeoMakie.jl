@@ -75,8 +75,7 @@ jobs:
               PackageSpec(name = "CairoMakie", rev = "master"), 
               PackageSpec(name = "GLMakie", rev = "master"),
               PackageSpec(name = "Rasters", rev = "main"),
-              PackageSpec(name = "DimensionalData", rev = "compathelper/new_version/2025-01-14-00-36-10-149-02142433071"),
-              PackageSpec(name = "ArchGDAL", rev = "master"),
+              PackageSpec(url = "https://github.com/asinghvi17/ArchGDAL.jl", rev = "patch-7"),
               PackageSpec(url = "https://github.com/asinghvi17/OhMyCards.jl", rev = "main"),
             ])
             Pkg.instantiate()'
