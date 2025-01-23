@@ -75,7 +75,7 @@ jobs:
               PackageSpec(name = "CairoMakie", rev = "master"), 
               PackageSpec(name = "GLMakie", rev = "master"),
               PackageSpec(name = "Rasters", rev = "main"),
-              PackageSpec(url = "https://github.com/asinghvi17/ArchGDAL.jl", rev = "patch-7"),
+              PackageSpec(name = "ArchGDAL", rev = "master"),
               PackageSpec(url = "https://github.com/asinghvi17/OhMyCards.jl", rev = "main"),
             ])
             Pkg.instantiate()'
