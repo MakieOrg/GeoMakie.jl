@@ -77,6 +77,7 @@ jobs:
               PackageSpec(name = "Rasters", rev = "main"),
               PackageSpec(name = "ArchGDAL", rev = "master"),
               PackageSpec(url = "https://github.com/asinghvi17/OhMyCards.jl", rev = "main"),
+              PackageSpec(url = "https://github.com/HolyLab/FlyThroughPaths.jl", rev = "main"),
             ])
             Pkg.instantiate()'
         env:
