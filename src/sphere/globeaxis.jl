@@ -25,6 +25,12 @@ For now, a simple implementation is to have a single globe.  We can always decid
 """
     GlobeAxis(layout_position; attrs...)
 
+!!! warning
+    GlobeAxis is experimental and we reserve the right to break the API at any time, 
+    even without a breaking release!
+
+    Use with care (but do use it, it's fun!)
+
 `GlobeAxis` is a 3-dimensional, geographic axis that plots your data on 
 the Earth as a globe.  It's similar to what you see if you zoom out in Google Maps,
 but without the ability to switch to web-mercator when zooming in.
