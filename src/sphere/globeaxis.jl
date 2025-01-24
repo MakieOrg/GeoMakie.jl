@@ -22,7 +22,45 @@ Per axis we want the following config:
 For now, a simple implementation is to have a single globe.  We can always decide on more or less complexity later.
 =#
 
+"""
+    GlobeAxis(layout_position; attrs...)
 
+`GlobeAxis` is a 3-dimensional, geographic axis that plots your data on 
+the Earth as a globe.  It's similar to what you see if you zoom out in Google Maps,
+but without the ability to switch to web-mercator when zooming in.
+
+All data is transformed to cartesian `(X, Y, Z)` space, 
+and inputs are (by default) interpreted as `(long, lat, [alt])`.
+
+You can change what the inputs mean by passing a different `source` CRS (see the docs) 
+as a keyword argument to each plot you make.
+
+Interaction is the same as Makie's `Axis3`, with the exception that 
+the camera is by default locked to always view the origin, and translation
+is blocked.  This makes scrolling a lot easier, and since the camera is a `Camera3D`
+you can always use that directly.
+
+## Plot-specific keywords
+
+GlobeAxis introduces some keywords you can use in `plot` functions to customize
+what they do.  These are applicable to _any_ plot, since they operate on the axis level.
+
+Currently, these attributes are:
+
+- `source = "+proj=longlat +datum=wgs84"`: set the source CRS, similarly to that attribute in `GeoAxis`.
+- `zlevel = 0`: set the default Z level / altitude before transformation, i.e., an offset from the default `0`.  
+  This is very useful when you want to layer plots on top of each other.
+  In general, if you use the default destination datum, a value of `20_000` is where 
+  `zlevel` starts to be visible.  
+  Of course, for simple displacement to correct z-fighting issues, values of 10
+  or more should suffice.
+- `reset_limits = true`: whether the plot should trigger a limit reset when plotted.  Useful if you are adding plots during interactive use.
+
+## Important attributes
+- `source = "+proj=longlat +datum=wgs84 +type=crs"`: set the default source CRS of the projection.  This is always normalized to the XY axis order, no matter what you write here.  This can also be overridden at any point by the source attribute to a plot.
+- `scenekw = (;)`: keyword arguments passed directly to the underlying `LScene`; this can be used to set lights etc.
+- `show_axis = true`: whether to show the LScene's axis, or not.
+"""
 Makie.@Block GlobeAxis <: Makie.AbstractAxis begin
     @forwarded_layout
     scene::Scene
