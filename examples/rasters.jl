@@ -17,14 +17,12 @@ using GeoMakie, CairoMakie
 ras = Raster(EarthEnv{HabitatHeterogeneity}, :homogeneity) # habitat homogeneity to neighbouring pixel
 # Let's take a look at this in regular Makie first:
 heatmap(ras; axis = (; aspect = DataAspect()))
-# We can plot this in any projection:
-fig = Figure(); ga = GeoAxis(fig[1, 1])
-hm = heatmap!(ga, ras)
-fig
+# We can plot this in any projection (but heatmap only works over a projection in CairoMakie, for all other backends use `surface` instead):
+fig, ga, hm = heatmap(ras; axis = (; type = GeoAxis))
 # We can also change the projection arbitrarily:
 ga.dest[] = "+proj=ortho +lon_0=19 +lat_0=72"
 fig
-# and all other Makie keyword arguments also apply!
+# and all other Makie keyword arguments and attributes also apply!
 hm.colormap = :isoluminant_cgo_70_c39_n256
 fig
 # You can also use other recipes like surface:
