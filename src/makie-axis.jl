@@ -297,9 +297,29 @@ getxlimits(la::GeoAxis) = getlimits(la, 1)
 getylimits(la::GeoAxis) = getlimits(la, 2)
 
 
+function _selection_vertices_notransform(ax_scene, outer, inner)
+    _clamp(p, plow, phigh) = Point2(clamp(p[1], plow[1], phigh[1]), clamp(p[2], plow[2], phigh[2]))
+    proj(point) = Makie.project(ax_scene, point) + Makie.origin(Makie.to_value(Makie.viewport(ax_scene)))
+    outer = Makie.positivize(outer)
+    inner = Makie.positivize(inner)
+
+    obl = Makie.bottomleft(outer)
+    obr = Makie.bottomright(outer)
+    otl = Makie.topleft(outer)
+    otr = Makie.topright(outer)
+
+    ibl = _clamp(Makie.bottomleft(inner), obl, otr)
+    ibr = _clamp(Makie.bottomright(inner), obl, otr)
+    itl = _clamp(Makie.topleft(inner), obl, otr)
+    itr = _clamp(Makie.topright(inner), obl, otr)
+    # We plot the selection vertices in blockscene, which is pixelspace, so we need to manually
+    # project the points to the space of `ax.scene`
+    return [proj(obl), proj(obr), proj(otr), proj(otl), proj(ibl), proj(ibr), proj(itr), proj(itl)]
+end
+
 function Makie.RectangleZoom(f::Function, ax::GeoAxis; kw...)
     r = Makie.RectangleZoom(f; kw...)
-    selection_vertices = lift(Makie._selection_vertices, Observable(ax.scene), ax.finallimits, r.rectnode)
+    selection_vertices = lift(_selection_vertices_notransform, Observable(ax.scene), ax.finallimits, r.rectnode)
     # manually specify correct faces for a rectangle with a rectangle hole inside
     faces = [1 2 5; 5 2 6; 2 3 6; 6 3 7; 3 4 7; 7 4 8; 4 1 8; 8 1 5]
     # plot to blockscene, so ax.scene stays exclusive for user plots
@@ -336,22 +356,14 @@ end
 
 function Makie.process_interaction(r::Makie.RectangleZoom, event::MouseEvent, ax::GeoAxis)
 
-    # TODO: actually, the data from the mouse event should be transformed already
-    # but the problem is that these mouse events are generated all the time
-    # and outside of log axes, you would quickly run into domain errors
-    transf = Makie.transform_func(ax)
-    inv_transf = Makie.inverse_transform(transf)
-
-    if isnothing(inv_transf)
-        @warn "Can't rectangle zoom without inverse transform" maxlog = 1
-        # TODO, what can we do without inverse?
-        return Consume(false)
-    end
+    # the data is already pre-transformed, let rectangle zoom work as it would on an axis without transformation
+    # we handle the inverse transform needed in the handling of finallimits anyway, so it's no bother
+    # and targetlimits is in transformed space, so we don't need to transform it
 
     if event.type === MouseEventTypes.leftdragstart
-        data = Makie.apply_transform(inv_transf, event.data)
-        prev_data = Makie.apply_transform(inv_transf, event.prev_data)
-
+        data = event.data
+        prev_data = event.prev_data
+        
         r.from = prev_data
         r.to = data
         r.rectnode[] = Makie._chosen_limits(r, ax)
@@ -360,8 +372,8 @@ function Makie.process_interaction(r::Makie.RectangleZoom, event::MouseEvent, ax
 
     elseif event.type === MouseEventTypes.leftdrag
         # clamp mouse data to shown limits
-        rect = Makie.apply_transform(transf, ax.finallimits[])
-        data = Makie.apply_transform(inv_transf, Makie.rectclamp(event.data, rect))
+        rect = ax.finallimits[]
+        data = Makie.rectclamp(event.data, rect)
 
         r.to = data
         r.rectnode[] = Makie._chosen_limits(r, ax)
@@ -406,6 +418,8 @@ function Makie.process_interaction(l::Makie.LimitReset, event::MouseEvent, ax::G
 end
 
 function Makie.process_interaction(s::Makie.ScrollZoom, event::Makie.ScrollEvent, ax::GeoAxis)
+    # TODO: zooming happens in transformed space here,
+    # should it happen in data space instead?
     # use vertical zoom
     zoom = event.y
 
