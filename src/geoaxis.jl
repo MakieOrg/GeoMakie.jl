@@ -507,7 +507,8 @@ function vis_spine!(points, text, points_px, d, mindist, labeloffset)
         # TODO use xticklabelpad
         p_offset = p_px .+ (p.dir .* (3 * labeloffset))
         push!(points_px, p_offset)
-        push!(text, string(round(Int, p.input[d]), "°"))
+		x = round(p.input[d]; sigdigits = 3)
+        push!(text, string(isinteger(x) ? round(Int, x) : x, "°"))
     end
 end
 
