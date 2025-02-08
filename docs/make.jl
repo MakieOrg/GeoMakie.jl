@@ -43,7 +43,7 @@ examples = String[
     joinpath("cartopy", "arrows.jl"),
     # # joinpath("cartopy", "vesta.jl"),
     joinpath("cartopy", "streamplot.jl"),
-    joinpath("gmt", "antioquia.jl"),
+    # joinpath("gmt", "antioquia.jl"),
     "german_lakes.jl",
     "field_and_countries.jl",
     "meshimage.jl",
