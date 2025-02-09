@@ -42,13 +42,13 @@ examples = String[
     joinpath("cartopy", "katrina.jl"),
     joinpath("cartopy", "arrows.jl"),
     # # joinpath("cartopy", "vesta.jl"),
-    joinpath("cartopy", "streamplot.jl"),
+    # joinpath("cartopy", "streamplot.jl"),
     # joinpath("gmt", "antioquia.jl"),
-    "german_lakes.jl",
-    "field_and_countries.jl",
-    "meshimage.jl",
+    # "german_lakes.jl",
+    # "field_and_countries.jl",
+    # "meshimage.jl",
     # "projections.jl",
-    "tissot.jl",
+    # "tissot.jl",
     # "rotating_earth.jl",
 ]
 example_dir = joinpath(dirname(@__DIR__), "examples")
