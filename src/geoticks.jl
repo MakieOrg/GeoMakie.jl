@@ -4,6 +4,24 @@
 This file contains the implementation of geographic tickfinders.
 =#
 
+
+"""
+    geomakie_get_ticklabels(tickfinder, tickformatter, vals, dim)
+
+Find the ticklabels for the given values and return a `Vector{String}` of the same length as `vals`.
+
+This method is meant to be extended for different `tickfinder` and `tickformatter` combinations,
+but falls back to `Makie.get_ticklabels(tickformatter, vals)` if no other method is available.
+"""
+function geomakie_get_ticklabels(tickfinder, tickformatter, vals, dim)
+    return Makie.get_ticklabels(tickformatter, vals)
+end
+
+
+function geomakie_get_tickvalues(tickfinder, dmini, dmaxi, mini, maxi)
+    return Makie.get_tickvalues(tickfinder, identity, mini, maxi)
+end
+
 """
     GeoTicks(; multiple = 12, threshold = 3, alternate_tickfinder = Makie.WilkinsonTicks(5; k_min = 3))
 

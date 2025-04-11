@@ -482,8 +482,9 @@ function angle_between(v1::Point, v2::Point)
     return angle
 end
 
-function vis_spine!(points, text, points_px, d, mindist, labeloffset)
+function vis_spine!(points, text, points_px, d, mindist, labeloffset, tickfinder, tickformatter)
     last_point = nothing
+    vals = Float64[]
     for p in points
         p_px = p.projected
         if !isnothing(last_point)
@@ -507,9 +508,25 @@ function vis_spine!(points, text, points_px, d, mindist, labeloffset)
         # TODO use xticklabelpad
         p_offset = p_px .+ (p.dir .* (3 * labeloffset))
         push!(points_px, p_offset)
-        push!(text, string(round(Int, p.input[d]), "°"))
+        push!(vals, p.input[d])
     end
+
+    append!(text, geomakie_get_ticklabels(tickfinder, tickformatter, vals, d))
 end
+
+"""
+    geomakie_get_ticklabels(tickfinder, tickformatter, vals, dim)
+
+Find the ticklabels for the given values and return a `Vector{String}` of the same length as `vals`.
+
+This method is meant to be extended for different `tickfinder` and `tickformatter` combinations,
+but falls back to `Makie.get_ticklabels(tickformatter, vals)` if no other method is available.
+"""
+function geomakie_get_ticklabels(tickfinder, tickformatter, vals, dim)
+    return Makie.get_ticklabels(tickformatter, vals)
+end
+
+# function geomakie
 
 function filter_too_close(point, all_points)
     a = point.projected
@@ -588,8 +605,8 @@ function Makie.initialize_block!(axis::GeoAxis)
         xlims = Makie.xlimits(limits_t)
         ylims = Makie.ylimits(limits_t)
 
-        xticks = user_xticks isa Makie.Automatic ? geoticks(-180, 180, xlims...) : Makie.get_tickvalues(user_xticks, xlims...)
-        yticks = user_yticks isa Makie.Automatic ? geoticks(-90, 90, ylims...) : Makie.get_tickvalues(user_yticks, ylims...)
+        xticks = geomakie_get_tickvalues(-180, 180, user_xticks, transform xlims...)
+        yticks = geomakie_get_tickvalues(-90, 90, user_yticks, transform ylims...)
 
         spines = spines_obs[]
         foreach(empty!, [spines.left, spines.right, spines.bottom, spines.top])
@@ -659,19 +676,19 @@ function Makie.initialize_block!(axis::GeoAxis)
         return
     end
 
-    onany(lat_spine, axis.xlabelpadding, axis.xticklabelsize) do spine, offset, size
+    onany(lat_spine, axis.xlabelpadding, axis.xticklabelsize, axis.xticks, axis.xtickformat) do spine, offset, size, ticks, tickformat
         empty!(lat_points_px[])
         empty!(lat_text[])
-        vis_spine!(spine, lat_text[], lat_points_px[], 1, size * 2, offset)
+        vis_spine!(spine, lat_text[], lat_points_px[], 1, size * 2, offset, ticks, tickformat)
         notify(lat_text)
         notify(lat_points_px)
         return
     end
 
-    onany(lon_spine, axis.ylabelpadding, axis.yticklabelsize) do spine, offset, size
+    onany(lon_spine, axis.ylabelpadding, axis.yticklabelsize, axis.yticks, axis.ytickformat) do spine, offset, size, ticks, tickformat
         empty!(lon_points_px[])
         empty!(lon_text[])
-        vis_spine!(spine, lon_text[], lon_points_px[], 2, size * 2, offset)
+        vis_spine!(spine, lon_text[], lon_points_px[], 2, size * 2, offset, ticks, tickformat)
         notify(lon_text)
         notify(lon_points_px)
         return
