@@ -22,7 +22,7 @@ heatmap(img)
 # Now we can plot it on a GeoAxis with a Mollweide projection:
 meshimage(-180..180, -90..90, reverse(img; dims = 1); npoints = 200, axis = (; type = GeoAxis, dest = "+proj=moll"))
 # Finally, we can also try to obtain the image as a Mollweide projected image via Healpix, and then plot it directly.
-# For more information on what we're doing here, see the [Multiple CRS](@ref) example.
+# For more information on what we're doing here, see the Multiple CRS example.
 img, _, _ = Healpix.mollweide(m)
 heatmap(img)
 # 
