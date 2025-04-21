@@ -32,7 +32,6 @@ features:
     link: https://juliageo.org/GeoInterface.jl/stable
   - title: Projections via Proj.jl
     details: Plot in any projection, with data coming from any projection!
-    link: /examples/multiple_crs
 ---
 
 
