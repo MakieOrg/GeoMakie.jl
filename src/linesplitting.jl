@@ -39,7 +39,8 @@ module LineSplitting
 		start_inds = [firstindex(linenodes);  end_inds .+ 1]  # starts of intervals
 		end_inds = [end_inds; lastindex(linenodes)]  # ends of intervals
 		# do the splitting (TODO: this needs to inject a point at the appropriate place)
-		split_coords = @. view((linenodes,), UnitRange(start_inds, end_inds))  # For each start-end pair, get those coords
+		# Here we can't view, since GB.LineString only wants 
+		split_coords = @. getindex((linenodes,), UnitRange(start_inds, end_inds))  # For each start-end pair, get those coords
 		# reconstruct lines from points
 		split_lines = GeometryBasics.MultiLineString(GeometryBasics.LineString.(split_coords))
 	end

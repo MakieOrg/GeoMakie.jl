@@ -36,6 +36,7 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 MakieCore = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
 MakieThemes = "e296ed71-da82-5faf-88ab-0034a9761098"
 NaturalEarth = "436b0209-26ab-4e65-94a9-6526d86fea76"
+OhMyCards = "1d55750c-489b-49e7-adc5-a004f92ae42b"
 Polylabel = "49a44318-e865-4b63-9842-695152d634c1"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Proj = "c94c279d-25a6-4763-9509-64d165bea63e"
@@ -46,7 +47,11 @@ TopoPlots = "2bdbdf9c-dbd8-403f-947b-1a4e0dd41a7a"
 WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 ZipFile = "a5390f91-8eb1-5f08-bee0-b1d1ffed6cea"
 
+[sources]
+OhMyCards = {url = "https://github.com/asinghvi17/OhMyCards.jl/"}
+GeoMakie = {path = ".."}
+
 [compat]
 Documenter = "1"
-Makie = "0.21"
+Makie = "0.22"
 MakieThemes = "0.1.1"

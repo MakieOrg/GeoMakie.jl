@@ -86,7 +86,4 @@ Makie.apply_transform(SPHERICAL_TRANSFORM_FUNC, Point3f(1, 1, 0))
 
 # You can also plot directly on a spherical mesh:
 
-mesh(
-    Sphere(Point3f(0), 1),
-    color =
-)
+mesh(Sphere(Point3f(0), 1); color = :red)

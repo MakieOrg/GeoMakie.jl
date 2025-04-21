@@ -28,14 +28,16 @@ removed if necessary.
 
 =#
 
-function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecTypes{N,T} where {N,T}
+function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecTypes{N,T} where {N, T <: Number}
     if all(isnan.(pt))
         return V(NaN)
     end
     # this is to catch errors - show the point which was invalid
     # and then catch it.
     try
-        return V(t(Vec(pt)))
+        # TODO: this needs to work on 2d-3d transforms too
+        # currently it only works on nd-nd transforms
+        return V(t(Vec{N, T}(pt)))
     catch e
         # catch this annoying edge case
         # if pt[2] ≈ 90.0f0 || pt[2] ≈ -90.0f0

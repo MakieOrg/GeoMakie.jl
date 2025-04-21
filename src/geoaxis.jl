@@ -878,6 +878,9 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
     return plot
 end
 
+# This function only exists to get around the attribute name check,
+# since source and dest are not listed as common attributes.
+# All crs handling is done in `plot!(ax::GeoAxis, plot)`.
 function Makie.MakieCore._create_plot!(F, attributes::Dict, ax::GeoAxis, args...)
     source = pop!(attributes, :source, nothing)
     dest = pop!(attributes, :dest, nothing)

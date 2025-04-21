@@ -1,10 +1,11 @@
 name = "GeoMakie"
 uuid = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
 authors = ["Makie.jl Contributors"]
-version = "0.7.10"
+version = "0.7.12"
 
 [deps]
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
+CoordinateTransformations = "150eb455-5306-5404-9cee-2592286d6298"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 GeoFormatTypes = "68eda718-8dee-11e9-39e7-89f7f65f511f"
 GeoInterface = "cf35fbd7-0cd7-5166-be24-54bfbe79505f"
@@ -23,23 +24,24 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
 
 [compat]
-Colors = "0.12"
+Colors = "0.12, 0.13"
+CoordinateTransformations = "0.6.3"
 Downloads = "1"
 GeoFormatTypes = "0.4"
 GeoInterface = "0.5, 1.0"
 GeoInterfaceMakie = "0.1.6"
 GeoJSON = "0.6, 0.7, 0.8"
 Geodesy = "1.1.0"
-GeometryBasics = "0.4.11"
+GeometryBasics = "0.4.11, 0.5"
 GeometryOps = "0.1.6"
 ImageIO = "0.6"
 LinearAlgebra = "1"
-Makie = "0.21.6"
+Makie = "0.21.6, 0.22"
 NaturalEarth = "0.1"
 Proj = "1"
 Reexport = "1"
 Statistics = "1"
-StructArrays = "0.4, 0.5, 0.6"
+StructArrays = "0.4, 0.5, 0.6, 0.7"
 julia = "1.6"
 
 [extras]

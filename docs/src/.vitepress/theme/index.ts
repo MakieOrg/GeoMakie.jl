@@ -1,19 +1,40 @@
 // .vitepress/theme/index.ts
 import { h } from 'vue'
-import type { Theme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
+import type { Theme as ThemeConfig } from 'vitepress'
+
+import { 
+  NolebaseEnhancedReadabilitiesMenu, 
+  NolebaseEnhancedReadabilitiesScreenMenu, 
+} from '@nolebase/vitepress-plugin-enhanced-readabilities/client'
+
+import VersionPicker from "@/VersionPicker.vue"
+import AuthorBadge from '@/AuthorBadge.vue'
+import Authors from '@/Authors.vue'
 
 import { enhanceAppWithTabs } from 'vitepress-plugin-tabs/client'
-import './style.css'
 
-export default {
+import '@nolebase/vitepress-plugin-enhanced-readabilities/client/style.css'
+import './style.css' // You could setup your own, or else a default will be copied.
+import './docstrings.css' // You could setup your own, or else a default will be copied.
+import './cards.css'
+
+export const Theme: ThemeConfig = {
   extends: DefaultTheme,
   Layout() {
     return h(DefaultTheme.Layout, null, {
-      // https://vitepress.dev/guide/extending-default-theme#layout-slots
+      'nav-bar-content-after': () => [
+        h(NolebaseEnhancedReadabilitiesMenu), // Enhanced Readabilities menu
+      ],
+      // A enhanced readabilities menu for narrower screens (usually smaller than iPad Mini)
+      'nav-screen-content-after': () => h(NolebaseEnhancedReadabilitiesScreenMenu),
     })
   },
   enhanceApp({ app, router, siteData }) {
-    enhanceAppWithTabs(app)
+    enhanceAppWithTabs(app);
+    app.component('VersionPicker', VersionPicker);
+    app.component('AuthorBadge', AuthorBadge)
+    app.component('Authors', Authors)
   }
-} satisfies Theme
+}
+export default Theme

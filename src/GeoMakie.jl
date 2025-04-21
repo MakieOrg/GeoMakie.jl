@@ -60,6 +60,11 @@ include("makie-axis.jl")
 include("mesh_image.jl")
 include("linesplitting.jl")
 
+include("sphere/unit_sphere_transforms.jl")
+include("sphere/icosphere.jl")
+include("sphere/globetransform.jl")
+include("sphere/globeaxis.jl")
+
 include("triangulation3d.jl")
 
 @reexport using Colors, Makie

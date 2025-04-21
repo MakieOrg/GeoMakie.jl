@@ -23,17 +23,26 @@ end
 # This should be removed once https://github.com/MakieOrg/Makie.jl/pull/4584 is merged!
 # TODO
 
+
+@static if hasproperty(GeometryBasics, :metafree)
+    # GB v0.4
+    _maybe_metafree(x) = GeometryBasics.metafree(x)
+else
+    # GB v0.5 - there is no meta
+    _maybe_metafree(x) = identity(x)
+end
+
 # We don't want to override the general case poly_convert for all polygons, because that's piracy,
 # but we _can_ override it for the specific case of a 3D polygon that is being transformed by a function
 # that is a subtype of Union{<: Proj.Transformation, <: GeoMakie.Geodesy.ECEFfromLLA}
-function Makie.poly_convert(polygon::GeometryBasics.Polygon, transform_func::Union{<: Proj.Transformation, <: GeoMakie.Geodesy.ECEFfromLLA})
+function Makie.poly_convert(polygon::GeometryBasics.Polygon, transform_func::Union{<: Proj.Transformation, <: GeoMakie.Geodesy.ECEFfromLLA, <: GlobeTransform})
 
-    outer = GeometryBasics.metafree(GeometryBasics.coordinates(polygon.exterior))
+    outer = _maybe_metafree(GeometryBasics.coordinates(polygon.exterior))
     PT = Makie.float_type(outer)
     points = [Makie.apply_transform(transform_func, outer)]
     points_flat = PT[outer;]
     for inner in polygon.interiors
-        inner_points = GeometryBasics.metafree(GeometryBasics.coordinates(inner))
+        inner_points = _maybe_metafree(GeometryBasics.coordinates(inner))
         append!(points_flat, inner_points)
         push!(points, Makie.apply_transform(transform_func, inner_points))
     end

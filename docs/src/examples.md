@@ -24,7 +24,6 @@ multiple_crs
 ```@overviewgallery
 axis_config
 italy
-raster_warping_masking
 world_population
 graph_on_usa
 orthographic
