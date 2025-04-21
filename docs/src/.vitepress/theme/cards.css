@@ -1,0 +1,140 @@
+/** ---------------------------------------------------------------------------
+* Gallery styling for example gallery
+*/
+
+
+.grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 10px;
+  }
+  
+  .gallery-image .heading {
+    text-align: center;
+    font-size: 2em;
+    letter-spacing: 1px;
+    padding: 40px;
+    color: black;
+  }
+  
+  .gallery-image {
+    padding: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .gallery-image :deep(img) {
+    height: 260px;
+    width: 300px;
+    transform: scale(1);
+    transition: transform 0.4s ease;
+    position: absolute;
+    bottom:0px;
+  }
+  
+  
+  .img-box {
+    box-sizing: content-box;
+    border-radius: 14px;
+    margin: 5px;
+    height: 225px;
+    width: 300px;
+    overflow: hidden;
+    display: inline-block;
+    color: white;
+    position: relative;
+    background-color: white;
+    border: 2px solid var(--vp-c-bg-alt);
+    bottom:0px;
+  }
+  
+  .img-box h2 {
+    border-top: 0;
+  }
+  
+  .img-box img {
+    height: 200px;
+    width: 300px;
+    object-fit: scale-down;
+    transition: transform 0.3s ease;
+    bottom: 0px;
+  }
+  
+  .caption {
+    position: relative;
+    top: -60px;
+    color: black;
+    left: 10px;
+    opacity: 1;
+    transition: transform 0.3s ease;
+  }
+  
+  .subcaption {
+    position: absolute;
+    bottom: 5px;
+    color: gray;
+    left: 10px;
+    opacity: 0;
+    transition: transform 0.3s ease;
+  }
+  
+  .transparent-box1 {
+    height: 225px;
+    width: 300px;
+    background-color: transparent;
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0.9;
+    transition: background-color 0.3s ease;
+  }
+  
+  .transparent-box2 {
+    /* height: 100px; */
+    /* width: 250px; */
+    background-color: transparent;
+    /* position: absolute; */
+    /* top: 150px; */
+    left: 0;
+    opacity: 0.9;
+    transition: background-color 0.3s ease;
+  }
+  
+  .img-box:hover img {
+    transform: scale(1.1);
+  }
+  
+  .img-box:hover .transparent-box1 {
+    background-color: var(--vp-c-bg-alt);
+  }
+  
+  .img-box:hover .transparent-box2 {
+    background-color: var(--vp-c-bg-alt);
+  }
+  
+  .img-box:hover .caption {
+    /* transform: translateY(-20px); */
+    opacity: 1;
+  }
+  
+  .img-box:hover .subcaption {
+    transform: translateY(-20px);
+    opacity: 1;
+  }
+  
+  .img-box:hover {
+    border: 2px solid var(--vp-c-brand-light);
+    cursor: pointer;
+  }
+  
+  .caption>p:nth-child(2) {
+    font-size: 0.8em;
+  }
+  .subcaption>p:nth-child(2) {
+    font-size: 0.8em;
+  }
+  
+  .opacity-low {
+    opacity: 0.85;
+  }

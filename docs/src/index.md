@@ -78,7 +78,7 @@ However, when using `surface` or `contour` plots this can lead to errors when th
 
 To fix this issue, the recommended approach is that you (1) change the central longitude of the map transformation (`dest`), and (2) `circshift` your data accordingly for `lons` and `field`.
 
-```@example MAIN
+```@example quickstart
 function cshift(lons, field, lon_0)
    shift = @. lons - lon_0 > 180
    nn = sum(shift)
@@ -86,7 +86,7 @@ function cshift(lons, field, lon_0)
 end
 ```
 
-```@example MAIN
+```@example quickstart
 lons = -180:180
 lats = -90:90
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
@@ -95,11 +95,11 @@ lon_0 = -160
 (lons_shift, field_shift) = cshift(lons, field, lon_0)
 ```
 
-```@example MAIN
+```@example quickstart
 fig = Figure()
 ax = GeoAxis(fig[1,1]; dest = "+proj=eqearth +lon_0=$(lon_0)")
 surface!(ax, lons_shift, lats, field_shift, colormap=:balance)
-lines!.(ax, GeoMakie.coastlines(ax), color=:black, overdraw = true)
+lines!(ax, GeoMakie.coastlines(ax), color=:black, overdraw = true)
 fig
 ```
 

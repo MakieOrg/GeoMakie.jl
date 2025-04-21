@@ -24,7 +24,7 @@ using Literate
 
 examples = String[
     "basic.jl",
-    "new.jl",
+    # "new.jl",
     "axis_config.jl",
     "italy.jl",
     "histogram.jl",
@@ -35,7 +35,7 @@ examples = String[
     # "geostationary_image.jl",
     # "multiple_crs.jl",
     "rasters.jl",
-    "raster_warping_masking.jl",
+    # "raster_warping_masking.jl", # this one fails due to Rasters.boolmask error
     "healpix.jl",
     # "is_it_a_plane.jl",
     joinpath("cartopy", "annotation.jl"),
