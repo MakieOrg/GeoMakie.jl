@@ -67,19 +67,6 @@ jobs:
         run: |
           xvfb-run -s '-screen 0 1024x768x24' julia --project=docs -e '
             using Pkg
-            Pkg.add([
-              PackageSpec(path = pwd()),
-              PackageSpec(name = "DocumenterVitepress", rev = "master"), 
-              PackageSpec(name = "Makie", rev = "master"), 
-              PackageSpec(name = "MakieCore", rev = "master"), 
-              PackageSpec(name = "CairoMakie", rev = "master"), 
-              PackageSpec(name = "GLMakie", rev = "master"),
-              PackageSpec(name = "Rasters", rev = "main"),
-              PackageSpec(name = "ArchGDAL", rev = "master"),
-              PackageSpec(url = "https://github.com/asinghvi17/OhMyCards.jl", rev = "main"),
-              PackageSpec(url = "https://github.com/HolyLab/FlyThroughPaths.jl", rev = "main"),
-              PackageSpec(url = "https://github.com/Moelf/FHist.jl", rev = "main"),
-            ])
             Pkg.instantiate()'
         env:
           DISPLAY: ':0'
