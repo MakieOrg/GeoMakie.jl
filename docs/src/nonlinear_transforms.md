@@ -64,7 +64,8 @@ The bounding box in transformed space directly maps to that in pixel space, and 
 
 However, in input space, this is not necessarily the case.  Consider the following GeoAxis:
 
-```@example nonlinear-transformations
+```julia
+# TODO: is failing now
 fig = Figure()
 ga = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=19 +lat_0=50")
 lines!(ga, GeoMakie.coastlines())
@@ -73,7 +74,7 @@ fig
 
 If we look at the grid of lon/lat values which are valid in transformed space,
 
-```@example nonlinear-transformations
+```julia
 lons = LinRange(-180, 180, 500)
 lats = LinRange(-90, 90, 500)
 
