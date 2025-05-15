@@ -86,7 +86,7 @@ Documenter.makedocs(;
     plugins = [OhMyCards.ExampleConfig(),],
 )
 
-deploydocs(; 
+DocumenterVitepress.deploydocs(; 
     repo="github.com/MakieOrg/GeoMakie.jl", 
     target="build", 
     push_preview = true, 
