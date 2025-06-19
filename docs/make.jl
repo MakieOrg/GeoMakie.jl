@@ -67,6 +67,7 @@ Documenter.makedocs(;
         deploy_url = "https://geo.makie.org",
         devbranch = "master",
         devurl = "dev",
+        keep = :patch,
     ),
     pages=[
         "Introduction" => "introduction.md",
