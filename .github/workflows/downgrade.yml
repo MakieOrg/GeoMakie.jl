@@ -1,0 +1,37 @@
+name: Downgrade
+on:
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - 'docs/**'
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - 'docs/**'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: ['1']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+      - uses: julia-actions/julia-downgrade-compat@v1
+        with:
+          skip: LinearAlgebra,Statistics,Downloads,Pkg,TOML
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+        env: 
+          DISPLAY: ':0'
+        with: 
+          prefix: xvfb-run -s '-screen 0 1024x768x24'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test_images
+          path: test_images/
