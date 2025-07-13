@@ -1,5 +1,5 @@
 using Documenter, DocumenterVitepress, Literate, OhMyCards
-using GeoMakie, CairoMakie, Makie, GeoInterfaceMakie
+using GeoMakie, CairoMakie, Makie
 
 # some strategic imports to avoid world age issues
 using FHist

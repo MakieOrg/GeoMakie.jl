@@ -8,8 +8,6 @@ anything else.
 using CairoMakie, GeoMakie
 using GADM, DataFrames
 import GeometryOps as GO
-using GeoInterfaceMakie # hide
-GeoInterfaceMakie.@enable GADM.ArchGDAL.IGeometry # hide
 
 # Acquire the data via [GADM.jl](https://github.com/JuliaGeo/GADM.jl), a package which allows
 # access to the GADM dataset of country border geometries.  We'll get the 1st level of
