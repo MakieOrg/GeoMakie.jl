@@ -41,8 +41,8 @@ the provided image.  Its conversion trait is `ImageLike`.
     op1)`.
     """
     uv_transform = Makie.LinearAlgebra.I
-    MakieCore.mixin_generic_plot_attributes()...
-    MakieCore.mixin_colormap_attributes()...
+    mixin_generic_plot_attributes()...
+    mixin_colormap_attributes()...
 end
 
 # this inherits all conversions for `Image`,
@@ -57,41 +57,47 @@ Makie.needs_tight_limits(::MeshImage) = true
 # This is the recipe implementation.
 
 function Makie.plot!(plot::MeshImage)
-    # Initialize some Observables which will hold data.
-    # For right now, they point to some undefined place in memory.
-    points_observable = Observable{Vector{Point3d}}()
-    faces_observable = Observable{Vector{Makie.GLTriangleFace}}()#=GeometryBasics.QuadFace{Int}=#
-    uv_observable = Observable{Vector{Vec2f}}()
+    # Initialize some Ref's that can hold references
+    # to pre-defined arrays.
+    points_buffer = Ref{Vector{Point3d}}(Point3d[])
+    faces_buffer = Ref{Vector{Makie.GLTriangleFace}}(Makie.GLTriangleFace[])#=GeometryBasics.QuadFace{Int}=#
+    uv_buffer = Ref{Vector{Vec2f}}(Vec2f[])
 
     # A sentinel so we can see if `npoints` changed.  If it did, we have to
     # recreate the mesh, which is slightly time-consuming.  If not, though,
     # then we only have to change the texture (image) which is cheaper.
-    old_npoints = Ref{Any}(0)
+    old_npoints = Ref{Tuple{Int, Int}}((0, 0))
 
-    # Handle the transformation
-    onany(plot, plot.converted[1], plot.converted[2], plot.transformation.transform_func, plot.npoints, plot.space, plot.z_level; update=true) do x_in, y_in, tfunc, npoints, space, z_level
-        # If `npoints` changed, then re-construct the mesh.
-        if npoints != old_npoints[]
+    Makie.map!(
+        plot,
+        [:x, :y, :transform_func, :npoints, :space, :z_level],
+        [:mesh]
+    ) do x_in, y_in, tfunc, npoints, space, z_level
+        # If `npoints` changed, then re-construct the buffers.
+        if (first(npoints), last(npoints)) != old_npoints[]
             # We need a new StructArray to hold all the points.
             # TODO: resize the old structarray instead!
-            points_observable.val = Vector{Point3d}(undef, first(npoints) * last(npoints))
+            points_buffer[] = Vector{Point3d}(undef, first(npoints) * last(npoints))
             # This constructs an efficient triangulation of a rectangle (all images are rectangles).
             rect = GeometryBasics.Tesselation(Rect2f(0, 0, 1, 1), (first(npoints), last(npoints)))
-            # This decomposes that Tesselation to actual triangles, with integer index values.
-            faces_observable.val = GeometryBasics.decompose(Makie.GLTriangleFace, rect)
-            # This holds the UVs for the mesh.  These are reversed, so that the image is plotted correctly.
-            uv_observable.val = map(x -> Vec2f(x[1], 1f0 - x[2]), GeometryBasics.decompose_uv(rect))
+            faces_buffer[] = GeometryBasics.decompose(Makie.GLTriangleFace, rect)
+            uv_buffer[] = map(x -> Vec2f(x[1], 1f0 - x[2]), GeometryBasics.decompose_uv(rect))
+            old_npoints[] = (first(npoints), last(npoints))
         end
+        nx, ny = old_npoints[]
 
         # These are the ranges for the points.
         # `first` and `last` are used to get the number of points per side, if that's provided as a tuple.
-        xs = LinRange(extrema(x_in)..., first(npoints))
-        ys = LinRange(extrema(y_in)..., last(npoints))
-        poval = points_observable.val
-        # The array is in a grid, so we have to update them on a grid as well.
-        for (linear_ind, cartesian_ind) in enumerate(CartesianIndices((first(npoints), last(npoints))))
+        xs = LinRange(extrema(x_in)..., nx)
+        ys = LinRange(extrema(y_in)..., ny)
+
+        points = points_buffer[]
+        faces = faces_buffer[]
+        uvs = uv_buffer[]
+
+        for (linear_ind, cartesian_ind) in enumerate(CartesianIndices((nx, ny)))
             p = Point3d(xs[cartesian_ind[1]], ys[cartesian_ind[2]], z_level)
-            poval[linear_ind] = Makie.to_ndim(
+            points[linear_ind] = Makie.to_ndim(
                 Point3d, 
                 Makie.apply_transform(
                     tfunc, 
@@ -101,53 +107,26 @@ function Makie.plot!(plot::MeshImage)
                 0.0
             )
         end
-        # Finally, we notify the points observable that it has an update.
-        notify(points_observable)
-        # If the faces were updated, we notify those as well.
-        if npoints != old_npoints[]
-            notify(faces_observable)
-            old_npoints[] = npoints
-        end
-    end
 
-    # You may have noticed that nowhere above did we actually create a mesh.  
-    # Let's remedy that now!
-    final_mesh = lift(plot, points_observable, faces_observable, uv_observable; ignore_equal_values = true#=, priority = -100=#) do points, faces, uv
-        @static if hasproperty(GeometryBasics, :metafree) # pre v0.5
-            return GeometryBasics.Mesh(
-                GeometryBasics.meta(points; uv=uv), # each point gets a UV, they're interpolated on faces
-                faces
-            )
-        else # post v0.5 / Makie v0.22
-            return GeometryBasics.Mesh(
+        return (GeometryBasics.Mesh(
                 points, 
                 faces;
-                uv = uv, # each point gets a UV, they're interpolated on faces
-            )
-        end
+                uv = uvs, # each point gets a UV, they're interpolated on faces
+            ),)
     end
 
     # Finally, we plot the mesh.
-    shared_attrs = Makie.shared_attributes(plot, Makie.Mesh)
-
-    haskey(shared_attrs, :color) && pop!(shared_attrs, :color)
-    haskey(shared_attrs, :shading) && pop!(shared_attrs, :shading)
-    haskey(shared_attrs, :transformation) && pop!(shared_attrs, :transformation)
-    haskey(shared_attrs, :uv_transform) && pop!(shared_attrs, :uv_transform)
-
+    # This auto forwards all shared attributes from the compute graph.
     mesh!(
         plot, 
-        final_mesh; 
-        color = plot.converted[3], # pass on the color directly
-        shading = NoShading, #
+        plot.attributes,
+        plot.mesh; 
+        color = plot.img, # pass on the color directly
         transformation = Makie.Transformation(
             plot.transformation;      # connect up the model matrix to the parent's model matrix
             transform_func = identity # do NOT connect the transform func, since we've already done that.  identity provides a custom transform func, while `nothing` signals that you don't care.
         ),
-        uv_transform = plot.uv_transform,
-        shared_attrs...
     )
-    # TODO: get a `:transformed` space out so we don't need this `transformation` hack
 end
 
 # This is an efficient implementation for data_limits,
