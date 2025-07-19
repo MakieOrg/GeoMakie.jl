@@ -102,7 +102,6 @@ function Makie.plot!(plot::MeshImage)
                 Makie.apply_transform(
                     tfunc, 
                     p,
-                    space
                 ), 
                 0.0
             )
