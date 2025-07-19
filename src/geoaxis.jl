@@ -620,11 +620,11 @@ function Makie.initialize_block!(axis::GeoAxis)
     # This creates the spines and ticklabels plots for the grid.
     cam = scene.camera
     lon_spine = Obs(SpinePoint[])
-    lon_text = Obs([""])
+    lon_text = Obs(String[])
     lon_points_px = Obs(Point2d[])
 
     lat_spine = Obs(SpinePoint[])
-    lat_text = Obs([""])
+    lat_text = Obs(String[])
     lat_points_px = Obs(Point2d[])
 
     onany(scene, spines_obs, cam.projectionview, vp_unchanged) do spines, pv, area
