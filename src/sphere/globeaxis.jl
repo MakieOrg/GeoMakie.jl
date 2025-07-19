@@ -400,7 +400,7 @@ function Makie.plot!(axis::GlobeAxis, plot::Makie.AbstractPlot)
     end
     return plot
 end
-function Makie.MakieCore._create_plot!(F, attributes::Dict, ax::GlobeAxis, args...)
+function _create_plot!(F, attributes::Dict, ax::GlobeAxis, args...)
     source = pop!(attributes, :source, ax.source)
     zlevel = pop!(attributes, :zlevel, 0)
     # dest = pop!(attributes, :dest, nothing)
