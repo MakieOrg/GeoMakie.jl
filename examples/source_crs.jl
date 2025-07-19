@@ -10,8 +10,6 @@ using GeoInterface: extent
 import GeometryOps as GO
 import GeoInterface as GI
 
-using GeoInterfaceMakie
-
 geojson = GeoMakie.coastlines()
 
 webmerc_geojson = GO.reproject(GI.convert.((GI,), geojson) |> GO.tuples; transform = GeoMakie.create_transform("+proj=webmerc +datum=WGS84", "+proj=longlat +datum=WGS84"))
