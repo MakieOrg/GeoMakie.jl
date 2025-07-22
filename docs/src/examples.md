@@ -34,6 +34,7 @@ meshimage
 projections
 tissot
 healpix
+netcdf
 ```
 
 ## Examples from Cartopy
