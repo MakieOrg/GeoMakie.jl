@@ -18,9 +18,9 @@ Makie.set_theme!(Theme(
         lats = -90:90
         field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 
-        fig = Figure()
-        ax = GeoAxis(fig[1,1])
-        el = surface!(ax, lons, lats, field; shading = NoShading)
+        fig = @test_nowarn Figure()
+        ax = @test_nowarn GeoAxis(fig[1,1])
+        el = @test_nowarn surface!(ax, lons, lats, field; shading = NoShading)
         @test true
         # display(fig)
     end
@@ -32,7 +32,7 @@ Makie.set_theme!(Theme(
 
     @testset "Line Splitting" begin
         @test split(GeoMakie.coastlines(),"+lon_0=-160") isa Vector
-        ga = GeoAxis(Figure();dest = "+proj=wintri +lon_0=-160")
+        ga = @test_nowarn GeoAxis(Figure();dest = "+proj=wintri +lon_0=-160")
         @test GeoMakie.coastlines(ga) isa Observable
         @test GeoMakie.coastlines(ga)[] isa AbstractVector
     end
