@@ -45,7 +45,7 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 ZipFile = "a5390f91-8eb1-5f08-bee0-b1d1ffed6cea"
 
 [sources]
-OhMyCards = {url = "https://github.com/asinghvi17/OhMyCards.jl/"}
+OhMyCards = {url = "https://github.com/asinghvi17/OhMyCards.jl/", rev = "as/dyad"}
 GeoMakie = {path = ".."}
 
 [compat]
