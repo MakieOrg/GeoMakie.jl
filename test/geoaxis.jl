@@ -1,11 +1,14 @@
 
 @testset "Legend" begin
-    fig = Figure()
+    fig = Figure();
     ga = GeoAxis(fig[1, 1])
     lines!(ga, 1:10, 1:10; label = "series 1")
     scatter!(ga, 1:19, 2:20; label= "series 2")
-    @test_nowarn Legend(fig[1, 2], ga)
-    fig
+    leg = @test_nowarn Legend(fig[1, 2], ga)
+    # Test that the legend contains the correct labels
+    leg_contents = contents(only(contents(leg.grid)))
+    labels = [l.text[] for l in filter(x -> x isa Label, leg_contents)]
+    @test isempty(setdiff(labels, ["series 1", "series 2"]))
 end
 
 @testset "Plotlists get transformed" begin
