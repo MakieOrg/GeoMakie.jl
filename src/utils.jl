@@ -201,14 +201,13 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
     return padding_vec
 end
 
-
 """
     geom_to_bands(geom; height = 100_000, base = 0)::Tuple{Vector{Point3d}, Vector{Point3d}}
 
 Reduce a geometry to a NaN-separated list of points, and
 return a pair of vectors of points in the same CRS - 
 one with z coordinate `base`, and one at z coordinate
-`height`.
+`base +height`.
 
 Returns a tuple of `(lower_band, upper_band)`.
 
@@ -230,7 +229,7 @@ julia> band(lb, ub; color = :red)
 """
 function geom_to_bands(geom; height = 100_000.0, base = 0.0, kwargs...)
     geom_lower = GO.applyreduce(vcat, GO.TraitTarget(GI.AbstractCurveTrait), geom; init = (NaN, NaN, NaN), kwargs...) do geom
-        points = GO.forcexyz(geom, 0.0).geom
+        points = GO.forcexyz(geom, base).geom
         push!(points, (NaN, NaN, NaN))
         return points
     end
