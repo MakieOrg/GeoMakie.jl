@@ -11,6 +11,7 @@
 stuff.jl
 .vscode
 *.swp
+gmt.history
 
 src/oldsrc
 src/experimental
