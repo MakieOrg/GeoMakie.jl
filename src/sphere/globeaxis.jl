@@ -321,8 +321,26 @@ function Makie.initialize_block!(axis::GlobeAxis; ellipsoid = Geodesy.wgs84_elli
 
 end
 
-function Makie.reset_limits!(axis::GlobeAxis; kwargs...)
-    Makie.reset_limits!(axis.lscene; kwargs...)
+function Makie.reset_limits!(ax::GlobeAxis)
+    function exclude(plot)
+        # only use plots with autolimits = true
+        is_in_autolimits = all(x -> Makie.to_value(get(plot, x, true)), (:xautolimits, :yautolimits, :zautolimits))
+        # only if they use data coordinates
+        is_in_data_space = Makie.is_data_space(plot)
+        # only use visible plots for limits
+        is_visible = Makie.to_value(get(plot, :visible, true))
+        # If any of the above are **FALSE**, then the plot must be 
+        # EXCLUDED
+        should_exclude = !(is_in_autolimits && is_in_data_space && is_visible)
+        return should_exclude
+    end
+    Makie.notify(ax.lscene.scene.theme.limits)
+    Makie.center!(ax.lscene.scene, 0.01 #=padding=#, exclude #=exclude=#)
+    # TODO: this is a hack to get the farclip to be OK and look alright...
+    # We should have a way to set the clipping according to the actual bbox 
+    # without excluding autolimits=false, but still center the camera on the data
+    # according to autolimits.
+    cameracontrols(ax.lscene.scene).far[] = 10
     return
 end
 tightlimits!(::GlobeAxis) = nothing # TODO implement!?  By getting the bbox of the sphere / ellipsoid and using that to compute the camera eyeposition / lookat / fov
