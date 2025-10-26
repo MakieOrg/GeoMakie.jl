@@ -200,3 +200,46 @@ function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::Abst
 
     return padding_vec
 end
+
+
+"""
+    geom_to_bands(geom; height = 100_000, base = 0)::Tuple{Vector{Point3d}, Vector{Point3d}}
+
+Reduce a geometry to a NaN-separated list of points, and
+return a pair of vectors of points in the same CRS - 
+one with z coordinate `base`, and one at z coordinate
+`height`.
+
+Returns a tuple of `(lower_band, upper_band)`.
+
+This can be directly splatted into Makie's `band!` recipe,
+which will create a 3D band.  Especially useful in [`GlobeAxis`](@ref).
+
+
+Accepts any GeoInterface-compatible geometry that is composed of curves
+(linestrings or linear rings) or a higher level structure composed of such.
+
+So any Polygon, MultiPolygon, LineString, MultiLineString, etc., but also
+a vector of those, a table (from Tables.jl), or a feature collection.
+
+## Example
+```julia-repl
+julia> lb, ub = geom_to_bands(california, 50_000)
+julia> band(lb, ub; color = :red)
+```
+"""
+function geom_to_bands(geom; height = 100_000.0, base = 0.0, kwargs...)
+    geom_lower = GO.applyreduce(vcat, GO.TraitTarget(GI.AbstractCurveTrait), geom; init = (NaN, NaN, NaN), kwargs...) do geom
+        points = GO.forcexyz(geom, 0.0).geom
+        push!(points, (NaN, NaN, NaN))
+        return points
+    end
+    geom_upper = map(geom_lower) do point
+        if isnan(point[3])
+            point
+        else
+            (point[1], point[2], point[3] + height)
+        end
+    end
+    return (Makie.Point3d.(geom_lower), Makie.Point3d.(geom_upper))
+end
