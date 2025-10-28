@@ -84,7 +84,7 @@ Documenter.makedocs(;
     authors="Anshul Singhvi and the Makie.jl contributors",
     warnonly = true,
     draft = false,
-    plugins = [OhMyCards.ExampleConfig(),],
+    plugins = [OhMyCards.ExampleConfig(; dot_slash = true),],
 )
 
 DocumenterVitepress.deploydocs(; 
