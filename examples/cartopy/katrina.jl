@@ -5,7 +5,7 @@ using CairoMakie, GeoMakie
 using Makie
 using DataFrames
 using NaturalEarth
-import GeometryOps as GO
+import GeometryOps as GO, GeoInterface as GI
 import LibGEOS # to activate buffering in GeometryOps
 
 #=
@@ -28,12 +28,12 @@ lats = [23.1, 23.4, 23.8, 24.5, 25.4, 26.0, 26.1, 26.2, 26.2, 26.0,
         25.7, 26.3, 27.2, 28.2, 29.3, 29.5, 30.2, 31.1, 32.6, 34.1,
         35.6, 37.0, 38.6, 40.1]
 
-katrina_path = GO.LineString(Point2.(lons, lats))
+katrina_path = GI.LineString(Point2.(lons, lats))
 
 # We can retrieve the US states from Natural Earth.  This particular feature collection
 # only contains US states.
 states_df = DataFrame(naturalearth("admin_1_states_provinces_lakes", 110))
-states_df.geometry .= GeoMakie.to_multipoly.(states_df.geometry)
+# Now, we can start filling the dataset with the data we need:
 states_df.color = fill(RGBAf(colorant"lightyellow"), size(states_df, 1))
 # We also have to filter for the continental states only, since we're focused on those:
 filter!(:name_en => !in(("Alaska", "Hawaii")), states_df)

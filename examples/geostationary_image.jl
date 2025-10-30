@@ -24,7 +24,7 @@
 # First, we load our packages and download the image we want to display, 
 # in this case a black-and-white image of the Earth from a satellite in 
 # geostationary orbit.
-using Makie, GeoMakie, CairoMakie
+using Makie, GeoMakie, GLMakie
 using Downloads, FileIO
 # Download a geostationary satellite image
 img = FileIO.load(Downloads.download("https://gist.github.com/pelson/5871263/raw/EIDA50_201211061300_clip2.png"))
@@ -58,6 +58,22 @@ mi.npoints[] = 1000
 fig
 
 # Of course, at some point we hit diminishing returns.
+# 
+# You can also put this on the globe with a [`GlobeAxis`](@ref)!
+f2, a2, p2 = meshimage(
+    -5500000 .. 5500000, -5500000 .. 5500000, img;
+    source="+proj=geos +h=35786000",
+    npoints=1000,
+    axis = (; type = GlobeAxis, show_axis = false)
+)
+## Add a background image too, to contextualize:
+background_plt = meshimage!(
+    a2, -180..180, -90..90, GeoMakie.earth();
+    uv_transform = :rotr90,
+    npoints = 1000,
+    zlevel = -100_000 # 100km below the surface of the earth
+)
+f2
 
 #=
 # Surface could be used as well, but is slower!

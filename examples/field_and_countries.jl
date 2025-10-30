@@ -13,7 +13,7 @@ using GeoMakie.GeoInterface
 path = GeoMakie.assetpath("vector", "countries.geo.json")
 json_str = read(path, String)
 worldCountries = GeoJSON.read(json_str)
-n = length(worldCountries)
+
 lons = -180:180
 lats = -90:90
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
@@ -32,7 +32,7 @@ translate!(hm1, 0, 0, -10)
 
 hm2 = poly!(
     ax, GeoMakie.to_multipoly(worldCountries.geometry);
-    color= 1:n,
+    color= 1:length(worldCountries),
     colormap = Reverse(:plasma),
     strokecolor = :black,
     strokewidth = 0.25

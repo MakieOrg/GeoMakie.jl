@@ -32,7 +32,7 @@ examples = String[
     "world_population.jl",
     "graph_on_usa.jl",
     "orthographic.jl",
-    # "geostationary_image.jl",
+    "geostationary_image.jl",
     # "multiple_crs.jl",
     "rasters.jl",
     # "raster_warping_masking.jl", # this one fails due to Rasters.boolmask error
