@@ -22,15 +22,15 @@ using GeometryBasics: Point2d
 Sweep points along a line of sight, given a position and velocity in the ECEF frame,
 and distances in meters.
 
-# Arguments
+## Arguments
 - `position`: The position of the satellite.
 - `velocity`: The velocity of the satellite.
 - `distances`: The distances to sweep along the line of sight, in meters.  Will be interpreted as meters in the ENU frame.
 
-# Returns
+## Returns
 A vector of 2-tuples of (longitude, latitude) in degrees, representing the sweep points according to `distances`.
 
-# Extended help
+## Extended help
 
 ## How does this work?
 
