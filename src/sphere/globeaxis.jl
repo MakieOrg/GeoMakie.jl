@@ -296,10 +296,15 @@ _geodesy_ellipsoid_from(x::T) where T = error("Unsupported ellipsoid type: $T.  
 
 function Makie.initialize_block!(axis::GlobeAxis; scenekw = NamedTuple())
 
+    lscene = LScene(axis.layout[1, 1]; show_axis = axis.show_axis, scenekw)
+    scene = lscene.scene
+    setfield!(axis, :scene, scene)
+    setfield!(axis, :lscene, lscene)
+
     # axis.show_axis = true
     # TODO: set up globe ellipsoid ahead of time.
     setfield!(axis, :ellipsoid, Observable{Geodesy.Ellipsoid}()) # TODO: change this to Geodesy.Datum, allow for a Geodesy.FlexibleDatum type that takes an ellipsoid.
-    on(axis, axis.dest) do dest
+    on(axis.scene, axis.dest; update = true) do dest
         axis.ellipsoid[] = _geodesy_ellipsoid_from(dest)
     end
     # Set up transformations first, so that the scene can be set up
@@ -309,24 +314,19 @@ function Makie.initialize_block!(axis::GlobeAxis; scenekw = NamedTuple())
     setfield!(axis, :transform_func, transform_obs)
     setfield!(axis, :inv_transform_func, transform_inv_obs)
 
-    on(axis, axis.ellipsoid) do ellipsoid
+    onany(axis.scene, axis.ellipsoid, axis.source; update = true) do ellipsoid, source
         transform_obs[] = create_globe_transform(ellipsoid, source, 0.0)
         transform_inv_obs[] = Makie.inverse_transform(transform_obs[])
     end
     # transform_ticks_obs = Observable{Any}(identity; ignore_equal_values=true)
     # transform_ticks_inv_obs = Observable{Any}(identity; ignore_equal_values=true)
-    
-
-    lscene = LScene(axis.layout[1, 1]; show_axis = axis.show_axis, scenekw)
-    scene = lscene.scene
-    setfield!(axis, :scene, scene)
-    setfield!(axis, :lscene, lscene)
 
     # set up the camera for the axis
     cc = cameracontrols(scene)
     cc.settings.mouse_translationspeed[] = 0.0
     cc.settings.zoom_shift_lookat[] = false
     cc.lookat[] = Makie.Vec3f(0, 0, 0) # center the camera on the globe
+    cc.upvector[] = Makie.Vec3f(0, 0, 1)
     # TODO: decide - should we use cam3d_cad or oldcam3d here?
     Makie.update_cam!(scene, cc)
 
@@ -352,30 +352,45 @@ function Makie.reset_limits!(axis::GlobeAxis; padding = 0.01, kwargs...)
     if axis.center[]
         Makie.center!(axis.scene, padding, exclude)
     end
+    Makie.update_cam!(axis; longlat = axis.camera_longlat[], altitude = axis.camera_altitude[])
+    return
+end
+tightlimits!(::GlobeAxis) = nothing # TODO implement!?  By getting the bbox of the sphere / ellipsoid and using that to compute the camera eyeposition / lookat / fov
+
+function Makie.update_cam!(
+        axis::GlobeAxis; 
+        longlat = axis.camera_longlat[], 
+        altitude = axis.camera_altitude[], 
+        upvector = Makie.automatic,
+        fov = Makie.automatic,
+    )
 
     cc = cameracontrols(axis.scene)
 
     current_eyeposition_ecef = cc.eyeposition[]
     current_eyeposition_lla = Makie.apply_transform(axis.inv_transform_func[], current_eyeposition_ecef)
-    current_eyeposition_latlong = Point2d(current_eyeposition_lla.lon, current_eyeposition_lla.lat)
+    current_eyeposition_latlong = Point2d(current_eyeposition_lla[1:2])
     current_eyeposition_elev = current_eyeposition_lla[3]
 
 
-    if axis.camera_longlat[] !== Makie.automatic
-        current_eyeposition_latlong = Point2d(axis.camera_longlat[])
+    if longlat !== Makie.automatic
+        current_eyeposition_latlong = Point2d(longlat)
     end
-    if axis.camera_altitude[] !== Makie.automatic
-        current_eyeposition_elev = axis.camera_altitude[]
+    if altitude !== Makie.automatic
+        current_eyeposition_elev = altitude
     end
 
     new_eyeposition = Makie.apply_transform(axis.transform_func[], Point3d(current_eyeposition_latlong..., current_eyeposition_elev))
 
     cc.eyeposition[] = Makie.Vec3f(new_eyeposition)
     cc.lookat[] = Makie.Vec3f(0, 0, 0)
+    cc.upvector[] = upvector === Makie.automatic ? Makie.Vec3f(0, 0, 1) : Makie.Vec3f(upvector)
+    if fov !== Makie.automatic
+        cc.fov[] = fov
+    end
     Makie.update_cam!(axis.scene, cc)
-    return
 end
-tightlimits!(::GlobeAxis) = nothing # TODO implement!?  By getting the bbox of the sphere / ellipsoid and using that to compute the camera eyeposition / lookat / fov
+
 
 # function axis_setup!(axis::GlobeAxis, transform_obs::Observable; scenekw = NamedTuple())
 
@@ -430,7 +445,7 @@ function Makie.plot!(axis::GlobeAxis, plot::Makie.AbstractPlot)
     source = pop!(plot.kw, :source, axis.source)
     zlevel = pop!(plot.kw, :zlevel, 0)
     # @show plot.kw
-    transformfunc = lift(axis.scene, create_globe_transform, axis.ellipsoid, source, zlevel)
+    transformfunc = lift(create_globe_transform, axis.scene, axis.ellipsoid, source, zlevel)
     trans = Makie.Transformation(transformfunc; get(plot.kw, :transformation, Attributes())...)
     plot.kw[:transformation] = trans
 
