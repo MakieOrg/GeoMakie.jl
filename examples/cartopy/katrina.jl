@@ -5,7 +5,7 @@ using CairoMakie, GeoMakie
 using Makie
 using DataFrames
 using NaturalEarth
-import GeometryOps as GO
+import GeometryOps as GO, GeoInterface as GI
 import LibGEOS # to activate buffering in GeometryOps
 
 #=
@@ -28,7 +28,7 @@ lats = [23.1, 23.4, 23.8, 24.5, 25.4, 26.0, 26.1, 26.2, 26.2, 26.0,
         25.7, 26.3, 27.2, 28.2, 29.3, 29.5, 30.2, 31.1, 32.6, 34.1,
         35.6, 37.0, 38.6, 40.1]
 
-katrina_path = GO.LineString(Point2.(lons, lats))
+katrina_path = GI.LineString(Point2.(lons, lats))
 
 # We can retrieve the US states from Natural Earth.  This particular feature collection
 # only contains US states.
@@ -39,7 +39,7 @@ states_df.color = fill(RGBAf(colorant"lightyellow"), size(states_df, 1))
 filter!(:name_en => !in(("Alaska", "Hawaii")), states_df)
 # In order to get a sense of which states are indirectly affected, we intersect by a buffered version of the linestring!
 # For context, let's see what this looks like:
-buffered_katrina_path = LibGEOS.buffer(katrina_path, 2) # within 2 degrees of the path 
+buffered_katrina_path = GO.buffer(katrina_path, 2) # within 2 degrees of the path 
 affected_states = view(states_df, GO.intersects.(states_df.geometry, (buffered_katrina_path,)), :)
 affected_states.color .= Makie.wong_colors()[end]
 # Finally, we can intersect the states directly:

@@ -5,7 +5,7 @@
 using CairoMakie, GeoMakie
 using Interpolations # for Streamplot on gridded data if necessary
 
-f(x::Point2{T}) where T = Point2{T}(
+stream_f(x::Point2{T}) where T = Point2{T}(
     10 * (2 * cos(2 * deg2rad(x[1]) + 3 * deg2rad(x[2] + 30)) ^ 2),
     20 * cos(6 * deg2rad(x[1]))
 )
@@ -13,7 +13,7 @@ f(x::Point2{T}) where T = Point2{T}(
 pole_longitude=177.5
 pole_latitude=37.5
 fig, ax, plt = streamplot(
-    f, 311.9..391.1, -23.6..24.8;
+    stream_f, 311.9..391.1, -23.6..24.8;
     arrow_size = 6,
     source = "+proj=ob_tran +o_proj=latlon +o_lon_p=0 +o_lat_p=$(pole_latitude) +lon_0=$(180+pole_longitude) +to_meter=$(deg2rad(1) * 6378137.0)",
     axis = (;
@@ -31,11 +31,11 @@ fig
 using Interpolations
 xs = range(311.9, 391.1, 100)
 ys = range(-23.6, 24.8, 100)
-uvs = f.(Point2f.(xs, ys'))
+uvs = stream_f.(Point2f.(xs, ys'))
 #
 uv_itp = LinearInterpolation((xs, ys), uvs)
 #
-streamplot(
+fig2, ax2, plt2 = streamplot(
     x -> uv_itp(x...), 311.9..391.1, -23.6..24.8; 
     arrow_size = 6, 
     source = "+proj=ob_tran +o_proj=latlon +o_lon_p=0 +o_lat_p=$(pole_latitude) +lon_0=$(180+pole_longitude) +to_meter=$(deg2rad(1) * 6378137.0)",
@@ -49,6 +49,6 @@ streamplot(
 #=
 ```@cardmeta
 Description = "A streamplot on gridded data."
-Cover = Makie.current_figure()
+Cover = fig2
 ```
 =#
