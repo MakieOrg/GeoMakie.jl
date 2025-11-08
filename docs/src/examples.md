@@ -21,6 +21,15 @@ multiple_crs
 
 ## Advanced functionality
 
+### GlobeAxis examples
+
+```@overviewgallery
+dashboard
+sweep_points
+```
+
+### GeoAxis examples
+
 ```@overviewgallery
 axis_config
 italy
