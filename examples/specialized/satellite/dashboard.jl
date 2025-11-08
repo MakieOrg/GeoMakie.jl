@@ -198,7 +198,7 @@ end
 
 satellite_marker_plt = scatter!(
     a.scene, satellite_graph[:satellite_position];
-    # marker = satellite_mesh,
+    ## marker = satellite_mesh,
 )
 
 satellite_trajectory_plt = lines!(
@@ -243,7 +243,7 @@ cc = Makie.cameracontrols(view_ax.scene)
 cam_controller = on(view_ax.scene, satellite_graph.satellite_position; update = true) do ecef
     time_rel = satellite_graph.time_rel[]
     lookat = Vec3d(0,0,0)
-    # TODO: some coordinate system shenanigans here
+    ## TODO: some coordinate system shenanigans here
     eyeposition = ecef .* 2
     upvector = Makie.normalize(sv_itrf[round(Int, time_rel * 86400) + 1].v)
     Makie.update_cam!(view_ax.scene, eyeposition, lookat, upvector)
