@@ -228,7 +228,7 @@ map!(
     [:satellite_trajectory, :satellite_trajectory_color], 
     [:satellite_trajectory_cut, :satellite_position_color_cut]
 )
-
+#
 satellite_trajectory_ground_plt = lines!(
     ground_ax,
     satellite_graph[:satellite_trajectory_cut];
