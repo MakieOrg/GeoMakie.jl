@@ -35,6 +35,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 MakieThemes = "e296ed71-da82-5faf-88ab-0034a9761098"
+NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
 NaturalEarth = "436b0209-26ab-4e65-94a9-6526d86fea76"
 OhMyCards = "1d55750c-489b-49e7-adc5-a004f92ae42b"
 Polylabel = "49a44318-e865-4b63-9842-695152d634c1"
@@ -50,8 +51,8 @@ WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 ZipFile = "a5390f91-8eb1-5f08-bee0-b1d1ffed6cea"
 
 [sources]
-OhMyCards = {url = "https://github.com/asinghvi17/OhMyCards.jl/", rev = "as/relpath"}
 GeoMakie = {path = ".."}
+OhMyCards = {rev = "as/relpath", url = "https://github.com/asinghvi17/OhMyCards.jl/"}
 
 [compat]
 Documenter = "1"
