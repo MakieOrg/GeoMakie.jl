@@ -44,6 +44,8 @@ meshimage
 projections
 tissot
 healpix
+sticker
+piracy_at_sea
 ```
 
 ## Examples from Cartopy

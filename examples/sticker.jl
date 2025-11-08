@@ -17,22 +17,22 @@ minlon = -180
 maxlon = 180
 epsilon = 1e-10
 central_longitude = 0
-# if emphasis == 'land':
-    top_interrupted_lons = (-40.0,)
-    bottom_interrupted_lons = (80.0, -20.0, -100.0)
-# elif emphasis == 'ocean':
-    # top_interrupted_lons = (-90.0, 60.0)
-    # bottom_interrupted_lons = (90.0, -60.0)
+top_interrupted_lons = (-40.0,)
+bottom_interrupted_lons = (80.0, -20.0, -100.0)
+## if emphasis == "ocean":
+    ## top_interrupted_lons = (-90.0, 60.0)
+    ## bottom_interrupted_lons = (90.0, -60.0)
+## end
 lons = zeros((2 + 2 * (length(top_interrupted_lons) + length(bottom_interrupted_lons))) * n + 1)
 lats = zeros((2 + 2 * (length(top_interrupted_lons) + length(bottom_interrupted_lons))) * n + 1)
 stop = 1
 
-# Left boundary
+## Left boundary
 lons[stop:stop + n-1] .= minlon
 lats[stop:stop + n-1] .= LinRange(-90, 90, n)
 stop += n
 
-# Top boundary
+## Top boundary
 for lon in top_interrupted_lons
     lons[stop:stop + n-1] .= lon - epsilon + central_longitude
     lats[stop:stop + n-1] .= LinRange(90, 0, n)
@@ -42,12 +42,12 @@ for lon in top_interrupted_lons
     stop += n
 end
 
-# Right boundary
+## Right boundary
 lons[stop:stop + n-1] .= maxlon
 lats[stop:stop + n-1] .= LinRange(90, -90, n)
 stop += n
 
-# Bottom boundary
+## Bottom boundary
 for lon in bottom_interrupted_lons
     lons[stop:stop + n-1] .= lon + epsilon + central_longitude
     lats[stop:stop + n-1] .= LinRange(-90, 0, n)
@@ -57,7 +57,7 @@ for lon in bottom_interrupted_lons
     stop += n
 end
 
-# Close loop
+## Close loop
 lons[end] = minlon
 lats[end] = -90
 
@@ -67,10 +67,7 @@ ext = GI.extent(projected_ring)
 ext_ring = GI.LinearRing([(ext.X[1], ext.Y[1]), (ext.X[1], ext.Y[2]), (ext.X[2], ext.Y[2]), (ext.X[2], ext.Y[1]), (ext.X[1], ext.Y[1]), ])
 cropping_poly = GI.Polygon([ext_ring, projected_ring])
 
-
-
-
-
+#
 
 fig = Figure()
 ax = GeoAxis(fig[1, 1]; dest = "+proj=igh")
@@ -82,3 +79,4 @@ xgrid_plot = lines!(ax.scene, ax.elements[:xgrid][1]; color = ax.xgridcolor, alp
 ygrid_plot = lines!(ax.scene, ax.elements[:ygrid][1]; color = ax.ygridcolor, alpha = 0.5)
 
 cropping_plot = poly!(ax.scene, cropping_poly; color = :white, strokecolor = ax.xgridcolor)
+fig

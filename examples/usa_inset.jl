@@ -92,3 +92,4 @@ ax_hawaii.height[] = Auto(false, us_states_hawaii_ratio / (us_states_alaska_rati
 #=
 
 =#
+fig

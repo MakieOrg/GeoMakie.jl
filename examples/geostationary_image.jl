@@ -1,4 +1,4 @@
-# # Image from satellite
+# # Geostationary Image from satellite
 
 # In this example, we'll show how to plot an image from a 
 # geostationary satellite into your chosen projection 

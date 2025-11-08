@@ -11,19 +11,24 @@ lats = -90:90
 field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
 # Makie provides two main recipes for contours = `contour` for lines, and `contourf` for fills.  
 # In this example, we'll see examples of both.
+# ### Regular contour
 fig = Figure(size = (1000, 750), Contour = (; labelsize = 14, labelfont = :bold), Text = (; strokecolor = :gray, strokewidth = .3))
 ax1 = GeoAxis(fig[1,1]; title = "Plain contour")
 contour!(ax1, lons, lats, field)
 fig
+# ### Filled contour
 # Makie also offers filled contours via the `contourf` recipe:
 ax2 = GeoAxis(fig[1,2]; title = "Filled contour")
 contourf!(ax2, lons, lats, field)
 fig
+# ### Contour with labels
 # The `contour` recipe also offers labels, which we can activate via keyword:
 ax3 = GeoAxis(fig[2,1]; title = "Contour with labels")
 contour!(ax3, lons, lats, field; labels = true)
 fig
-# Finally, we can get a filled contour plot with labels by connecting the two:
+# ### Filled contour with labels
+# Finally, we can get a filled contour plot with labels by connecting 
+# the levels from the `contourf` plot to the `contour` plot:
 ax4 = GeoAxis(fig[2,2]; title = "Filled contour with labels")
 cfp = contourf!(ax4, lons, lats, field)
 clp = contour!(
