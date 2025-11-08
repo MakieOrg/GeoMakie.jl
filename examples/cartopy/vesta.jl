@@ -1,5 +1,11 @@
 # # Plotting in SPACE
 
+#=
+```@cardmeta
+Description = "A plot of Vesta's surface, on a nonstandard ellipsoid."
+Cover = fig
+```
+=#
 using GeoMakie, CairoMakie
 using Rasters, ArchGDAL
 using ImageIO, DataDeps
@@ -54,10 +60,3 @@ f, a, p = meshimage(
         camera_longlat = (0, 0),
     )
 )
-
-#=
-```@cardmeta
-Description = "A plot of Vesta's surface, on a nonstandard ellipsoid."
-Cover = fig
-```
-=#
