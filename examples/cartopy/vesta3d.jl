@@ -22,7 +22,7 @@ DataDeps.register(
 )
 # Now, we can load the image and create a `Raster` from it.  This is stored in memory.
 vesta_image_matrix = FileIO.load(joinpath(DataDeps.datadep"vesta_image", "PIA17037.jpg"))
-vesta_image_matrix = vesta_image_matrix[begin:2:end, begin:2:end] # hide
+vesta_image_matrix = vesta_image_matrix[begin:4:end, begin:4:end] # hide
 # Since this is an image of Vesta, we need to define its coordinate reference system (CRS).
 # We use Proj's [ellipsoid parameters](https://proj.org/en/9.3/usage/ellipsoids.html#ellipsoid-size-parameters)
 # to define the ellipsoid of Vesta, specifically the semi-major and semi-minor axes (`+a` and `+b` respectively).
