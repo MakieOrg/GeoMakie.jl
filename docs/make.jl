@@ -63,8 +63,6 @@ end
 
 doc = Documenter.makedocs(;
     modules=[GeoMakie],
-    doctest=false,
-    warnonly = true,
     format=DocumenterVitepress.MarkdownVitepress(; 
         repo = "https://github.com/MakieOrg/GeoMakie.jl", 
         deploy_url = "https://geo.makie.org",
@@ -85,6 +83,7 @@ doc = Documenter.makedocs(;
     ],
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
+    doctest=false,
     warnonly = true,
     draft = false,
     plugins = [OhMyCards.ExampleConfig(; dot_slash = true),],
