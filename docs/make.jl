@@ -19,8 +19,8 @@ else
     get!(ENV, "RASTERDATASOURCES_PATH", raster_data_sources_path)
 end
 # invoke some geomakie things to be sure it works
-GeoMakie.coastlines()
-GeoMakie.earth()
+GeoMakie.coastlines();
+GeoMakie.earth();
 
 using Literate
 
@@ -43,8 +43,8 @@ examples = String[
     joinpath("cartopy", "annotation.jl"),
     joinpath("cartopy", "katrina.jl"),
     joinpath("cartopy", "arrows.jl"),
-    # joinpath("cartopy", "vesta.jl"),
-    # joinpath("cartopy", "vesta3d.jl"),
+    joinpath("cartopy", "vesta.jl"),
+    joinpath("cartopy", "vesta3d.jl"),
     joinpath("cartopy", "streamplot.jl"),
     joinpath("gmt", "antioquia.jl"),
     "german_lakes.jl",
@@ -91,9 +91,11 @@ doc = Documenter.makedocs(;
     authors="Anshul Singhvi and the Makie.jl contributors",
     doctest=false,
     warnonly = true,
-    draft = false,
+    draft = true,
     plugins = [OhMyCards.ExampleConfig(; dot_slash = true),],
-)
+    pagesonly = true,
+    debug = true,
+);
 
 DocumenterVitepress.deploydocs(; 
     repo="github.com/MakieOrg/GeoMakie.jl", 
