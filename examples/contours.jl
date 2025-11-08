@@ -29,7 +29,7 @@ cfp = contourf!(ax4, lons, lats, field)
 clp = contour!(
     ax4, lons, lats, field; 
     color = :black, labels = true, 
-    levels = cfp._computed_levels
+    levels = cfp.computed_levels
 )
 fig
 # In order to control the levels, we need only set the levels for the first filled contour plot:

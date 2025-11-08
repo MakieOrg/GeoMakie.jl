@@ -91,10 +91,10 @@ HST
 2 20580  28.4680 242.7474 0002152  56.7096 303.3705 15.27131570752566
 """
 
-prop = Propagators.init(Val(:SGP4), tle)
-sv_teme = Propagators.propagate!(prop, 0:1:(86400 * 30), OrbitStateVector)
-eop = fetch_iers_eop()
-sv_itrf = sv_eci_to_ecef.(sv_teme, (TEME(),), (SatelliteToolbox.ITRF(),), (eop,))
+prop = SatelliteToolbox.Propagators.init(Val(:SGP4), tle)
+sv_teme = SatelliteToolbox.Propagators.propagate!(prop, 0:1:(86400 * 30), OrbitStateVector)
+eop = SatelliteToolbox.fetch_iers_eop()
+sv_itrf = SatelliteToolbox.sv_eci_to_ecef.(sv_teme, (TEME(),), (SatelliteToolbox.ITRF(),), (eop,))
 # ## Plotting!
 
 # ### Background imagery and orbit lines
@@ -244,7 +244,8 @@ view_label = Label(
 view_ax = GlobeAxis(diag_gl[3, 1]; show_axis = false, center = false)
 meshimage!(view_ax, -180..180, -90..90, globe_image; uv_transform = :rotr90)
 f
-# Extract camera controls for the view axis
+# Extract camera controls for the view axis.
+# We'll use this to update the camera to be at the satellite's predicted position.
 cc = Makie.cameracontrols(view_ax.scene)
 ## Update the camera when the satellite position changes
 cam_controller = on(view_ax.scene, satellite_graph.satellite_position; update = true) do ecef

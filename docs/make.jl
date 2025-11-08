@@ -61,9 +61,10 @@ for filename in examples
     Literate.markdown(file, joinpath(@__DIR__, "src", "examples", first(splitdir(filename))); documenter = true)
 end
 
-Documenter.makedocs(;
+doc = Documenter.makedocs(;
     modules=[GeoMakie],
     doctest=false,
+    warnonly = true,
     format=DocumenterVitepress.MarkdownVitepress(; 
         repo = "https://github.com/MakieOrg/GeoMakie.jl", 
         deploy_url = "https://geo.makie.org",
@@ -95,3 +96,7 @@ DocumenterVitepress.deploydocs(;
     push_preview = true, 
     forcepush = true
 )
+
+if length(doc.build.errors) > 0
+    error("Errors found in documentation build: $(join(doc.build.errors, "\n"))")
+end
