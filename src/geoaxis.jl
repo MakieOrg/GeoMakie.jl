@@ -854,8 +854,10 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
     source = pop!(plot.kw, :source, axis.source)
     transformfunc = lift(create_transform, axis.dest, source)
 
-    trans = Makie.Transformation(transformfunc; get(plot.kw, :transformation, Attributes())...)
-    plot.kw[:transformation] = trans
+    if !Makie.not_in_data_space(plot)
+        trans = Makie.Transformation(transformfunc; get(plot.kw, :transformation, Attributes())...)
+        plot.kw[:transformation] = trans
+    end
 
     # remove the reset_limits kwarg if there is one, this determines whether to automatically reset limits
     # on plot insertion
