@@ -198,7 +198,6 @@ end
 
 satellite_marker_plt = scatter!(
     a.scene, satellite_graph[:satellite_position];
-    ## marker = satellite_mesh,
 )
 
 satellite_trajectory_plt = lines!(
@@ -223,8 +222,12 @@ satellite_marker_ground_plt = scatter!(
     strokewidth = 1
 )
 
-
-map!(splitify, satellite_graph, [:satellite_trajectory, :satellite_trajectory_color], [:satellite_trajectory_cut, :satellite_position_color_cut])
+map!(
+    splitify,
+    satellite_graph, 
+    [:satellite_trajectory, :satellite_trajectory_color], 
+    [:satellite_trajectory_cut, :satellite_position_color_cut]
+)
 
 satellite_trajectory_ground_plt = lines!(
     ground_ax,
@@ -232,23 +235,26 @@ satellite_trajectory_ground_plt = lines!(
     color = satellite_graph[:satellite_position_color_cut]
 )
 
-
-view_label = Label(diag_gl[2, 1], "Satellite View"; halign = :center, font = :bold,tellheight = true, tellwidth = false)
+view_label = Label(
+    diag_gl[2, 1], "Satellite View"; 
+    halign = :center, font = :bold, 
+    tellheight = true, tellwidth = false
+)
 view_ax = GlobeAxis(diag_gl[3, 1]; show_axis = false, center = false)
 meshimage!(view_ax, -180..180, -90..90, globe_image; uv_transform = :rotr90)
-
+f
 # Extract camera controls for the view axis
 cc = Makie.cameracontrols(view_ax.scene)
-# Update the camera when the satellite position changes
+## Update the camera when the satellite position changes
 cam_controller = on(view_ax.scene, satellite_graph.satellite_position; update = true) do ecef
     time_rel = satellite_graph.time_rel[]
     lookat = Vec3d(0,0,0)
-    ## TODO: some coordinate system shenanigans here
-    eyeposition = ecef .* 2
+    eyeposition = ecef .* 2    ## TODO: some coordinate system shenanigans here
     upvector = Makie.normalize(sv_itrf[round(Int, time_rel * 86400) + 1].v)
     Makie.update_cam!(view_ax.scene, eyeposition, lookat, upvector)
     return nothing
 end
+f
 # ## Animation: Play button and dynamic speedup
 
 # Here's the dashboard controls to run the animation interactively.
@@ -284,7 +290,7 @@ player_listener = Makie.Observables.on(events(f).tick) do tick
         yield()
         toc = time()
     else
-        # do nothing
+        ## do nothing
     end
 end
 
