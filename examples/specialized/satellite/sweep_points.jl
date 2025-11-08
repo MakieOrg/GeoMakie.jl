@@ -15,6 +15,8 @@ Cover = f
 using LinearAlgebra: normalize
 using Geodesy
 using GeometryBasics: Point2d
+using SatelliteToolbox, SatelliteAnalysis
+using GLMakie, GeoMakie
 
 """
     sweep_points(position, velocity, distances)
@@ -69,31 +71,28 @@ function sweep_points(position, velocity, distances)
     end
 end
 ## Convenience method for propagating a satellite and then sweeping points along its line of sight
-sweep_points(sv::OrbitStateVector, distances) = sweep_points(ECEF(sv.r), ECEF(sv.v), distances)
+sweep_points(sv::SatelliteToolbox.OrbitStateVector, distances) = sweep_points(ECEF(sv.r), ECEF(sv.v), distances)
 ## Simple example usage
 JFK = LLA(; lat = 40.6413, lon = -73.7781, alt = 0.0)
 sp = sweep_points(ECEFfromLLA(wgs84)(JFK), ECEF(0, 0, 1), LinRange(0, 49, 50))
 
 # A more complex example, simulating a satellite
-using SatelliteToolbox, SatelliteAnalysis
-amz1_tle = tle"""
+amz1_tle = SatelliteToolbox.tle"""
        AMAZONIA 1
        1 47699U 21015A   25205.73369244  .00000207  00000+0  78058-4 0  9996
        2 47699  98.3576 279.7581 0001748  96.4737 263.6651 14.40869396231498
 """
 
-prop = Propagators.init(Val(:SGP4), amz1_tle)
+prop = SatelliteToolbox.Propagators.init(Val(:SGP4), amz1_tle)
 
-sv_teme = Propagators.propagate!(prop, 0:12:(3600*10), OrbitStateVector)
-eop = fetch_iers_eop()
-sv_itrf = sv_eci_to_ecef.(sv_teme, (TEME(),), (SatelliteToolbox.ITRF(),), (eop,))
+sv_teme = SatelliteToolbox.Propagators.propagate!(prop, 0:12:(3600*10), OrbitStateVector)
+eop = SatelliteToolbox.fetch_iers_eop()
+sv_itrf = SatelliteToolbox.sv_eci_to_ecef.(sv_teme, (TEME(),), (SatelliteToolbox.ITRF(),), (eop,))
 
 sweep_points_timeseries = sweep_points.(sv_itrf, (LinRange(-125000, 125000, 5),))
 
 # Plot the sweep points on a globeaxis, just to get an idea.
-using GLMakie, GeoMakie
 scatter(reduce(vcat, sweep_points_timeseries); axis = (; type = GlobeAxis))
-
 
 # Sample a raster, at the points at which 
 # the satellite's sensor would "sample".
@@ -115,6 +114,8 @@ f, a, p = surface(
     shading = NoShading,
     axis = (; type = GlobeAxis, show_axis = false)
 )
+## Create a "background" mesh such that the satellite traces 
+## on the other side of the globe (from the camera's point of view) are faded out.
 bg = meshimage!(a, -180..180, -90..90, reshape([RGBAf(1,1,1,0.5)], 1, 1); uv_transform = :rotr90, zlevel = -100_000, reset_limits = false)
 lines!(a, GeoMakie.coastlines(); color = (:black, 0.5), linewidth = 1)
 f
