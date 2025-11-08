@@ -363,6 +363,8 @@ function Makie.update_cam!(
         altitude = axis.camera_altitude[], 
         upvector = Makie.automatic,
         fov = Makie.automatic,
+        near = Makie.automatic,
+        far = Makie.automatic,
     )
 
     cc = cameracontrols(axis.scene)
@@ -375,19 +377,45 @@ function Makie.update_cam!(
 
     if longlat !== Makie.automatic
         current_eyeposition_latlong = Point2d(longlat)
+        axis.camera_longlat[] = longlat
     end
     if altitude !== Makie.automatic
         current_eyeposition_elev = altitude
+        axis.camera_altitude[] = altitude
     end
 
     new_eyeposition = Makie.apply_transform(axis.transform_func[], Point3d(current_eyeposition_latlong..., current_eyeposition_elev))
 
     cc.eyeposition[] = Makie.Vec3f(new_eyeposition)
     cc.lookat[] = Makie.Vec3f(0, 0, 0)
-    cc.upvector[] = upvector === Makie.automatic ? Makie.Vec3f(0, 0, 1) : Makie.Vec3f(upvector)
+    cc.upvector[] = if upvector === Makie.automatic
+        Makie.Vec3f(0, 0, 1) 
+    elseif isnothing(upvector) 
+        cc.upvector[] 
+    else
+        Makie.Vec3f(upvector)
+    end
+    
     if fov !== Makie.automatic
         cc.fov[] = fov
     end
+    if near !== Makie.automatic
+        cc.near[] = near
+    end
+    if far !== Makie.automatic
+        cc.far[] = far
+    end
+
+    # Set the bounding sphere for the camera
+    # so its clipping settings are adequately calibrated
+    bb = Makie.boundingbox(axis.scene, Makie.not_in_data_space)
+    width = widths(bb)
+    center = maximum(bb) - 0.5 * width
+    radius = 0.5 * norm(width)
+    if !(isnan(radius) || (radius == 0))
+        cc.bounding_sphere[] = Makie.Sphere(Point3d(center), radius)
+    end
+    
     Makie.update_cam!(axis.scene, cc)
 end
 
