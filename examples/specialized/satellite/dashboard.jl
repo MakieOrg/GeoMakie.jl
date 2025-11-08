@@ -13,6 +13,7 @@ and full-sky map from the European Southern Observatory.
 =#
 
 using GeoMakie, GLMakie
+GLMakie.activate!() # hide
 using GeoMakieArtifacts
 
 using Geodesy, Proj
@@ -270,10 +271,13 @@ cam_controller = on(view_ax.scene, satellite_graph.satellite_position; update = 
     Makie.update_cam!(view_ax.scene, eyeposition, lookat, upvector)
     return nothing
 end
+
 f
 # ## Animation: Play button and dynamic speedup
 
 # Here's the dashboard controls to run the animation interactively.
+# ```julia
+#=
 controls_gl = GridLayout(diag_gl[4, 1]; alignmode = Outside())
 play_button = Button(controls_gl[1, 1]; tellwidth = false, tellheight = true, label = "▶")
 is_playing = Observable(false)
@@ -311,3 +315,5 @@ player_listener = Makie.Observables.on(events(f).tick) do tick
 end
 satellite_graph.time_rel[] = 1
 f
+=#
+# ```
