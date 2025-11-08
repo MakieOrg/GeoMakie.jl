@@ -1,6 +1,8 @@
 using Documenter, DocumenterVitepress, Literate, OhMyCards
 using GeoMakie, CairoMakie, Makie
 
+import GLMakie, CairoMakie
+
 # some strategic imports to avoid world age issues
 using FHist
 
@@ -32,12 +34,12 @@ examples = String[
     "world_population.jl",
     "graph_on_usa.jl",
     "orthographic.jl",
-    # "geostationary_image.jl",
+    "geostationary_image.jl",
     # "multiple_crs.jl",
     "rasters.jl",
     # "raster_warping_masking.jl", # this one fails due to Rasters.boolmask error
     "healpix.jl",
-    # "is_it_a_plane.jl",
+    "is_it_a_plane.jl",
     joinpath("cartopy", "annotation.jl"),
     joinpath("cartopy", "katrina.jl"),
     joinpath("cartopy", "arrows.jl"),
@@ -50,7 +52,9 @@ examples = String[
     "meshimage.jl",
     # "projections.jl",
     "tissot.jl",
-    # "rotating_earth.jl",
+    "rotating_earth.jl",
+    "sticker.jl",
+    "piracy_at_sea.jl",
     joinpath("specialized", "satellite", "dashboard.jl"),
     joinpath("specialized", "satellite", "sweep_points.jl"),
 ]

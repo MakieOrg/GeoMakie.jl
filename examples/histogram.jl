@@ -5,9 +5,9 @@
 
 # We use the excellent [`FHist.jl`](https://github.com/Moelf/FHist.jl) to create the histogram.
 
-using CairoMakie, GeoMakie
+using GLMakie, GeoMakie
 using FHist
-import CairoMakie: Point2d
+import GLMakie: Point2d
 
 # First, we generate random points in a normal distribution:
 random_data = randn(Point2d, 100_000) 
