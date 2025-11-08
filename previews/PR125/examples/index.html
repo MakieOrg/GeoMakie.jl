@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · GeoMakie.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">GeoMakie.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">GeoMakie.jl</a></li><li class="is-active"><a class="tocitem" href>Examples</a><ul class="internal"><li><a class="tocitem" href="#Contourf"><span>Contourf</span></a></li><li><a class="tocitem" href="#Axis-configuration"><span>Axis configuration</span></a></li><li><a class="tocitem" href="#Italy&#39;s-states"><span>Italy&#39;s states</span></a></li><li><a class="tocitem" href="#Projections"><span>Projections</span></a></li><li><a class="tocitem" href="#Orthographic-projection"><span>Orthographic projection</span></a></li><li><a class="tocitem" href="#World-Population-centers"><span>World Population centers</span></a></li><li><a class="tocitem" href="#Field-and-countries"><span>Field and countries</span></a></li><li><a class="tocitem" href="#Rotating-Earth"><span>Rotating Earth</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Examples</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Examples</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/MakieOrg/GeoMakie.jl/blob/master/docs/src/examples.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h2 id="Contourf"><a class="docs-heading-anchor" href="#Contourf">Contourf</a><a id="Contourf-1"></a><a class="docs-heading-anchor-permalink" href="#Contourf" title="Permalink"></a></h2><pre><code class="language-julia hljs">using GeoMakie, CairoMakie
+
+lons = -180:180
+lats = -90:90
+# Create some field of values across `lons` and `lats`
+# This grid can be of any density, but note that the
+# time it takes to plot scales with the grid size!
+field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
+
+# Surface example
+fig = Figure()
+ax = GeoAxis(fig[1,1])
+contourf!(ax, lons, lats, field; shading = false)
+
+fig</code></pre><p><img src="../images/contourf.png" alt="Contourf"/></p><h2 id="Axis-configuration"><a class="docs-heading-anchor" href="#Axis-configuration">Axis configuration</a><a id="Axis-configuration-1"></a><a class="docs-heading-anchor-permalink" href="#Axis-configuration" title="Permalink"></a></h2><pre><code class="language-julia hljs">using Makie, CairoMakie, GeoMakie
+
+fig = Figure(resolution = (1000,1000))
+
+axs = [GeoAxis(fig[i, j]) for i in 1:2, j in 1:2]
+
+# axis 1 - I want an orthographic projection.
+axs[1, 1].scene.transformation.transform_func[] = Proj.Transformation(&quot;+proj=latlong&quot;,&quot;+proj=ortho&quot;)
+xlims!(axs[1, 1], -90, 90)
+
+# axis 2 - wacky spines
+axs[1, 2].topspinevisible = false
+axs[1, 2].rightspinecolor = :red
+axs[1, 2].spinewidth      = 5
+
+# axis 3 - messing with grids
+axs[2, 1].xgridcolor = :blue
+axs[2, 1].xgridstyle = :dashdot
+axs[2, 1].ygridcolor = (:orange, 0.5)
+axs[2, 1].ygridwidth = 2.0
+
+# axis 4 - customizing ticks
+axs[2, 2].xticks = -180:10:180
+axs[2, 2].xticklabelsvisible[] = false
+hidexdecorations!(axs[2, 2])
+fig</code></pre><p><img src="../images/axis_config.png" alt="Axis configuration"/></p><h2 id="Italy&#39;s-states"><a class="docs-heading-anchor" href="#Italy&#39;s-states">Italy&#39;s states</a><a id="Italy&#39;s-states-1"></a><a class="docs-heading-anchor-permalink" href="#Italy&#39;s-states" title="Permalink"></a></h2><pre><code class="language-julia hljs">using CairoMakie, GeoMakie
+using GeoMakie.GeoJSON
+using Downloads
+using GeometryBasics
+using GeoInterface
+
+# Acquire data
+it_states = Downloads.download(&quot;https://github.com/openpolis/geojson-italy/raw/master/geojson/limits_IT_provinces.geojson&quot;)
+geo = GeoJSON.read(read(it_states, String))
+
+fig = Figure()
+ga = GeoAxis(fig[1, 1]; dest = &quot;+proj=ortho +lon_0=12.5 +lat_0=42&quot;, lonlims=(12, 13), latlims = (40, 44))
+poly!(ga, geo; strokecolor = :blue, strokewidth = 1, color = (:blue, 0.5), shading = false);
+datalims!(ga)
+
+fig</code></pre><p><img src="../images/italy.png" alt="Italy&#39;s states"/></p><h2 id="Projections"><a class="docs-heading-anchor" href="#Projections">Projections</a><a id="Projections-1"></a><a class="docs-heading-anchor-permalink" href="#Projections" title="Permalink"></a></h2><pre><code class="language-julia hljs">using GeoMakie, CairoMakie, Makie
+
+lons = -180:180
+lats = -90:90
+field = [exp(cosd(l)) + 3(y / 90) for l in lons, y in lats]
+
+fig = Figure()
+ax1 = GeoAxis(fig[1, 1], dest = &quot;+proj=vitk1 +lat_1=45 +lat_2=55&quot;,
+    coastlines = true, title = &quot;vitk1&quot;)
+ax2 = GeoAxis(fig[1, 2], dest = &quot;+proj=wintri&quot;,
+    coastlines = true, title = &quot;wintri&quot;)
+
+surface!(ax1, lons, lats, field; shading = false, colormap = (:plasma, 0.45))
+surface!(ax2, lons, lats, field; shading = false)
+hidedecorations!(ax1)
+
+fig</code></pre><p><img src="../images/projections.png" alt="Projections"/></p><h2 id="Orthographic-projection"><a class="docs-heading-anchor" href="#Orthographic-projection">Orthographic projection</a><a id="Orthographic-projection-1"></a><a class="docs-heading-anchor-permalink" href="#Orthographic-projection" title="Permalink"></a></h2><pre><code class="language-julia hljs">using GeoMakie, CairoMakie
+
+# Limited-domain projections (like orthographic) must have
+# their limits correctly set!
+# If the limits are too large, you may get a blank figure.
+lons = -180:180
+lats = -90:90
+field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
+
+fig = Figure()
+ga = GeoAxis(
+    fig[1, 1],
+    dest=&quot;+proj=ortho&quot;,
+    lonlims = automatic,
+    coastlines = true,
+    title = &quot;Orthographic projection with proper limits&quot;
+)
+# hidedecorations!(ga)
+sp = surface!(ga, lons, lats, field; shading = false, colormap = :rainbow_bgyrm_35_85_c69_n256)
+cb = Colorbar(fig[1, 2], sp)
+
+fig</code></pre><p><img src="../images/orthographic.png" alt="Orthographic projection"/></p><h2 id="World-Population-centers"><a class="docs-heading-anchor" href="#World-Population-centers">World Population centers</a><a id="World-Population-centers-1"></a><a class="docs-heading-anchor-permalink" href="#World-Population-centers" title="Permalink"></a></h2><pre><code class="language-julia hljs"># This example was contributed by Martijn Visser (@visr)
+using Makie, CairoMakie, GeoMakie
+using GeoMakie.GeoJSON
+using GeometryBasics
+using Downloads
+
+source = &quot;+proj=longlat +datum=WGS84&quot;
+dest = &quot;+proj=natearth2&quot;
+
+url = &quot;https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/&quot;
+land = Downloads.download(url * &quot;ne_110m_land.geojson&quot;)
+land_geo = GeoJSON.read(read(land, String))
+pop = Downloads.download(url * &quot;ne_10m_populated_places_simple.geojson&quot;)
+pop_geo = GeoJSON.read(read(pop, String))
+
+begin
+    fig = Figure(resolution = (1000,500))
+    ga = GeoAxis(
+        fig[1, 1];
+        source = source,
+        dest = dest
+    )
+
+    ga.xticklabelsvisible[] = false
+    ga.yticklabelsvisible[] = false
+    poly!(ga, land_geo, color=:black)
+    popisqrt = map(pop_geo) do geo
+        popi = geo.pop_max
+        popi &gt; 0 ? sqrt(popi) : 0.0
+    end
+    mini, maxi = extrema(popisqrt)
+    size = map(popisqrt) do popi
+        normed = (popi .- mini) ./ (maxi - mini)
+        return (normed * 20) .+ 1
+    end
+    scatter!(ga, pop_geo, color=popisqrt, markersize=size)
+    fig
+end</code></pre><p><img src="../images/world_population.png" alt="World Population centers"/></p><h2 id="Field-and-countries"><a class="docs-heading-anchor" href="#Field-and-countries">Field and countries</a><a id="Field-and-countries-1"></a><a class="docs-heading-anchor-permalink" href="#Field-and-countries" title="Permalink"></a></h2><pre><code class="language-julia hljs"># This example was taken from Lazar Alonso&#39;s
+# BeautifulMakie.jl repository.  It has some really
+# good stuff - check it out!
+using Makie, CairoMakie, GeoMakie
+import Downloads
+using GeoMakie.GeoJSON
+using GeometryBasics
+using GeoInterface
+
+# https://datahub.io/core/geo-countries#curl # download data from here
+worldCountries = GeoJSON.read(read(Downloads.download(&quot;https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json&quot;), String))
+n = length(worldCountries)
+lons = -180:180
+lats = -90:90
+field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
+
+fig = Figure(resolution = (1200,800), fontsize = 22)
+
+ax = GeoAxis(
+    fig[1,1];
+    dest = &quot;+proj=wintri&quot;,
+    title = &quot;World Countries&quot;,
+    tellheight = true,
+)
+
+hm1 = surface!(ax, lons, lats, field; shading = false)
+translate!(hm1, 0, 0, -10)
+
+hm2 = poly!(
+    ax, worldCountries;
+    color= 1:n,
+    colormap = Reverse(:plasma),
+    strokecolor = :black,
+    strokewidth = 0.25
+)
+
+cb = Colorbar(fig[1,2]; colorrange = (1, n), colormap = Reverse(:plasma), label = &quot;variable, color code&quot;, height = Relative(0.65))
+
+fig</code></pre><p><img src="../images/field_and_countries.png" alt="Field and countries"/></p><h2 id="Rotating-Earth"><a class="docs-heading-anchor" href="#Rotating-Earth">Rotating Earth</a><a id="Rotating-Earth-1"></a><a class="docs-heading-anchor-permalink" href="#Rotating-Earth" title="Permalink"></a></h2><pre><code class="language-julia hljs">using Makie, CairoMakie, GeoMakie
+
+destnode = Observable(&quot;+proj=ortho&quot;)
+
+fig = Figure()
+ga = GeoAxis(
+    fig[1, 1],
+    coastlines = true,
+    dest = destnode,
+    lonlims = Makie.automatic
+)
+image!(-180..180, -90..90, rotr90(GeoMakie.earth()); interpolate = false)
+hidedecorations!(ga)
+
+record(fig, &quot;rotating_earth_ortho.mp4&quot;; framerate=30) do io
+    for lon in -90:90
+        ga.title[] = string(lon) * &quot;°&quot;
+        destnode[] = &quot;+proj=ortho +lon_0=$lon&quot;
+        xlims!(ga, lon-90, lon+90)
+        recordframe!(io)
+    end
+end
+</code></pre><video controls autoplay loop>
+<source src="https://user-images.githubusercontent.com/32143268/165003843-db5984f0-9ccf-49f7-847e-88fd63e80bb4.mp4" type="video/mp4">
+Your browser does not support this video.
+</video></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« GeoMakie.jl</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.23 on <span class="colophon-date" title="Wednesday 21 September 2022 13:47">Wednesday 21 September 2022</span>. Using Julia version 1.8.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

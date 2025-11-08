@@ -1,0 +1,1 @@
+import{_ as e,c as a,o as t,a6 as r}from"./chunks/framework.Z133WHs2.js";const b=JSON.parse('{"title":"Data","description":"","frontmatter":{},"headers":[],"relativePath":"data.md","filePath":"data.md","lastUpdated":null}'),s={name:"data.md"},o=r("",19),i=[o];function l(n,h,d,c,p,u){return t(),a("div",null,i)}const g=e(s,[["render",l]]);export{b as __pageData,g as default};
