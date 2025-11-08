@@ -26,6 +26,7 @@ multiple_crs
 ```@overviewgallery
 dashboard
 sweep_points
+vesta3d
 ```
 
 ### GeoAxis examples
@@ -52,6 +53,7 @@ annotation
 arrows
 katrina
 streamplot
+vesta
 ```
 
 ## Examples from GMT

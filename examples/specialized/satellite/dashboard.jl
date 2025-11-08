@@ -1,3 +1,17 @@
+#=
+# Satellite dashboard
+
+In this example, we'll build a live dashboard that shows the orbit of a satellite,
+along with a ground track and a "simulation" of the view from the satellite.
+
+To simulate the satellite's trajectory, we'll use the [`SatelliteToolbox.jl`](https://github.com/JuliaSpace/SatelliteToolbox.jl) ecosystem.
+
+The dashboard's visuals will come from GeoMakieArtifacts.jl, which exposes the NASA Blue Marble images
+and full-sky map from the European Southern Observatory.
+
+
+=#
+
 using GeoMakie, GLMakie
 using GeoMakieArtifacts
 
@@ -295,5 +309,5 @@ player_listener = Makie.Observables.on(events(f).tick) do tick
         ## do nothing
     end
 end
-
+satellite_graph.time_rel[] = 1
 f
