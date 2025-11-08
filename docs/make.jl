@@ -96,6 +96,6 @@ DocumenterVitepress.deploydocs(;
     forcepush = true
 )
 
-if length(doc.build.errors) > 0
+if length(doc.internal.errors) > 0
     error("Errors found in documentation build: $(join(doc.build.errors, "\n"))")
 end
