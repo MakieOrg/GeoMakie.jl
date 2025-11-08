@@ -68,14 +68,13 @@ end
 
 doc = Documenter.makedocs(;
     modules=[GeoMakie],
-    # format=DocumenterVitepress.MarkdownVitepress(; 
-    #     repo = "https://github.com/MakieOrg/GeoMakie.jl", 
-    #     deploy_url = "https://geo.makie.org",
-    #     devbranch = "master",
-    #     devurl = "dev",
-    #     keep = :patch,
-    # ),
-    format = [],
+    format=DocumenterVitepress.MarkdownVitepress(; 
+        repo = "https://github.com/MakieOrg/GeoMakie.jl", 
+        deploy_url = "https://geo.makie.org",
+        devbranch = "master",
+        devurl = "dev",
+        keep = :patch,
+    ),
     pages=[
         "Introduction" => "introduction.md",
         "Gallery" => "examples.md",
@@ -91,7 +90,7 @@ doc = Documenter.makedocs(;
     authors="Anshul Singhvi and the Makie.jl contributors",
     doctest=false,
     warnonly = true,
-    draft = true,
+    draft = false,
     plugins = [OhMyCards.ExampleConfig(; dot_slash = true),],
     pagesonly = true,
     debug = true,
