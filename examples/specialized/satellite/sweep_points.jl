@@ -1,3 +1,17 @@
+# # Satellite sweep plot
+# Here, we'll plot the data collected by a satellite as it orbits
+# the Earth.
+# Note that we've chosen to fake the data by simulating the satellite sweep
+# over a high-level data product.  See the `satellite_sweep_plot.jl` example
+# in `GeoMakie/examples/specialized/satellite/` for a more complete example
+# using real data.
+#=
+```@cardmeta
+Description = "Plot satellite data acquisition on the globe"
+Cover = f
+```
+=#
+
 using LinearAlgebra: normalize
 using Geodesy
 using GeometryBasics: Point2d
@@ -36,31 +50,28 @@ This runs with 2 allocations (not sure why 2, probably one of the transforms)
 and in ~6 μs for 50 points on my machine.  Scales linearly with `length(distances)`.
 """
 function sweep_points(position, velocity, distances)
-    # Input is in ECEF space.
-    # Operate in ENU space and then convert to long lat
+    ## Input is in ECEF space.
+    ## Operate in ENU space and then convert to long lat
     enu_transf = ENUfromECEF(position, wgs84)
     lla_transf = LLAfromENU(position, wgs84)
     enu_position = ENU(0.0, 0.0, 0.0) # by definition of the enu frame
     enu_velocity = enu_transf(position +velocity) # should be enu(position + velocity) - enu(position) but we don't actually need to do that
 
-    # Calculate the direction of the velocity
+    ## Calculate the direction of the velocity
     enu_direction = normalize(Point2d(enu_velocity.e, enu_velocity.n))
     sweep_left_direction = Point2d(enu_direction[2], -enu_direction[1])
 
-    # Calculate the points along the line of sight
+    ## Calculate the points along the line of sight
     sweep_points = map(distances) do distance
         p = Point2d(enu_position.e, enu_position.n) + distance * sweep_left_direction
         lla = lla_transf(ENU(p[1], p[2], 0.0))
         (lla.lon, lla.lat)
     end
 end
-
-# Convenience method for propagating a satellite and then sweeping points along its line of sight
+## Convenience method for propagating a satellite and then sweeping points along its line of sight
 sweep_points(sv::OrbitStateVector, distances) = sweep_points(ECEF(sv.r), ECEF(sv.v), distances)
-
-# Simple example usage
+## Simple example usage
 JFK = LLA(; lat = 40.6413, lon = -73.7781, alt = 0.0)
-
 sp = sweep_points(ECEFfromLLA(wgs84)(JFK), ECEF(0, 0, 1), LinRange(0, 49, 50))
 
 # A more complex example, simulating a satellite
@@ -79,26 +90,31 @@ sv_itrf = sv_eci_to_ecef.(sv_teme, (TEME(),), (SatelliteToolbox.ITRF(),), (eop,)
 
 sweep_points_timeseries = sweep_points.(sv_itrf, (LinRange(-125000, 125000, 5),))
 
-# plot on globeaxis
+# Plot the sweep points on a globeaxis, just to get an idea.
 using GLMakie, GeoMakie
-scatter(reduce(vcat, sampling_timeseries); axis = (; type = GlobeAxis))
+scatter(reduce(vcat, sweep_points_timeseries); axis = (; type = GlobeAxis))
 
 
-# sample a raster, at the points at which 
-# the satellite's sensor would "sample"
+# Sample a raster, at the points at which 
+# the satellite's sensor would "sample".
 using Rasters, RasterDataSources
 import ArchGDAL, NCDatasets # to activate extensions on rasters for file IO
-
-# RasterDataSources is broken on my dev branch, so you can just get the file directly.
 worldclim_file = RasterDataSources.getraster(WorldClim{Climate}, :tmin; month = 1)
 ras = Raster(worldclim_file)
 ras = replace_missing(ras, NaN)
-# re-sample the raster to the sampling timeseries.  This is currently a manual process,
+# Re-sample the raster to the sampling timeseries.  This is currently a manual process,
 # but we should just make everything a raster here.
-xys = reduce(hcat, sampling_timeseries)
+xys = reduce(hcat, sweep_points_timeseries)
 vals = map(xys) do xy
     ras[X(Contains(xy[1])), Y(Contains(xy[2]))]
 end
 # Finally, we plot the results on a GeoMakie GlobeAxis.
-f, a, p = surface(first.(xys), last.(xys), zeros(size(xys)); color = vals, shading = NoShading, axis = (; type = GlobeAxis, show_axis = false))
+f, a, p = surface(
+    first.(xys), last.(xys), zeros(size(xys)); 
+    color = vals, 
+    shading = NoShading,
+    axis = (; type = GlobeAxis, show_axis = false)
+)
+bg = meshimage!(a, -180..180, -90..90, reshape([RGBAf(1,1,1,0.5)], 1, 1); uv_transform = :rotr90, zlevel = -100_000, reset_limits = false)
 lines!(a, GeoMakie.coastlines(); color = (:black, 0.5), linewidth = 1)
+f
