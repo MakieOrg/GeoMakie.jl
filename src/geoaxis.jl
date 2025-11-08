@@ -611,10 +611,10 @@ function Makie.initialize_block!(axis::GeoAxis)
     end
     # These are the grid plots from earlier.
     longridplot = lines!(scene, lonticks_line_obs; color=axis.xgridcolor, linewidth=axis.xgridwidth,
-        visible=axis.xgridvisible, linestyle=axis.xgridstyle, transparency=true)
+        visible=axis.xgridvisible, linestyle=axis.xgridstyle, transparency=true, inspectable=false)
     translate!(longridplot, 0, 0, 100)
     latgridplot = lines!(scene, latticks_line_obs; color=axis.ygridcolor, linewidth=axis.ygridwidth,
-        visible=axis.ygridvisible, linestyle=axis.ygridstyle, transparency=true)
+        visible=axis.ygridvisible, linestyle=axis.ygridstyle, transparency=true, inspectable=false)
     translate!(latgridplot, 0, 0, 100)
 
     # This creates the spines and ticklabels plots for the grid.
