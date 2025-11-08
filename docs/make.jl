@@ -44,7 +44,7 @@ examples = String[
     joinpath("cartopy", "katrina.jl"),
     joinpath("cartopy", "arrows.jl"),
     # joinpath("cartopy", "vesta.jl"),
-    joinpath("cartopy", "vesta3d.jl"),
+    # joinpath("cartopy", "vesta3d.jl"),
     joinpath("cartopy", "streamplot.jl"),
     joinpath("gmt", "antioquia.jl"),
     "german_lakes.jl",
@@ -68,13 +68,14 @@ end
 
 doc = Documenter.makedocs(;
     modules=[GeoMakie],
-    format=DocumenterVitepress.MarkdownVitepress(; 
-        repo = "https://github.com/MakieOrg/GeoMakie.jl", 
-        deploy_url = "https://geo.makie.org",
-        devbranch = "master",
-        devurl = "dev",
-        keep = :patch,
-    ),
+    # format=DocumenterVitepress.MarkdownVitepress(; 
+    #     repo = "https://github.com/MakieOrg/GeoMakie.jl", 
+    #     deploy_url = "https://geo.makie.org",
+    #     devbranch = "master",
+    #     devurl = "dev",
+    #     keep = :patch,
+    # ),
+    format = [],
     pages=[
         "Introduction" => "introduction.md",
         "Gallery" => "examples.md",
