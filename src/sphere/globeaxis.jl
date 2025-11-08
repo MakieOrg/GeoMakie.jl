@@ -76,8 +76,8 @@ Makie.@Block GlobeAxis <: Makie.AbstractAxis begin
     # scrollevents::Observable{Makie.ScrollEvent}
     # keysevents::Observable{Makie.KeysEvent}
     # interactions::Dict{Symbol, Tuple{Bool, Any}}
-    elements::Dict{Symbol, Any}
     ellipsoid::Observable{Geodesy.Ellipsoid}
+    elements::Dict{Symbol, Any}
     transform_func::Observable{Any}
     inv_transform_func::Observable{Any}
     @attributes begin
@@ -104,13 +104,19 @@ Makie.@Block GlobeAxis <: Makie.AbstractAxis begin
         # Projection
         "Projection of the source data. This is the value plots will default to, but can be overwritten via `plot(...; source=...)`"
         source = "+proj=longlat +datum=WGS84"
-        "Projection that the axis uses to display the data."
-        dest = "+proj=cart +datum=WGS84"
-
+        "Destination ellipsoid.  This is the ellipsoid that the data will be transformed to.  Must be a `Geodesy.Ellipsoid`, `Geodesy.Datum`, or a `(; a = ..., f = ...)` named tuple."
+        dest = Geodesy.wgs84
 
         # appearance controls
         "Controls if the axis is visible.  This is a regular 3D OldAxis for now."
-        show_axis::Bool = true
+        show_axis::Bool = false
+        "Whether to reset the camera on each display."
+        center = true
+        "The longitude and latitude of the camera.  If `automatic`, then the camera will be optimally positioned to cover all your data."
+        camera_longlat = Makie.automatic
+        "The altitude of the camera.  If `automatic`, then the camera will be optimally positioned to cover all your data."
+        camera_altitude = Makie.automatic
+
         "The set of fonts which text in the axis should use.s"
         fonts = (; regular = "TeX Gyre Heros Makie")
         "The axis title string."
@@ -285,21 +291,31 @@ end
 
 _geodesy_ellipsoid_from(g::Geodesy.Ellipsoid) = g
 _geodesy_ellipsoid_from(g::Geodesy.Datum) = Geodesy.ellipsoid(g)
-_geodesy_ellipsoid_from(n::NamedTuple{(:a, :f), Tuple{Float64, Float64}}) = Geodesy.ellipsoid(; n...)
+_geodesy_ellipsoid_from(n::NamedTuple{(:a, :f), Tuple{<: Real, <: Real}}) = Geodesy.ellipsoid(; n...)
+_geodesy_ellipsoid_from(x::T) where T = error("Unsupported ellipsoid type: $T.  Must be a `Geodesy.Ellipsoid`, `Geodesy.Datum`, or a `(; a = ..., f = ...)` named tuple.")
 
-function Makie.initialize_block!(axis::GlobeAxis; ellipsoid = Geodesy.wgs84_ellipsoid, scenekw = NamedTuple())
+function Makie.initialize_block!(axis::GlobeAxis; scenekw = NamedTuple())
 
     # axis.show_axis = true
     # TODO: set up globe ellipsoid ahead of time.
-    setfield!(axis, :ellipsoid, Observable{Geodesy.Ellipsoid}(_geodesy_ellipsoid_from(ellipsoid))) # TODO: change this to Geodesy.Datum, allow for a Geodesy.FlexibleDatum type that takes an ellipsoid.
+    setfield!(axis, :ellipsoid, Observable{Geodesy.Ellipsoid}()) # TODO: change this to Geodesy.Datum, allow for a Geodesy.FlexibleDatum type that takes an ellipsoid.
+    on(axis, axis.dest) do dest
+        axis.ellipsoid[] = _geodesy_ellipsoid_from(dest)
+    end
     # Set up transformations first, so that the scene can be set up
     # and linked to those.
     transform_obs = Observable{Any}(identity; ignore_equal_values=true)
     transform_inv_obs = Observable{Any}(identity; ignore_equal_values=true)
-    transform_ticks_obs = Observable{Any}(identity; ignore_equal_values=true)
-    transform_ticks_inv_obs = Observable{Any}(identity; ignore_equal_values=true)
     setfield!(axis, :transform_func, transform_obs)
     setfield!(axis, :inv_transform_func, transform_inv_obs)
+
+    on(axis, axis.ellipsoid) do ellipsoid
+        transform_obs[] = create_globe_transform(ellipsoid, source, 0.0)
+        transform_inv_obs[] = Makie.inverse_transform(transform_obs[])
+    end
+    # transform_ticks_obs = Observable{Any}(identity; ignore_equal_values=true)
+    # transform_ticks_inv_obs = Observable{Any}(identity; ignore_equal_values=true)
+    
 
     lscene = LScene(axis.layout[1, 1]; show_axis = axis.show_axis, scenekw)
     scene = lscene.scene
@@ -321,8 +337,42 @@ function Makie.initialize_block!(axis::GlobeAxis; ellipsoid = Geodesy.wgs84_elli
 
 end
 
-function Makie.reset_limits!(axis::GlobeAxis; kwargs...)
-    Makie.reset_limits!(axis.lscene; kwargs...)
+function Makie.reset_limits!(axis::GlobeAxis; padding = 0.01, kwargs...)
+
+    function exclude(plot)
+        # only use plots with autolimits = true
+        autolimits = Makie.to_value.(get.((plot,), (:xautolimits, :yautolimits, :zautolimits), true))
+        all(autolimits) || return true
+        # only if they use data coordinates
+        Makie.is_data_space(plot) || return true
+        # only use visible plots for limits
+        return !Makie.to_value(get(plot, :visible, true))
+    end
+
+    if axis.center[]
+        Makie.center!(axis.scene, padding, exclude)
+    end
+
+    cc = cameracontrols(axis.scene)
+
+    current_eyeposition_ecef = cc.eyeposition[]
+    current_eyeposition_lla = Makie.apply_transform(axis.inv_transform_func[], current_eyeposition_ecef)
+    current_eyeposition_latlong = Point2d(current_eyeposition_lla.lon, current_eyeposition_lla.lat)
+    current_eyeposition_elev = current_eyeposition_lla[3]
+
+
+    if axis.camera_longlat[] !== Makie.automatic
+        current_eyeposition_latlong = Point2d(axis.camera_longlat[])
+    end
+    if axis.camera_altitude[] !== Makie.automatic
+        current_eyeposition_elev = axis.camera_altitude[]
+    end
+
+    new_eyeposition = Makie.apply_transform(axis.transform_func[], Point3d(current_eyeposition_latlong..., current_eyeposition_elev))
+
+    cc.eyeposition[] = Makie.Vec3f(new_eyeposition)
+    cc.lookat[] = Makie.Vec3f(0, 0, 0)
+    Makie.update_cam!(axis.scene, cc)
     return
 end
 tightlimits!(::GlobeAxis) = nothing # TODO implement!?  By getting the bbox of the sphere / ellipsoid and using that to compute the camera eyeposition / lookat / fov
@@ -380,7 +430,7 @@ function Makie.plot!(axis::GlobeAxis, plot::Makie.AbstractPlot)
     source = pop!(plot.kw, :source, axis.source)
     zlevel = pop!(plot.kw, :zlevel, 0)
     # @show plot.kw
-    transformfunc = lift(create_globe_transform, axis.ellipsoid, source, zlevel)
+    transformfunc = lift(axis.scene, create_globe_transform, axis.ellipsoid, source, zlevel)
     trans = Makie.Transformation(transformfunc; get(plot.kw, :transformation, Attributes())...)
     plot.kw[:transformation] = trans
 
