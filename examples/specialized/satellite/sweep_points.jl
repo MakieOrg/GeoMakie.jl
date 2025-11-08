@@ -75,7 +75,7 @@ JFK = LLA(; lat = 40.6413, lon = -73.7781, alt = 0.0)
 sp = sweep_points(ECEFfromLLA(wgs84)(JFK), ECEF(0, 0, 1), LinRange(0, 49, 50))
 
 # A more complex example, simulating a satellite
-using SatelliteToolbox, SatelliteToolboxTransformations
+using SatelliteToolbox, SatelliteAnalysis
 amz1_tle = tle"""
        AMAZONIA 1
        1 47699U 21015A   25205.73369244  .00000207  00000+0  78058-4 0  9996
