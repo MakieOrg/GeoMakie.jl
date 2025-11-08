@@ -9,6 +9,7 @@ using SatelliteToolbox
 # ```@raw html
 # <details>
 # <summary>Utility functions</summary>
+# ```
 # From gadomski/antimeridian on github
 function crossing_latitude_flat(p1, p2)
     latitude_delta = p2[2] - p1[2]
