@@ -92,7 +92,7 @@ doc = Documenter.makedocs(;
     warnonly = true,
     draft = false,
     plugins = [OhMyCards.ExampleConfig(; dot_slash = true),],
-    pagesonly = true,
+    pagesonly = !(get(ENV, "CI", "false") == "true"),
     debug = true,
 );
 
