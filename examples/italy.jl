@@ -1,5 +1,5 @@
 #=
-# States of Italy
+# Regions of Italy
 
 This example shows how to get data from a source and plot it using 
 GeoMakie.  It's more to show how to hybridize two data sources than 
