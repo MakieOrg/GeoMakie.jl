@@ -45,7 +45,7 @@ jobs:
           DISPLAY: ':0'
         with: 
           prefix: xvfb-run -s '-screen 0 1024x768x24'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: test_images
