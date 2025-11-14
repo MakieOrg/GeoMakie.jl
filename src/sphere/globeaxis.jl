@@ -291,8 +291,8 @@ end
 
 _geodesy_ellipsoid_from(g::Geodesy.Ellipsoid) = g
 _geodesy_ellipsoid_from(g::Geodesy.Datum) = Geodesy.ellipsoid(g)
-_geodesy_ellipsoid_from(n::NamedTuple{(:a, :f), Tuple{<: Real, <: Real}}) = Geodesy.Ellipsoid(; a = string(n.a), f = string(n.f))
-_geodesy_ellipsoid_from(n::NamedTuple{(:a, :b), Tuple{<: Real, <: Real}}) = Geodesy.Ellipsoid(; a = string(n.a), b = string(n.b))
+_geodesy_ellipsoid_from(n::NamedTuple{(:a, :f_inv), <: Tuple{<: Real, <: Real}}) = Geodesy.Ellipsoid(; a = string(n.a), f_inv = string(n.f_inv))
+_geodesy_ellipsoid_from(n::NamedTuple{(:a, :b), <: Tuple{<: Real, <: Real}}) = Geodesy.Ellipsoid(; a = string(n.a), b = string(n.b))
 _geodesy_ellipsoid_from(x::T) where T = error("Unsupported ellipsoid type: $T.  Must be a `Geodesy.Ellipsoid`, `Geodesy.Datum`, or a `(; a = ..., f = ...)` named tuple.")
 
 function Makie.initialize_block!(axis::GlobeAxis; scenekw = NamedTuple())
