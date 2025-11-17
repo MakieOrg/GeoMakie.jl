@@ -1,1 +1,0 @@
-import{_ as e,c as a,o as t,a6 as r}from"./chunks/framework.CEFjc51j.js";const g=JSON.parse('{"title":"Data","description":"","frontmatter":{},"headers":[],"relativePath":"data.md","filePath":"data.md","lastUpdated":null}'),s={name:"data.md"},o=r("",19),i=[o];function l(n,h,d,c,p,u){return t(),a("div",null,i)}const b=e(s,[["render",l]]);export{g as __pageData,b as default};
