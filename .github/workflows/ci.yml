@@ -33,7 +33,7 @@ jobs:
           access_token: ${{ github.token }}
 
       # Do tests
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
@@ -56,7 +56,7 @@ jobs:
     steps:
       - name: Install binary dependencies
         run: sudo apt-get update && sudo apt-get install -y xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Download all workflow run artifacts
         uses: actions/download-artifact@v5
       - uses: julia-actions/setup-julia@latest
