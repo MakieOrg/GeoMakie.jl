@@ -44,28 +44,29 @@ const Text = Makie.Text
 # Quick fix for GeometryBasics
 Base.convert(::Type{Rect{N, Float64}}, x::Rect{N}) where N = Rect{N, Float64}(x)
 
-include("makie_piracy.jl")
-include("geojson.jl") # GeoJSON/GeoInterface support
-include("conversions.jl")
-include("data.jl")
-include("utils.jl")
-include("geodesy.jl")
-include("geoticks.jl")
-include("projection.jl")
+include("makie_piracy.jl")    # Quick patches for Makie
+include("triangulation3d.jl") # 3D polygon triangulation for geospatial cases
+include("geojson.jl")         # GeoJSON/GeoInterface support - should be deprecated at some point
+include("conversions.jl")     # basic conversion functions - not sure if these are needed with GeometryOps now being a thing, or used anywhere
+include("data.jl")            # data loading functions - `coastlines`, `earth`, `land`
+include("utils.jl")           # utility functions - `geo2basic`, `to_multipoly`, `to_multilinestring`
+include("geodesy.jl")         # Integrating Geodesy.jl coordinate transformations into Makie's transformation system
+include("projection.jl")      # Integrating Proj.jl transformations into Makie's transformation system
 
-include("geoaxis.jl")
-include("makie-axis.jl")
+# GeoAxis
+include("geoaxis/geoaxis.jl")    # GeoAxis definition
+include("geoaxis/makie-axis.jl") # Makie function overloads and integration for GeoAxis
+include("geoaxis/geoticks.jl")   # Geo specific tick finder (again, not used at the moment, but should be)
+
+# GlobeAxis
+include("sphere/unit_sphere_transforms.jl") # Transformations from plate-carree to unit sphere - we should just use the implementation in GeometryOps now
+include("sphere/icosphere.jl")              # Icosphere for full-globe plots, not yet used but should be used soon
+include("sphere/globetransform.jl")         # GlobeTransform definitions for going to/from ellipsoids
+include("sphere/globeaxis.jl")              # GlobeAxis definition and Makie function overloads
 
 # some basic recipes
-include("mesh_image.jl")
-include("linesplitting.jl")
-
-include("sphere/unit_sphere_transforms.jl")
-include("sphere/icosphere.jl")
-include("sphere/globetransform.jl")
-include("sphere/globeaxis.jl")
-
-include("triangulation3d.jl")
+include("mesh_image.jl")    # Mesh image recipe - interpolate an image onto a projected mesh, saving a lot of cost compared to reprojecting the image
+include("linesplitting.jl") # Line splitting submodule - used for splitting lines at the antimeridian
 
 @reexport using Colors, Makie
 export Proj
