@@ -1,3 +1,17 @@
+#=
+# 3D polygon triangulation
+
+This file hooks in to Makie's infrastructure to inject triangulation routines
+that work for planar 3D polygons, i.e. polygons that lie on _some_ plane in 3D.
+
+The functions here all assume that the plane defined by the first three non-collinear
+points of the exterior of the polygon are sufficient to define the plane.
+The exact criterion here is in `extract_three_unique_and_independent_points`.
+
+This only gets injected into Makie if the polygon is being meshed in the `poly` recipe
+_and_ the `transform_func` is known to us (a `Proj.Transformation` or one of the `GlobeTransform`s).
+=#
+
 using Makie.LinearAlgebra
 using GeometryBasics
 using GeometryOps.ExactPredicates
@@ -106,12 +120,18 @@ function extract_three_unique_and_independent_points(points::Vector{Vector{PT}})
         end
     end
 
+    p1_3d = Makie.to_ndim(Point3d, p1, 0.0)
+    p2_3d = Makie.to_ndim(Point3d, p2, 0.0)
+    p3_3d = Makie.to_ndim(Point3d, p3, 0.0)
+
     # Account for collinear points
-    if _collinear(Makie.to_ndim(Point3d, p1, 0.0), Makie.to_ndim(Point3d, p2, 0.0), Makie.to_ndim(Point3d, p3, 0.0)) == 0 # collinear, all the points lie on the same line
+    if _collinear(p1_3d, p2_3d, p3_3d) == 0 # collinear, all the points lie on the same line
         if length(points[1]) <= 3
             error("Polygon has only three points and they are all collinear, we can't triangulate this!")
         end
-        new_point_idx = findfirst(p -> _collinear(Makie.to_ndim(Point3d, p1, 0.0), Makie.to_ndim(Point3d, p2, 0.0), Makie.to_ndim(Point3d, p), 0.0) != 0, points[1])
+        # Find the first point in the polygon's exterior
+        # that is not collinear with the first two points.
+        new_point_idx = findfirst(p -> _collinear(p1_3d, p2_3d, Makie.to_ndim(Point3d, p, 0.0)) != 0, points[1])
         if isnothing(new_point_idx)
             error("All points in the polygon are collinear, we can't triangulate this!")
         end
