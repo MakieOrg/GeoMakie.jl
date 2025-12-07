@@ -45,7 +45,6 @@ const Text = Makie.Text
 Base.convert(::Type{Rect{N, Float64}}, x::Rect{N}) where N = Rect{N, Float64}(x)
 
 include("makie_piracy.jl")    # Quick patches for Makie
-include("triangulation3d.jl") # 3D polygon triangulation for geospatial cases
 include("geojson.jl")         # GeoJSON/GeoInterface support - should be deprecated at some point
 include("conversions.jl")     # basic conversion functions - not sure if these are needed with GeometryOps now being a thing, or used anywhere
 include("data.jl")            # data loading functions - `coastlines`, `earth`, `land`
@@ -67,6 +66,9 @@ include("sphere/globeaxis.jl")              # GlobeAxis definition and Makie fun
 # some basic recipes
 include("mesh_image.jl")    # Mesh image recipe - interpolate an image onto a projected mesh, saving a lot of cost compared to reprojecting the image
 include("linesplitting.jl") # Line splitting submodule - used for splitting lines at the antimeridian
+
+# This has to be last because it uses types introduced in other files
+include("triangulation3d.jl") # 3D polygon triangulation for geospatial cases
 
 @reexport using Colors, Makie
 export Proj
