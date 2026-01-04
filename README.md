@@ -6,7 +6,7 @@
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://geo.makie.org/dev)
 ![CI](https://github.com/MakieOrg/GeoMakie.jl/actions/workflows/ci.yml/badge.svg)
 
-This package is **in development**, and may break often.  You can install it from the REPL like so:
+This package is **still in development**, but the API for GeoAxis is broadly stable barring a breaking Makie release.  You can install it from the REPL like so:
 ```julia
 ]add GeoMakie
 ```
