@@ -1,6 +1,6 @@
 # GeoMakie
 
-## Geographic plotting utilities for Makie.jl <a href = "https://www.github.com/MakieOrg/Makie.jl"><img src="https://raw.githubusercontent.com/MakieOrg/Makie.jl/master/assets/logo.png" alt="Makie.jl" height="30" align = "top"></a>
+## Geographic plotting utilities for Makie.jl <a href = "https://www.github.com/MakieOrg/Makie.jl"><img src="https://raw.githubusercontent.com/MakieOrg/MakieLogos/refs/heads/main/Makie/logo_with_text.svg" alt="Makie.jl" height="50" align = "center"></a>
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://geo.makie.org/stable)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://geo.makie.org/dev)
