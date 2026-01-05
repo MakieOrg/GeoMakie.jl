@@ -36,7 +36,12 @@ function ProjGlobeTransform(dest::Geodesy.Datum, src, zlevel)
     return ProjGlobeTransform(Geodesy.ellipsoid(dest), src, zlevel)
 end
 function ProjGlobeTransform(dest::Geodesy.Ellipsoid, src, zlevel)
-    dest_str = "+proj=cart +a=$(dest.a) +f=$(dest.f)"
+    # if a sphere is requested, then use the radius directly.
+    if iszero(dest.f) || dest.a == dest.b
+        dest_str = "+proj=cart +R=$(dest.a)"
+    else # it's an actual ellipsoid, so provide shape params.
+        dest_str = "+proj=cart +a=$(dest.a) +b=$(dest.b)"
+    end
     transf = create_transform(dest_str, src)
     return ProjGlobeTransform(transf, zlevel)
 end
