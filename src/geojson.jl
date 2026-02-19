@@ -134,7 +134,7 @@ function _mls2ls(mls::GeometryBasics.MultiLineString{N, T}) where {N, T}
     points = Vector{Point{N, T}}()
     sizehint!(
         points, 
-        sum(GeometryBasics.GeoInterface.npoint, mls.linestrings) #= length of individual linestrings =# + 
+        sum(GeoInterface.npoint, mls.linestrings) #= length of individual linestrings =# + 
         length(mls.linestrings) #= NaN points between linestrings =#
     )
     for ls in mls
