@@ -40,9 +40,9 @@ end
     @testset "GridBased" begin
         lons = -180:180
         lats = -90:90
-        
+
         field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
-        
+
         @test_nowarn heatmap!(ax, lons, lats, field)
         @test_nowarn surface!(ax, lons, lats, field)
         @test_nowarn contour!(ax, lons, lats, field)
@@ -70,6 +70,35 @@ end
     @test new_prots.top == 0
     @test new_prots.bottom == 0
 
+end
+
+@testset "backgroundcolor" begin
+    lons = -180:180
+    lats = -90:90
+    field = [exp(cosd(l)) + 3(y/90) for l in lons, y in lats]
+
+    @testset "default is white" begin
+        fig = Figure()
+        ax = GeoAxis(fig[1, 1])
+        surface!(ax, lons, lats, field; shading = NoShading)
+        @test ax.backgroundcolor[] == RGBAf(1, 1, 1, 1)
+        @test haskey(ax.elements, :background)
+    end
+
+    @testset "custom color at construction" begin
+        fig = Figure()
+        ax = GeoAxis(fig[1, 1]; backgroundcolor = :red)
+        surface!(ax, lons, lats, field; shading = NoShading)
+        @test ax.backgroundcolor[] == RGBAf(1, 0, 0, 1)
+    end
+
+    @testset "color update after construction" begin
+        fig = Figure()
+        ax = GeoAxis(fig[1, 1])
+        surface!(ax, lons, lats, field; shading = NoShading)
+        ax.backgroundcolor[] = RGBAf(0, 0, 0, 0)
+        @test ax.backgroundcolor[] == RGBAf(0, 0, 0, 0)
+    end
 end
 
 @testset "Aspect ratio is equal to Axis with DataAspect" begin
