@@ -64,7 +64,7 @@ Currently, these attributes are:
 
 ## Important attributes
 - `source = "+proj=longlat +datum=wgs84 +type=crs"`: set the default source CRS of the projection.  This is always normalized to the XY axis order, no matter what you write here.  This can also be overridden at any point by the source attribute to a plot.
-- `scenekw = (;)`: keyword arguments passed directly to the underlying `LScene`; this can be used to set lights etc.
+- `lights = automatic`: lights to install on the underlying scene. `automatic` installs a camera-locked three-point rig (key/fill/back) plus a low ambient — chosen so plots with shading enabled stay visible whichever side of the globe you're looking at. Pass a `Vector{<:Makie.AbstractLight}` to override; include an `AmbientLight` in the vector if you want non-zero ambient. Pass `[]` for a fully dark scene. The attribute is observable, so you can mutate it after construction (e.g. `ga.lights[] = [...]` or `ga.lights[] = automatic` to restore the default).
 - `show_axis = true`: whether to show the LScene's axis, or not.
 """
 Makie.@Block GlobeAxis <: Makie.AbstractAxis begin
@@ -286,7 +286,30 @@ Makie.@Block GlobeAxis <: Makie.AbstractAxis begin
         # "The color of the axis spine."
         # spinecolor::RGBAf = :black
         # spinetype::Symbol = :geospine
+
+        # lights
+        "Lights to install on the underlying scene. `automatic` installs a camera-locked three-point rig with a low ambient. Pass a vector to override; include an `AmbientLight` in the vector if you want non-zero ambient. Pass `[]` for a fully dark scene."
+        lights::Union{Makie.Automatic, <:AbstractVector{<:Makie.AbstractLight}} = Makie.automatic
     end
+end
+
+function _default_globe_rig()
+    return Makie.AbstractLight[
+        Makie.AmbientLight(Makie.RGBf(0.15, 0.15, 0.15)),
+        Makie.DirectionalLight(Makie.RGBf(0.85, 0.85, 0.85), Makie.Vec3f(-0.4, -0.3,  1.0), true),
+        Makie.DirectionalLight(Makie.RGBf(0.30, 0.30, 0.35), Makie.Vec3f( 0.5, -0.2,  1.0), true),
+        Makie.DirectionalLight(Makie.RGBf(0.20, 0.20, 0.25), Makie.Vec3f( 0.0,  0.6, -1.0), true),
+    ]
+end
+
+function _apply_lights!(scene, v)
+    lights = v === Makie.automatic ? _default_globe_rig() : collect(v)
+    ambient_idx = findlast(l -> l isa Makie.AmbientLight, lights)
+    ambient_color = ambient_idx === nothing ? Makie.RGBf(0, 0, 0) : lights[ambient_idx].color[]
+    rest = filter(l -> !(l isa Makie.AmbientLight), lights)
+    Makie.set_ambient_light!(scene, ambient_color)
+    Makie.set_lights!(scene, rest)
+    return
 end
 
 _geodesy_ellipsoid_from(g::Geodesy.Ellipsoid) = g
@@ -333,6 +356,10 @@ function Makie.initialize_block!(axis::GlobeAxis; scenekw = NamedTuple())
 
     setfield!(axis, :globe_limits, Observable{Rect3d}(Makie.boundingbox(axis.scene)))
     setfield!(axis, :elements, Dict{Symbol, Any}())
+
+    on(axis.scene, axis.lights; update = true) do v
+        _apply_lights!(axis.scene, v)
+    end
 
     return
 
