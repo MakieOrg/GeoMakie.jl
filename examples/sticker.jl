@@ -34,6 +34,7 @@ stop += n
 
 ## Top boundary
 for lon in top_interrupted_lons
+    global stop
     lons[stop:stop + n-1] .= lon - epsilon + central_longitude
     lats[stop:stop + n-1] .= LinRange(90, 0, n)
     stop += n
@@ -49,6 +50,7 @@ stop += n
 
 ## Bottom boundary
 for lon in bottom_interrupted_lons
+    global stop
     lons[stop:stop + n-1] .= lon + epsilon + central_longitude
     lats[stop:stop + n-1] .= LinRange(-90, 0, n)
     stop += n
