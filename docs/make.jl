@@ -90,21 +90,20 @@ doc = Documenter.makedocs(;
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
     doctest=false,
-    warnonly = [:docs_block, :missing_docs],
+    warnonly = true,
     draft = false,
     plugins = [OhMyCards.ExampleConfig(; dot_slash = true),],
     pagesonly = !(get(ENV, "CI", "false") == "true"),
     debug = true,
 );
 
-DocumenterVitepress.deploydocs(;
-    repo="github.com/MakieOrg/GeoMakie.jl",
-    target="build",
-    push_preview = true,
+DocumenterVitepress.deploydocs(; 
+    repo="github.com/MakieOrg/GeoMakie.jl", 
+    target="build", 
+    push_preview = true, 
     forcepush = true
 )
 
-fatal_errors = filter(Documenter.is_strict(doc), doc.internal.errors)
-if !isempty(fatal_errors)
-    error("Errors found in documentation build: $(join(fatal_errors, "\n"))")
+if length(doc.internal.errors) > 0
+    error("Errors found in documentation build: $(join(doc.internal.errors, "\n"))")
 end
