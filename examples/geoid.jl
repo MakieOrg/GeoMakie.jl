@@ -31,7 +31,7 @@ sp = surface!(ax, gravitational_potential_ras .* 10_000; colormap = :turbo)
 # at each (lon, lat). This puts them at the same radial distance as the surface so
 # depth testing hides back-of-globe coastlines naturally — no depth_shift hack needed.
 draped = GO.transform(GeoMakie.coastlines()) do p
-    (p[1], p[2], 10_000 * gravitational_potential_ras[X(Near(p[1])), Y(Near(p[2]))])
+    (p[1], p[2], 10_000 * gravitational_potential_ras[X(Near(p[1])), Y(Near(p[2]))] + 1_000)
 end
 cl = lines!(ax, draped; color = :black, linewidth = 0.5)
 fig # hide
