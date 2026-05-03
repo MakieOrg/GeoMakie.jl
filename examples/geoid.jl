@@ -11,6 +11,7 @@ Cover = fig
 
 using Rasters, ArchGDAL, Downloads
 using GeoMakie
+import GeometryOps as GO
 
 path = Downloads.download("https://cdn.proj.org/us_nga_egm96_15.tif")
 gravitational_potential_ras = Raster(path) # geoid undulation, metres
@@ -28,13 +29,8 @@ sp = surface!(ax, gravitational_potential_ras .* 10_000; colormap = :turbo)
 # Drape coastlines onto the (exaggerated) geoid surface itself by sampling the raster
 # at each (lon, lat). This puts them at the same radial distance as the surface so
 # depth testing hides back-of-globe coastlines naturally — no depth_shift hack needed.
-draped = Point3f[]
-for ls in GeoMakie.coastlines()
-    for pt in ls.points
-        z = 10_000 * gravitational_potential_ras[X(Near(pt[1])), Y(Near(pt[2]))]
-        push!(draped, Point3f(pt[1], pt[2], z))
-    end
-    push!(draped, Point3f(NaN, NaN, NaN))
+draped = GO.transform(GeoMakie.coastlines()) do p
+    (p[1], p[2], 10_000 * gravitational_potential_ras[X(Near(p[1])), Y(Near(p[2]))])
 end
 cl = lines!(ax, draped; color = :black, linewidth = 0.5)
 
