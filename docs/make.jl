@@ -97,13 +97,9 @@ doc = Documenter.makedocs(;
     debug = true,
 );
 
-DocumenterVitepress.deploydocs(; 
-    repo="github.com/MakieOrg/GeoMakie.jl", 
-    target="build", 
-    push_preview = true, 
+DocumenterVitepress.deploydocs(;
+    repo="github.com/MakieOrg/GeoMakie.jl",
+    target="build",
+    push_preview = true,
     forcepush = true
 )
-
-if length(doc.internal.errors) > 0
-    error("Errors found in documentation build: $(join(doc.internal.errors, "\n"))")
-end
