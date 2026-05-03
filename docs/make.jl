@@ -103,3 +103,8 @@ DocumenterVitepress.deploydocs(;
     push_preview = true,
     forcepush = true
 )
+
+fatal_errors = filter(Documenter.is_strict(doc), doc.internal.errors)
+if !isempty(fatal_errors)
+    error("Errors found in documentation build: $(join(fatal_errors, "\n"))")
+end
