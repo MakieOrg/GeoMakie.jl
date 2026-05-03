@@ -94,6 +94,13 @@ end
 
 
 
+"""
+    to_multipoly(geom)
+
+Convert a polygon, vector of polygons, multipolygon, or any GeoInterface-compatible
+geometry into a `GeometryBasics.MultiPolygon`. `GeometryCollection`s are handled by
+extracting their polygon and multipolygon members and unioning them.
+"""
 to_multipoly(poly::GeometryBasics.Polygon) = GeometryBasics.MultiPolygon([poly])
 to_multipoly(poly::Vector{GeometryBasics.Polygon}) = GeometryBasics.MultiPolygon(poly)
 to_multipoly(mp::GeometryBasics.MultiPolygon) = mp
