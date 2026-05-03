@@ -24,7 +24,19 @@ gravitational_potential_ras = set(gravitational_potential_ras, X => xdim .+ dx/2
 fig = Figure(size = (700, 700))
 ax  = GlobeAxis(fig[1,1])
 sp = surface!(ax, gravitational_potential_ras .* 10_000; colormap = :turbo)
-cl = lines!(ax, GeoMakie.coastlines(); color = :black, linewidth = 0.5, depth_shift = -.01)
+
+# Drape coastlines onto the (exaggerated) geoid surface itself by sampling the raster
+# at each (lon, lat). This puts them at the same radial distance as the surface so
+# depth testing hides back-of-globe coastlines naturally — no depth_shift hack needed.
+draped = Point3f[]
+for ls in GeoMakie.coastlines()
+    for pt in ls.points
+        z = 10_000 * gravitational_potential_ras[X(Near(pt[1])), Y(Near(pt[2]))]
+        push!(draped, Point3f(pt[1], pt[2], z))
+    end
+    push!(draped, Point3f(NaN, NaN, NaN))
+end
+cl = lines!(ax, draped; color = :black, linewidth = 0.5)
 
 # --- Geocentric datum + local datum silhouettes ----------------------------
 # Plot two reference ellipsoid silhouettes against the bumpy geoid surface
