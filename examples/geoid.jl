@@ -10,7 +10,8 @@ Cover = fig
 =#
 
 using Rasters, ArchGDAL, Downloads
-using GeoMakie
+using GeoMakie, GLMakie
+GLMakie.activate!() # hide
 import GeometryOps as GO
 
 path = Downloads.download("https://cdn.proj.org/us_nga_egm96_15.tif")
@@ -33,8 +34,8 @@ draped = GO.transform(GeoMakie.coastlines()) do p
     (p[1], p[2], 10_000 * gravitational_potential_ras[X(Near(p[1])), Y(Near(p[2]))])
 end
 cl = lines!(ax, draped; color = :black, linewidth = 0.5)
-
-# --- Geocentric datum + local datum silhouettes ----------------------------
+fig # hide
+# ### Geocentric datum + local datum silhouettes
 # Plot two reference ellipsoid silhouettes against the bumpy geoid surface
 # (whose undulation N is exaggerated 10000×): the global geocentric datum
 # (WGS84, centred at Earth's mass centre) as a solid black circle, and a
@@ -62,6 +63,7 @@ pink = RGBf(0.93, 0.27, 0.6)
 geocentric = [Point3f(a_wgs84 * (cos(t) * u1 + sin(t) * u2)) for t in ts]
 lines!(ax.scene, geocentric;
        color = :black, linewidth = 2.5, overdraw = true)
+fig # hide
 
 # Local datum: pink dashed circle, translated toward the surface region of
 # interest so it bulges out on that side and tucks inside on the opposite —
@@ -70,6 +72,7 @@ offset = 0.04 * a_wgs84 * normalize(surface_pt)
 local_datum = [Point3f(offset + a_wgs84 * (cos(t) * u1 + sin(t) * u2)) for t in ts]
 lines!(ax.scene, local_datum;
        color = pink, linestyle = :dash, linewidth = 2.5, overdraw = true)
+fig # hide
 
 # Thin crosshairs through the geocentre, in the view plane.
 hl = 1.04 * a_wgs84
