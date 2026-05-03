@@ -90,7 +90,7 @@ doc = Documenter.makedocs(;
     sitename="GeoMakie.jl",
     authors="Anshul Singhvi and the Makie.jl contributors",
     doctest=false,
-    warnonly = true,
+    warnonly = [:docs_block, :missing_docs],
     draft = false,
     plugins = [OhMyCards.ExampleConfig(; dot_slash = true),],
     pagesonly = !(get(ENV, "CI", "false") == "true"),
