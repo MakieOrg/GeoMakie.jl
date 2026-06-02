@@ -72,6 +72,75 @@ end
 
 end
 
+@testset "Antimeridian-aware contour/contourf" begin
+    lons = -180:180
+    lats = -90:90
+    field = [exp(cosd(l)) + 3(y / 90) for l in lons, y in lats]
+
+    @testset "seam-crossing projections split the geometry" begin
+        for dest in ("+proj=longlat +lon_0=180", "+proj=longlat +lon_0=-150", "+proj=moll +lon_0=150")
+            fig = Figure()
+            ax = GeoAxis(fig[1, 1]; dest)
+            cfp = @test_nowarn contourf!(ax, lons, lats, field)
+            clp = @test_nowarn contour!(ax, lons, lats, field)
+            Makie.update_state_before_display!(fig)
+            # the split nodes exist and produce at least as much geometry as the raw
+            @test haskey(cfp.attributes.outputs, :split_polys)
+            @test length(cfp.split_polys[]) >= length(cfp.polys[])
+            @test haskey(clp.attributes.outputs, :split_lines)
+            @test length(clp.split_lines[]) >= length(clp.masked_lines[])
+            # every split polygon lies within [lon0 - 180, lon0 + 180]
+            lon0 = GeoMakie.parse_lon0(dest)
+            for p in cfp.split_polys[]
+                for v in GeometryBasics.coordinates(p.exterior)
+                    @test lon0 - 180 - 1 <= v[1] <= lon0 + 180 + 1
+                end
+            end
+        end
+    end
+
+    @testset "curvilinear input" begin
+        nx, ny = 40, 30
+        LON = [l + 35 * sind(y) for l in range(-150, 150, nx), y in range(-80, 80, ny)]
+        LAT = [Float64(y) for l in range(-150, 150, nx), y in range(-80, 80, ny)]
+        Z = [cosd(l) + sind(2y) for l in range(-150, 150, nx), y in range(-80, 80, ny)]
+        fig = Figure()
+        ax = GeoAxis(fig[1, 1]; dest = "+proj=moll +lon_0=0")
+        @test_nowarn contourf!(ax, LON, LAT, Z)
+        @test_nowarn contour!(ax, LON, LAT, Z)
+        Makie.update_state_before_display!(fig)
+    end
+
+    @testset "Oceananigans tripolar grid (Makie.jl#4885)" begin
+        # A real curvilinear ocean grid that crosses the antimeridian. Guarded so
+        # the suite still passes if Oceananigans can't be loaded in this env.
+        loaded = try
+            @eval using Oceananigans
+            true
+        catch err
+            @warn "Skipping tripolar test: Oceananigans unavailable" err
+            false
+        end
+        if loaded
+            grid = Oceananigans.TripolarGrid(size = (20, 15, 1))
+            λ, φ, _ = Oceananigans.nodes(grid, Oceananigans.Center(), Oceananigans.Center(), Oceananigans.Center())
+            λ = Array(λ[1:grid.Nx, 1:grid.Ny, 1])
+            φ = Array(φ[1:grid.Nx, 1:grid.Ny, 1])
+            z = @. cosd(3λ) * cosd(φ)
+            fig = Figure()
+            ax = GeoAxis(fig[1, 1]; dest = "+proj=moll +lon_0=0")
+            cfp = @test_nowarn contourf!(ax, λ, φ, z; levels = -1:0.2:1)
+            @test_nowarn contour!(ax, λ, φ, z; levels = -1:0.2:1)
+            Makie.update_state_before_display!(fig)
+            @test length(cfp.split_polys[]) >= length(cfp.polys[])
+            # add_cyclic_point should extend the grid by one column
+            λc, φc, zc = add_cyclic_point(λ, φ, z)
+            @test size(λc, 1) == size(λ, 1) + 1
+            @test_nowarn contourf!(GeoAxis(fig[1, 2]; dest = "+proj=moll +lon_0=0"), λc, φc, zc; levels = -1:0.2:1)
+        end
+    end
+end
+
 @testset "Aspect ratio is equal to Axis with DataAspect" begin
     # Create two figures, one with regular axis and one with geoaxis
     # the transformation in both cases is the identity

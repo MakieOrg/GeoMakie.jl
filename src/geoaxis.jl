@@ -849,7 +849,12 @@ function compute_protrusions(title, titlesize, titlegap, titlevisible,
 end
 
 # This is where we override the stuff to make it our stuff.
-function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
+#
+# The body lives in `_geoaxis_plot!` so that more specific methods
+# (e.g. the antimeridian-aware `contour`/`contourf` overrides in
+# `contoursplitting_geo.jl`) can reuse the exact transform-injection and
+# limit-reset logic before post-processing the inserted plot.
+function _geoaxis_plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
     # deal with setting the transform_func correctly
     source = pop!(plot.kw, :source, axis.source)
     transformfunc = lift(create_transform, axis.dest, source)
@@ -862,7 +867,7 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
     # remove the reset_limits kwarg if there is one, this determines whether to automatically reset limits
     # on plot insertion
     reset_limits = to_value(pop!(plot.kw, :reset_limits, true))
-    
+
     # actually plot
     Makie.plot!(axis.scene, plot)
 
@@ -879,6 +884,8 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
 
     return plot
 end
+
+Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot) = _geoaxis_plot!(axis, plot)
 
 
 # This function only exists to get around the attribute name check,

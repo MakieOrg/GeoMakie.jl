@@ -242,3 +242,51 @@ function geom_to_bands(geom; height = 100_000.0, base = 0.0, kwargs...)
     end
     return (Makie.Point3d.(geom_lower), Makie.Point3d.(geom_upper))
 end
+
+# ---------------------------------------------------------------------------
+# Cyclic point (wrap-around) for periodic gridded data
+# ---------------------------------------------------------------------------
+
+"""
+    add_cyclic_point(lons::AbstractVector, data::AbstractMatrix; period = 360)
+    add_cyclic_point(lons::AbstractMatrix, lats::AbstractMatrix, data::AbstractMatrix; dims = 1, period = 360)
+
+Append a *cyclic point* to longitude-periodic gridded data, analogous to
+[`cartopy.util.add_cyclic_point`](https://cartopy.readthedocs.io/stable/gallery/scalar_data/wrapping_global.html).
+
+Many global grids store each longitude only once, so there is no cell bridging
+the last column back to the first.  `contourf`/`contour`/`surface` then leave a
+thin gap along that periodic boundary.  This helper appends a copy of the first
+slice (along `dims`, default the first / longitude dimension) at the end, with
+its longitudes shifted by `period` (default `360`), closing the seam.
+
+- The **vector** form takes a longitude vector and a `data` matrix whose first
+  dimension is longitude; it returns `(lons_c, data_c)`.
+- The **matrix** form takes curvilinear `lons`, `lats` and `data` matrices and
+  returns `(lons_c, lats_c, data_c)`; only `lons` is shifted by `period`.
+
+```julia
+lon_c, data_c = add_cyclic_point(lon, data)
+contourf!(ga, lon_c, lat, data_c)
+
+λ_c, φ_c, z_c = add_cyclic_point(λ, φ, z)   # curvilinear / tripolar grids
+contourf!(ga, λ_c, φ_c, z_c)
+```
+"""
+function add_cyclic_point(lons::AbstractVector, data::AbstractMatrix; period = 360)
+    size(data, 1) == length(lons) ||
+        throw(ArgumentError("`length(lons)` ($(length(lons))) must equal `size(data, 1)` ($(size(data, 1)))"))
+    lons_c = vcat(collect(lons), lons[begin] + period)
+    data_c = vcat(data, data[begin:begin, :])
+    return lons_c, data_c
+end
+
+function add_cyclic_point(lons::AbstractMatrix, lats::AbstractMatrix, data::AbstractMatrix; dims::Int = 1, period = 360)
+    (size(lons) == size(lats) == size(data)) ||
+        throw(ArgumentError("`lons`, `lats` and `data` must have the same size"))
+    first_slice(A) = selectdim(A, dims, firstindex(A, dims):firstindex(A, dims))
+    lons_c = cat(lons, first_slice(lons) .+ period; dims = dims)
+    lats_c = cat(lats, first_slice(lats); dims = dims)
+    data_c = cat(data, first_slice(data); dims = dims)
+    return lons_c, lats_c, data_c
+end
