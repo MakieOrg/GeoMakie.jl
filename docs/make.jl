@@ -85,6 +85,7 @@ doc = Documenter.makedocs(;
             "Architecture" => "architecture.md",
             "Adding demos" => "adding_demos.md",
         ],
+        "API reference" => "api.md",
         "Examples" => joinpath.(("examples",), replace.(examples, (".jl" => ".md",))),
     ],
     sitename="GeoMakie.jl",
