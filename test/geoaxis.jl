@@ -137,7 +137,51 @@ end
             λc, φc, zc = add_cyclic_point(λ, φ, z)
             @test size(λc, 1) == size(λ, 1) + 1
             @test_nowarn contourf!(GeoAxis(fig[1, 2]; dest = "+proj=moll +lon_0=0"), λc, φc, zc; levels = -1:0.2:1)
+
+            # lon_0 = 180 (the #4885 condition): the antimeridian now runs through
+            # the visible map centre, so on the cyclic-closed grid the split must
+            # actually fire (split_polys strictly more than the input polys) for the
+            # curvilinear bands to render without smearing across the seam.
+            ax180 = GeoAxis(fig[2, 1]; dest = "+proj=moll +lon_0=180")
+            cfp180 = @test_nowarn contourf!(ax180, λc, φc, zc; levels = -1:0.2:1)
+            @test_nowarn contour!(ax180, λc, φc, zc; levels = -1:0.2:1)
+            Makie.update_state_before_display!(fig)
+            @test length(cfp180.split_polys[]) > length(cfp180.polys[])
         end
+    end
+
+    @testset "unclosed global grid warns; closed grid / lon_0=0 stay quiet" begin
+        # global but one cell short of closing (span 356°) -> footgun
+        lons_open = collect(-180.0:4:176)
+        lats2 = collect(-90.0:4:90)
+        f = [cosd(3l) * cosd(y) for l in lons_open, y in lats2]
+
+        # warns at lon_0 = 180 (the data seam lands at the visible map centre)
+        let fig = Figure(), ax = GeoAxis(fig[1, 1]; dest = "+proj=moll +lon_0=180")
+            @test_logs (:warn,) match_mode = :any contourf!(ax, lons_open, lats2, f)
+        end
+        # quiet at lon_0 = 0 (the seam hides on the map edge)
+        let fig = Figure(), ax = GeoAxis(fig[1, 1]; dest = "+proj=moll +lon_0=0")
+            @test_nowarn contourf!(ax, lons_open, lats2, f)
+        end
+        # quiet once the grid is closed with add_cyclic_point, even at lon_0 = 180
+        lonc, fc = add_cyclic_point(lons_open, f)
+        let fig = Figure(), ax = GeoAxis(fig[1, 1]; dest = "+proj=moll +lon_0=180")
+            @test_nowarn contourf!(ax, lonc, lats2, fc)
+        end
+    end
+
+    @testset "polar-stereographic cap" begin
+        # A band that encircles the pole, on a grid stopping short of ±90.
+        lonp = collect(-180.0:4:176)
+        latp = collect(20.0:2:88)
+        zp = [sind(y) + 0.25 * cosd(3l) * cosd(y) for l in lonp, y in latp]
+        lonc, zc = add_cyclic_point(lonp, zp)
+        fig = Figure()
+        ax = GeoAxis(fig[1, 1]; dest = "+proj=stere +lat_0=90 +lon_0=0")
+        cfp = @test_nowarn contourf!(ax, lonc, latp, zc; levels = range(-1, 1; length = 11))
+        Makie.update_state_before_display!(fig)
+        @test length(cfp.split_polys[]) >= length(cfp.polys[])
     end
 end
 

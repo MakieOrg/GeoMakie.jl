@@ -186,12 +186,53 @@ function split_polygon(
     return pieces
 end
 
+# Subdivide a ring so no edge is longer than `dl` degrees (linear in lon/lat).
+# Only inserts points on long edges — existing vertices are kept exactly, so the
+# band shape is unchanged.  This is what stops the projected fill from showing
+# thin white seams: a contour band's edges come at the data-grid spacing (e.g.
+# 4°), and projecting those long edges as straight chords leaves slivers between
+# adjacent bands near the seam.  Densifying first makes the chords follow the
+# projected meridians/parallels.
+function _densify_ring(pts::AbstractVector{<:GeometryBasics.Point2}, dl::Real)
+    n = length(pts)
+    n < 2 && return collect(Point2f, pts)
+    out = Point2f[]
+    sizehint!(out, n)
+    @inbounds for i in 1:(n - 1)
+        a = pts[i]; b = pts[i + 1]
+        push!(out, Point2f(a))
+        d = max(abs(b[1] - a[1]), abs(b[2] - a[2]))
+        if d > dl
+            k = ceil(Int, d / dl)
+            for j in 1:(k - 1)
+                t = Float32(j / k)
+                push!(out, Point2f(a[1] + t * (b[1] - a[1]), a[2] + t * (b[2] - a[2])))
+            end
+        end
+    end
+    push!(out, Point2f(pts[end]))
+    return out
+end
+
+function _densify_poly(p::GeometryBasics.Polygon, dl::Real)
+    ext = _densify_ring(GeometryBasics.coordinates(p.exterior), dl)
+    isempty(p.interiors) && return Polygon(GeometryBasics.LineString(ext))
+    holes = [GeometryBasics.LineString(_densify_ring(GeometryBasics.coordinates(h), dl)) for h in p.interiors]
+    return Polygon(GeometryBasics.LineString(ext), holes)
+end
+
 """
-    split_polys_and_colors(polys, colors, lon0; close_at_poles=true)
+    split_polys_and_colors(polys, colors, lon0; close_at_poles=true, densify_dlat=1.0)
 
 Apply `split_polygon` to each polygon in `polys`, expanding the
 parallel `colors` vector so each split piece inherits its parent's
 colour.  Returns `(new_polys, new_colors)`.
+
+Every output piece is densified so no edge exceeds `densify_dlat` degrees
+(`_densify_ring`).  This is essential: the bands come at the data-grid spacing,
+and projecting their long straight edges per-vertex would leave thin white
+seams between adjacent bands near the antimeridian.  Set `densify_dlat=Inf` to
+disable.
 """
 function split_polys_and_colors(
         polys::AbstractVector{<:GeometryBasics.Polygon},
@@ -199,13 +240,14 @@ function split_polys_and_colors(
         lon0::Real;
         close_at_poles::Bool = true,
         seam_dlat::Real = 1.0,
+        densify_dlat::Real = 1.0,
     )
     new_polys = Polygon{2, Float32}[]
     new_colors = eltype(colors)[]
     for (poly, col) in zip(polys, colors)
         pieces = split_polygon(poly, lon0; close_at_poles, seam_dlat)
         for p in pieces
-            push!(new_polys, p)
+            push!(new_polys, isfinite(densify_dlat) ? _densify_poly(p, densify_dlat) : p)
             push!(new_colors, col)
         end
     end
@@ -279,8 +321,12 @@ function split_linestring_points(
         if abs(dlon) > 180.0
             sign_dir = dlon > 0 ? -1 : +1
             lat_cross = _crossing_latitude(prev[1], prev[2], p_norm[1], p_norm[2], lon0, sign_dir)
-            exit_lon = lon0 + sign_dir * 180.0
-            entry_lon = lon0 - sign_dir * 180.0
+            # Nudge the inserted boundary vertices a hair (`SEAM_EPS`) inward,
+            # toward `lon0`, so a vertex sitting exactly on the antimeridian
+            # doesn't project ambiguously to either screen edge (same fix as
+            # `_densify_seam_ring` applies to polygon seam vertices).
+            exit_lon = lon0 + sign_dir * (180.0 - SEAM_EPS)
+            entry_lon = lon0 - sign_dir * (180.0 - SEAM_EPS)
             push!(out, Point2f(exit_lon, lat_cross))
             push!(out, Point2f(NaN, NaN))
             push!(out, Point2f(entry_lon, lat_cross))
@@ -330,8 +376,9 @@ function split_linestring_points(
         if abs(dlon) > 180.0
             sign_dir = dlon > 0 ? -1 : +1
             lat_cross = _crossing_latitude(prev[1], prev[2], p_norm[1], p_norm[2], lon0, sign_dir)
-            exit_lon = lon0 + sign_dir * 180.0
-            entry_lon = lon0 - sign_dir * 180.0
+            # Nudge inserted boundary vertices inward by `SEAM_EPS` (see one-arg method).
+            exit_lon = lon0 + sign_dir * (180.0 - SEAM_EPS)
+            entry_lon = lon0 - sign_dir * (180.0 - SEAM_EPS)
             push!(out, Point2f(exit_lon, lat_cross)); push!(cout, prev_col)
             push!(out, Point2f(NaN, NaN)); push!(cout, prev_col)
             push!(out, Point2f(entry_lon, lat_cross)); push!(cout, col)

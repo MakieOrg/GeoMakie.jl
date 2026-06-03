@@ -64,11 +64,32 @@ function _drop_child!(scene, plot, child)
     return
 end
 
+# Warn once (at plot-build time) when a projected `contourf`/`contour` is handed a
+# global-but-unclosed longitude grid: the antimeridian split then leaves a seam at
+# `lon_0 ± 180` (the map centre for `lon_0 = 180`).  Harmless at `lon_0 = 0` (the
+# seam lands on the map edge), so we stay quiet there.  Non-fatal — any read that
+# isn't ready yet just skips the check.  Wrapping with `add_cyclic_point` fixes it.
+function _warn_if_unclosed_global!(plot)
+    try
+        lon0 = _antimeridian_lon0(plot.transform_func[])
+        (lon0 === nothing || abs(lon0) < 1.0e-9) && return
+        if _is_global_periodic_lon(plot.x[], plot.z[])
+            @warn "GeoMakie: this longitude grid looks global but is not closed " *
+                "(one cell short of 360°), so projected `contourf`/`contour` will " *
+                "show a seam at lon_0 ± 180. Wrap it with `GeoMakie.add_cyclic_point` " *
+                "before plotting to close the seam."
+        end
+    catch
+    end
+    return
+end
+
 # ---------------------------------------------------------------------------
 # Filled contours
 # ---------------------------------------------------------------------------
 function Makie.plot!(axis::GeoAxis, plot::Makie.Contourf)
     _geoaxis_plot!(axis, plot)
+    _warn_if_unclosed_global!(plot)
 
     Makie.register_computation!(
         plot.attributes,
@@ -107,6 +128,7 @@ end
 # ---------------------------------------------------------------------------
 function Makie.plot!(axis::GeoAxis, plot::Makie.Contour)
     _geoaxis_plot!(axis, plot)
+    _warn_if_unclosed_global!(plot)
 
     # `:masked_lines` is the NaN-separated point vector actually drawn by the
     # recipe's `lines!` child (== `:contour_points` when labels are off, with

@@ -2,7 +2,8 @@
 # These run without a plotting backend.
 
 using GeoMakie, GeometryBasics, Test
-using GeoMakie: split_polygon, split_polys_and_colors, split_linestring_points, _normalise_lon
+using GeoMakie: split_polygon, split_polys_and_colors, split_linestring_points, _normalise_lon,
+    _is_global_periodic_lon, SEAM_EPS
 const P2 = GeometryBasics.Point2f
 
 # helper: longitudes of a polygon's exterior
@@ -78,6 +79,40 @@ end
     out = split_linestring_points(pts, 0.0)
     @test !any(p -> isnan(p[1]), out)
     @test all(p -> -180 - 1e-3 <= p[1] <= 180 + 1e-3, out)
+end
+
+@testset "split_linestring_points: boundary vertices nudged inward by SEAM_EPS" begin
+    # crossing 170 -> 190 at lon0 = 0 inserts boundary vertices at ±(180 - SEAM_EPS),
+    # not exactly ±180 (so Proj doesn't project them ambiguously to either edge).
+    pts = P2[(170, 3), (190, 3)]
+    out = split_linestring_points(pts, 0.0)
+    lons = [p[1] for p in out if !isnan(p[1])]
+    @test maximum(lons) ≈ 180 - SEAM_EPS atol = 1e-4
+    @test minimum(lons) ≈ -(180 - SEAM_EPS) atol = 1e-4
+    @test maximum(lons) < 180 && minimum(lons) > -180
+    # colour-co-split variant nudges identically
+    op, _ = split_linestring_points(pts, [1.0, 2.0], 0.0)
+    lons2 = [p[1] for p in op if !isnan(p[1])]
+    @test maximum(lons2) ≈ 180 - SEAM_EPS atol = 1e-4
+    @test minimum(lons2) ≈ -(180 - SEAM_EPS) atol = 1e-4
+end
+
+@testset "_is_global_periodic_lon detector" begin
+    z(n) = zeros(n, 3)
+    # global but one cell short of closing (the footgun) -> true
+    @test _is_global_periodic_lon(collect(-180.0:10:170), z(36))
+    @test _is_global_periodic_lon(collect(0.0:2:358), z(180))
+    # already closed (includes the wrap column) -> false
+    @test !_is_global_periodic_lon(collect(-180.0:10:180), z(37))
+    # regional grid -> false
+    @test !_is_global_periodic_lon(collect(0.0:10:170), z(18))
+    # more than one cell short -> false (one cyclic point wouldn't close it)
+    @test !_is_global_periodic_lon(collect(-180.0:10:160), z(35))
+    # mismatched length -> false (no throw)
+    @test !_is_global_periodic_lon(collect(-180.0:10:170), z(10))
+    # curvilinear / matrix longitude -> always false (not detected)
+    λ = [Float64(l) for l in -180:10:170, _ in 1:3]
+    @test !_is_global_periodic_lon(λ, z(36))
 end
 
 @testset "add_cyclic_point" begin

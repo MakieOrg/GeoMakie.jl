@@ -263,7 +263,16 @@ its longitudes shifted by `period` (default `360`), closing the seam.
 - The **vector** form takes a longitude vector and a `data` matrix whose first
   dimension is longitude; it returns `(lons_c, data_c)`.
 - The **matrix** form takes curvilinear `lons`, `lats` and `data` matrices and
-  returns `(lons_c, lats_c, data_c)`; only `lons` is shifted by `period`.
+  returns `(lons_c, lats_c, data_c)`; only `lons` is shifted by `period`.  It
+  assumes the periodic dimension is `dims` (default `1`).
+
+!!! note "Wrap global grids before projected contours"
+    On a projected `GeoAxis`, `contourf!`/`contour!` split contour geometry at
+    the antimeridian (`lon_0 ± 180`).  A global but *unclosed* grid leaves a thin
+    seam at the periodic boundary — invisible at `lon_0 = 0` (it lands on the map
+    edge) but at the **map centre** for other `lon_0` (e.g. `180`).  Wrap such
+    grids with `add_cyclic_point` first; GeoMakie warns if it detects an unclosed
+    global longitude axis.
 
 ```julia
 lon_c, data_c = add_cyclic_point(lon, data)
@@ -290,3 +299,28 @@ function add_cyclic_point(lons::AbstractMatrix, lats::AbstractMatrix, data::Abst
     data_c = cat(data, first_slice(data); dims = dims)
     return lons_c, lats_c, data_c
 end
+
+# `true` when `lons` looks like a *global but unclosed* longitude axis: roughly
+# uniform spacing `Δ`, spanning almost a full `period` but one cell short of
+# closing (`span ≈ period - Δ`).  Such a grid leaves a thin seam along the
+# periodic boundary unless wrapped with [`add_cyclic_point`](@ref); the
+# `GeoAxis` `contourf`/`contour` hooks use this to warn the user.  A grid that is
+# already closed (`span ≈ period`), regional (`span ≪ period`), or more than one
+# cell short returns `false` (a single cyclic point would not close those).
+#
+# Only the **vector** longitude case is detected; curvilinear (matrix) longitude
+# grids fold near the poles and are too easy to misclassify, so they return
+# `false` (no warning) — those users are guided by the docs/example instead.
+function _is_global_periodic_lon(lons::AbstractVector, z::AbstractMatrix; period = 360, atol = 1.0e-3)
+    length(lons) == size(z, 1) || return false
+    n = length(lons)
+    n >= 3 || return false
+    span = float(lons[end] - lons[begin])
+    span > 0 || return false
+    Δ = span / (n - 1)
+    # not already closed, and within one cell of closing
+    return span < period - atol && span > period - 1.5 * Δ
+end
+
+_is_global_periodic_lon(::AbstractMatrix, ::AbstractMatrix; kwargs...) = false
+_is_global_periodic_lon(::Any, ::Any; kwargs...) = false
