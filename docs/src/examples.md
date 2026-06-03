@@ -28,6 +28,7 @@ multiple_crs
 dashboard
 sweep_points
 vesta3d
+geoid
 ```
 
 ### GeoAxis examples
