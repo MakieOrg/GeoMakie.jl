@@ -1,14 +1,28 @@
 """
-    abstract type GlobeTransform 
+    abstract type GlobeTransform
 
-The supertype for all globe transforms.  
-    
+The supertype for all globe transforms.
+
 All subtypes must be callable with a Point, and have a field `zlevel`.
 
 Construct via [`create_globe_transform`](@ref).  Used in [`GlobeAxis`](@ref).
 """
 abstract type GlobeTransform end
 
+"""
+    create_globe_transform(dest, src, zlevel)
+
+Create a [`GlobeTransform`](@ref) that converts coordinates from the `src` CRS
+into geocentric Cartesian (ECEF) coordinates on the ellipsoid `dest`, offsetting
+each point's altitude by `zlevel`.
+
+Returns a [`GeodesyGlobeTransform`](@ref) when `dest` is a `Geodesy.Ellipsoid`
+and `src` is passed as a *type* (dispatched on `src::Type`). In practice `src`
+must be one of the coordinate types for which a `GeodesyGlobeTransform`
+constructor exists (`Geodesy.LLA`, `Geodesy.UTM`, `Geodesy.UTMZ`); other types
+raise a `MethodError`. Otherwise returns a Proj.jl-based
+[`ProjGlobeTransform`](@ref).
+"""
 function create_globe_transform(dest::Geodesy.Ellipsoid, src::Type, zlevel)
     return GeodesyGlobeTransform(dest, src, zlevel)
 end
@@ -83,6 +97,12 @@ end
 Makie.inverse_transform(f::ProjGlobeTransform) = InverseProjGlobeTransform(f)
 Makie.inverse_transform(f::InverseProjGlobeTransform) = ProjGlobeTransform(Base.inv(f.inv_transf), f.zlevel)
 
+"""
+    struct GeodesyGlobeTransform{CoordType, T} <: GlobeTransform
+
+Geodesy.jl based transformation to the `dest` ellipsoid, for source coordinates
+of type `CoordType` (e.g. `Geodesy.LLA`, `Geodesy.UTM`, `Geodesy.UTMZ`).
+"""
 struct GeodesyGlobeTransform{CoordType, T} <: GlobeTransform
     transf::T
     zlevel::Float64

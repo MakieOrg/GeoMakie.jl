@@ -138,8 +138,9 @@ To plot a scalar field, simply use `surface!(ga, lonmin..lonmax, latmin..latmax,
 ```@docs
 GeoMakie.to_multipoly
 GeoMakie.geo2basic
-GeoMakie.GeoAxis
 GeoMakie.geoformat_ticklabels
-GeoMakie.meshimage
 
 ```
+
+`GeoAxis`, `meshimage`, and the rest of the public API are documented on the
+[API reference](@ref) page.
