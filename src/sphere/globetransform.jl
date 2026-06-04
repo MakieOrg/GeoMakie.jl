@@ -17,8 +17,11 @@ into geocentric Cartesian (ECEF) coordinates on the ellipsoid `dest`, offsetting
 each point's altitude by `zlevel`.
 
 Returns a [`GeodesyGlobeTransform`](@ref) when `dest` is a `Geodesy.Ellipsoid`
-and `src` is a Geodesy coordinate type (e.g. `Geodesy.LLA`); otherwise returns a
-Proj.jl-based [`ProjGlobeTransform`](@ref).
+and `src` is passed as a *type* (dispatched on `src::Type`). In practice `src`
+must be one of the coordinate types for which a `GeodesyGlobeTransform`
+constructor exists (`Geodesy.LLA`, `Geodesy.UTM`, `Geodesy.UTMZ`); other types
+raise a `MethodError`. Otherwise returns a Proj.jl-based
+[`ProjGlobeTransform`](@ref).
 """
 function create_globe_transform(dest::Geodesy.Ellipsoid, src::Type, zlevel)
     return GeodesyGlobeTransform(dest, src, zlevel)
