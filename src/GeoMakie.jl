@@ -52,8 +52,10 @@ include("utils.jl")
 include("geodesy.jl")
 include("geoticks.jl")
 include("projection.jl")
+include("sphere_clip.jl") # sphere-space clipping + adaptive resampling for discontinuities
 
 include("geoaxis.jl")
+include("contoursplitting_geo.jl") # seam-aware filled contours on a GeoAxis
 include("makie-axis.jl")
 
 # some basic recipes
