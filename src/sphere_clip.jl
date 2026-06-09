@@ -764,7 +764,18 @@ end
 
 # Clip one polygon (given as lon/lat rings, exterior first) at `clip`, resample each piece,
 # and assemble into GB polygons. The full d3 pipeline for fills.
-function _split_polygon(clip::SphereClip, rings_deg, project, scale)
+#
+# `rotated=false` (default): emit geographic lon/lat (un-rotated); the caller draws with the
+# full `+lon_0` transform. `project` must be that full projector. Used for circle/NoClip and
+# the standalone `split_geometry`.
+#
+# `rotated=true` (Option B, antimeridian only): emit coordinates in the CANONICAL ROTATED
+# frame and let the caller draw with the CENTRED transform (`+lon_0=0`). Because
+# `centred ∘ rotate == full` exactly for a pure-longitude rotation, the plot lands in the same
+# projected space as the axis — but the seam now sits at rotated ±180°, which the centred
+# projection maps to distinct edges, so there is no longitude-wrap collapse and no nudge.
+# `project` must be the CENTRED projector.
+function _split_polygon(clip::SphereClip, rings_deg, project, scale; rotated::Bool = false)
     clip isa NoClip && return _rings_to_polygons(rings_deg, project)
     fwd, inv = _rotation(clip)
     seam = clip isa AntimeridianClip
@@ -775,8 +786,12 @@ function _split_polygon(clip::SphereClip, rings_deg, project, scale)
     for r in clipped
         rd = Point2d[]
         for q in r
-            lon, lat = _unrotate(inv, q[1], q[2], seam)
-            push!(rd, Point2d(lon, lat))
+            if rotated
+                push!(rd, Point2d(q[1] * _R2D, q[2] * _R2D))      # keep the canonical rotated frame
+            else
+                lon, lat = _unrotate(inv, q[1], q[2], seam)
+                push!(rd, Point2d(lon, lat))
+            end
         end
         isempty(rd) && continue
         rd[end] != rd[1] && push!(rd, rd[1])                  # close
