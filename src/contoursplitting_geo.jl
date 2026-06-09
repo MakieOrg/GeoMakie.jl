@@ -21,15 +21,14 @@ function _drop_child!(scene, plot, child)
     return
 end
 
-# Split each band polygon at the clip's discontinuity, replicating its colour onto every
-# resulting piece. `polys`/`colors` are parallel vectors from the `contourf` recipe.
-function _split_polys_colors(polys, colors, clip::SphereClip)
+# Split each band polygon at the clip's discontinuity (full d3 pipeline: rotate → clip →
+# resample), replicating its colour onto every resulting piece. `polys`/`colors` are parallel
+# vectors from the `contourf` recipe; `project`/`scale` drive the adaptive resampler.
+function _split_polys_colors(polys, colors, clip::SphereClip, project, scale)
     newpolys = GeometryBasics.Polygon{2,Float32}[]
     newcolors = eltype(colors)[]
     for (poly, col) in zip(polys, colors)
-        clipped = clip_fill(clip, _poly_rings(poly))
-        densified = [_densify_ring_sphere(r, 1.0) for r in clipped]
-        for np in _rings_to_polygons(densified)
+        for np in _split_polygon(clip, _poly_rings(poly), project, scale)
             push!(newpolys, np); push!(newcolors, col)
         end
     end
@@ -54,7 +53,9 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Contourf)
     ) do (polys, colors, tfunc), changed, cached
         clip = clip_strategy(tfunc)
         clip isa NoClip && return (polys, colors)
-        return _split_polys_colors(polys, colors, clip)
+        project = _projector(tfunc)
+        scale = resample_scale(project)
+        return _split_polys_colors(polys, colors, clip, project, scale)
     end
 
     child = _find_child(plot, Makie.Poly)

@@ -1,24 +1,45 @@
 #=
-# Sphere-space clipping + adaptive resampling
+# Sphere-space clipping + adaptive resampling (d3-geo port)
 
-Generic handling of projection discontinuities (antimeridian, azimuthal horizons,
-interrupted lobes, oblique square tears) the way d3-geo does it: clip geometry **on
-the sphere, before projection**, and densify each segment with **adaptive bisection**
-so projected curves are smooth. Output stays in lon/lat, so the existing GeoAxis
-pipeline (split node emits lon/lat → child plot projects per-vertex) is untouched —
-no inverse projection of data, no projected-space heuristics.
+Generic handling of projection discontinuities (antimeridian seam, azimuthal/perspective
+horizons) the way d3-geo does it: clip geometry **on the sphere, before projection**, then
+densify each piece with **adaptive bisection** so projected curves are smooth. Output stays
+in lon/lat, so the existing GeoAxis pipeline (child plot projects per-vertex) is untouched.
+
+This is a faithful port of d3-geo's *architecture*, not just its primitives:
+
+    rotate → preclip → resample → project              (d3 projection/index.js)
+
+We clip in a **rotated canonical frame** (the projection centre at [0,0], so the seam is
+at ±180° and a horizon circle is centred at the origin), exactly as d3 does, then rotate
+the result back to geographic lon/lat. The downstream Proj transform then re-applies its
+own `+lon_0`/`+lat_0` rotation, so emitting geographic coordinates is correct.
+
+A single generic clip driver ([`_clip_polygon`](@ref)/[`_clip_open`](@ref)) is parameterised
+by a [`SphereClip`](@ref) supplying *visibility*, a *line clipper*, a boundary *interpolate*,
+and a *start* seed — the same four hooks d3 feeds to `clip/index.js`. Antimeridian and circle
+share the driver and `rejoin`, so there is no projected-space surgery and no `GeometryOps`
+strip-clipping fallback.
 
 Ports of:
-- `d3-geo/src/projection/resample.js`        → [`resample_sphere`](@ref)
-- `d3-geo/src/clip/antimeridian.js`          → [`AntimeridianClip`](@ref)
-- `d3-geo/src/clip/circle.js` (visibility)   → [`CircleClip`](@ref)
+- `d3-geo/src/projection/resample.js`  → [`resample_sphere`](@ref)
+- `d3-geo/src/clip/index.js`           → [`_clip_polygon`](@ref) / [`_clip_open`](@ref)
+- `d3-geo/src/clip/rejoin.js`          → [`_rejoin`](@ref)
+- `d3-geo/src/clip/antimeridian.js`    → [`AntimeridianClip`](@ref)
+- `d3-geo/src/clip/circle.js`          → [`CircleClip`](@ref)
+- `d3-geo/src/polygonContains.js`      → [`_polygon_contains`](@ref)
+- `d3-geo/src/rotation.js`             → [`_rotation`](@ref)
 
-The discontinuity each destination transform tears along is chosen by
-[`clip_strategy`](@ref), the analog of d3's per-projection `preclip`.
+The discontinuity each destination transform tears along is chosen by [`clip_strategy`](@ref),
+the analog of d3's per-projection `preclip`.
+
+Geometry I/O goes through GeoInterface (`GI`) so the input type is irrelevant; the spherical
+math (containment, great-circle intersections, rejoin) has no GO/GI equivalent and is ported.
 =#
 
 const _D2R = π / 180
 const _R2D = 180 / π
+const _EPS = 1.0e-6             # d3 epsilon (radians)
 
 # unit cartesian of a lon/lat (degrees)
 @inline _cart(lon, lat) = (c = cos(lat * _D2R); (c * cos(lon * _D2R), c * sin(lon * _D2R), sin(lat * _D2R)))
@@ -27,24 +48,24 @@ const _R2D = 180 / π
     x, y, z = v
     (atan(y, x) * _R2D, asin(clamp(z, -1.0, 1.0)) * _R2D)
 end
+# radian versions (canonical-frame clip works in radians, like d3)
+@inline _cartr(λ, φ) = (c = cos(φ); (c * cos(λ), c * sin(λ), sin(φ)))
+@inline _sphr(v) = (atan(v[2], v[1]), asin(clamp(v[3], -1.0, 1.0)))
+
 @inline _dot3(a, b) = a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
 @inline _norm3(v) = sqrt(_dot3(v, v))
-# great-circle interpolation between unit vectors, t in [0,1]
-@inline function _slerp(a, b, t)
-    d = clamp(_dot3(a, b), -1.0, 1.0)
-    Ω = acos(d)
-    Ω < 1.0e-12 && return a
-    s = sin(Ω)
-    w0 = sin((1 - t) * Ω) / s
-    w1 = sin(t * Ω) / s
-    v = (a[1] * w0 + b[1] * w1, a[2] * w0 + b[2] * w1, a[3] * w0 + b[3] * w1)
+@inline _cross3(a, b) = (a[2] * b[3] - a[3] * b[2], a[3] * b[1] - a[1] * b[3], a[1] * b[2] - a[2] * b[1])
+@inline function _normalize3(v)
     n = _norm3(v)
-    (v[1] / n, v[2] / n, v[3] / n)
+    n < 1.0e-300 ? v : (v[1] / n, v[2] / n, v[3] / n)
 end
 
 @inline _lon(p) = @inbounds Float64(p[1])
 @inline _lat(p) = @inbounds Float64(p[2])
 @inline _isfinitexy(xy) = isfinite(xy[1]) && isfinite(xy[2])
+
+# wrap a longitude (radians) into (-π, π], d3 rotationIdentity
+@inline _wrapλ(λ) = abs(λ) > π ? λ - round(λ / 2π) * 2π : λ
 
 ############################################################
 #                  Adaptive resampler                      #
@@ -70,6 +91,11 @@ function _resample_to!(out, project, scale, v0, ll0, xy0, v1, ll1, xy1, depth)
     lon2, lat2 = _sph(vm)
     if abs(abs(vm[3]) - 1) < 1.0e-9 || abs(ll0[1] - ll1[1]) < 1.0e-9
         lon2 = (ll0[1] + ll1[1]) / 2
+    else
+        # `_sph` wraps lon into (-180,180]; the clip output may be intentionally unwrapped
+        # (e.g. a seam piece at 330°..360°), so snap the midpoint to the endpoints' branch.
+        target = (ll0[1] + ll1[1]) / 2
+        lon2 += round((target - lon2) / 360.0) * 360.0
     end
     ll2 = (lon2, lat2)
     xy2 = project(lon2, lat2)
@@ -91,10 +117,10 @@ end
     resample_sphere(sub, project; scale=1.0) -> Vector{Point2d}
 
 Adaptively densify one **break-free** lon/lat polyline `sub` (vector of point-likes,
-degrees) so that, once projected by `project((lon,lat)) -> (x,y)`, the curve is smooth.
+degrees) so that, once projected by `project(lon, lat) -> (x,y)`, the curve is smooth.
 Returns lon/lat points (the caller's transform does the projecting). Midpoints are taken
 on the sphere (great-circle); the error test is in projected space. `scale` converts
-projected units to the threshold's units (e.g. 1/map-diagonal) — see `resample_scale`.
+projected units to the threshold's units — see [`resample_scale`](@ref).
 
 Direction-symmetric: `resample_sphere(sub) == reverse(resample_sphere(reverse(sub)))`.
 """
@@ -119,7 +145,7 @@ function resample_sphere(sub, project; scale::Float64 = 1.0)
     return out
 end
 
-# A scale that makes `_DELTA2` correspond to ~a fraction of the projected map size, so
+# A scale that makes `_DELTA2` correspond to a small fraction of the projected map size, so
 # the same threshold behaves across projections with wildly different units (degrees vs
 # metres). `project` is sampled on a coarse lon/lat grid to estimate the projected span.
 function resample_scale(project)
@@ -132,216 +158,12 @@ function resample_scale(project)
     end
     span = max(umax - umin, vmax - vmin)
     (isfinite(span) && span > 0) || return 1.0
-    # target: one "unit" ≈ span/200  ⇒ scale so that distances are measured in those units
     return 200.0 / span
 end
 
 ############################################################
-#                    Clip strategies                       #
+#              Spherical point-in-polygon                  #
 ############################################################
-
-abstract type SphereClip end
-
-"No discontinuity — pass geometry through unchanged (non-Proj / `+over`)."
-struct NoClip <: SphereClip end
-
-"""
-    AntimeridianClip(lon0)
-
-Tear at the meridian `lon0 ± 180` (the periodicity seam). Port of d3
-`clip/antimeridian.js`: split a segment that crosses the antimeridian, inserting the
-exact crossing latitude on each side. `lon0` is the projection centre (`+lon_0 +pm`).
-"""
-struct AntimeridianClip <: SphereClip
-    lon0::Float64
-end
-
-"""
-    CircleClip(axis, radius; mode=:horizon)
-
-Small circle of angular `radius` (degrees) about unit cartesian `axis`. `:horizon`
-keeps only the visible side (azimuthal/perspective horizons — `ortho`/`geos`/…); `:seam`
-keeps both sides and only splits at the crossing. Visibility is the cartesian test
-`dot(cartesian(p), axis) > cos(radius)` — works at `radius = 90°` (a hemisphere), where a
-lon/lat disk polygon does not exist.
-"""
-struct CircleClip <: SphereClip
-    axis::NTuple{3,Float64}
-    cosr::Float64
-    mode::Symbol
-end
-# build a CircleClip from a centre (lon,lat) and angular radius, both in degrees
-circle_clip(center_lon, center_lat, radius_deg; mode = :horizon) =
-    CircleClip(_cart(center_lon, center_lat), cos(radius_deg * _D2R), mode)
-
-# --- antimeridian crossing latitude (d3 clipAntimeridianIntersect), radians -----
-@inline function _antimeridian_lat(λ0, φ0, λ1, φ1)
-    s = sin(λ0 - λ1)
-    abs(s) < 1.0e-12 && return (φ0 + φ1) / 2
-    cφ0 = cos(φ0); cφ1 = cos(φ1)
-    atan((sin(φ0) * cφ1 * sin(λ1) - sin(φ1) * cφ0 * sin(λ0)) / (cφ0 * cφ1 * s))
-end
-
-############################################################
-#         clip_line: split a polyline at the tear         #
-############################################################
-
-"""
-    clip_line(clip, pts) -> Vector{Vector{Point2d}}
-
-Split a lon/lat polyline `pts` into visible sub-polylines at `clip`'s discontinuity,
-inserting boundary points at each crossing. Sub-polylines are later resampled and joined
-with `NaN` breaks. `NoClip` returns the input as a single sub.
-"""
-function clip_line(::NoClip, pts)
-    sub = Point2d[Point2d(_lon(p), _lat(p)) for p in pts]
-    return Vector{Point2d}[sub]
-end
-
-function clip_line(c::AntimeridianClip, pts)
-    subs = Vector{Point2d}[]
-    cur = Point2d[]
-    n = length(pts)
-    n == 0 && return subs
-    # work in a frame shifted so the tear is at ±180, normalised into [-180,180)
-    sh(lon) = mod(lon - c.lon0 + 180.0, 360.0) - 180.0
-    λprev = sh(_lon(pts[1])); φprev = _lat(pts[1]) * _D2R
-    push!(cur, Point2d(_lon(pts[1]), _lat(pts[1])))
-    @inbounds for i in 2:n
-        λ1d = sh(_lon(pts[i])); φ1 = _lat(pts[i]) * _D2R
-        λ0 = λprev * _D2R; λ1 = λ1d * _D2R
-        sign0 = λ0 > 0 ? π : -π
-        sign1 = λ1 > 0 ? π : -π
-        Δ = abs(λ1 - λ0)
-        if sign0 != sign1 && Δ >= π            # antimeridian crossing
-            φx = _antimeridian_lat(λ0, φprev, λ1, φ1)
-            φxd = φx * _R2D
-            push!(cur, Point2d(c.lon0 + sign0 * _R2D, φxd))    # finish at this side's ±180
-            push!(subs, cur)
-            cur = Point2d[]
-            push!(cur, Point2d(c.lon0 + sign1 * _R2D, φxd))    # resume at the other side
-        end
-        push!(cur, Point2d(_lon(pts[i]), _lat(pts[i])))
-        λprev = λ1d; φprev = φ1
-    end
-    length(cur) >= 1 && push!(subs, cur)
-    return subs
-end
-
-function clip_line(c::CircleClip, pts)
-    subs = Vector{Point2d}[]
-    cur = Point2d[]
-    n = length(pts)
-    n == 0 && return subs
-    vis(p) = _dot3(_cart(_lon(p), _lat(p)), c.axis) > c.cosr
-    function crossing(a, b)                    # binary-search the great-circle crossing
-        va = _cart(_lon(a), _lat(a)); vb = _cart(_lon(b), _lat(b)); ina = vis(a)
-        lo, hi = 0.0, 1.0
-        for _ in 1:48
-            mid = (lo + hi) / 2
-            (_dot3(_slerp(va, vb, mid), c.axis) > c.cosr) == ina ? (lo = mid) : (hi = mid)
-        end
-        _sph(_slerp(va, vb, (lo + hi) / 2))
-    end
-    keep(p) = c.mode === :seam || vis(p)
-    keep(pts[1]) && push!(cur, Point2d(_lon(pts[1]), _lat(pts[1])))
-    @inbounds for i in 2:n
-        q = pts[i - 1]; p = pts[i]
-        if vis(q) == vis(p)
-            keep(p) && push!(cur, Point2d(_lon(p), _lat(p)))
-        else
-            xlon, xlat = crossing(q, p)
-            push!(cur, Point2d(xlon, xlat))                 # finish at the boundary
-            (c.mode === :seam || vis(q)) && !isempty(cur) && push!(subs, cur)
-            cur = Point2d[]
-            push!(cur, Point2d(xlon, xlat))                 # resume at the boundary
-            keep(p) && push!(cur, Point2d(_lon(p), _lat(p)))
-            if c.mode === :horizon && !vis(p)
-                length(cur) >= 2 && push!(subs, cur)
-                cur = Point2d[]
-            end
-        end
-    end
-    length(cur) >= 2 && push!(subs, cur)
-    return subs
-end
-
-"""
-    split_resample_line(pts, project, clip; scale=resample_scale(project)) -> Vector{Point2d}
-
-Full line pipeline: clip `pts` at `clip`'s discontinuity, adaptively resample each visible
-sub, and join with `NaN` breaks. Output is lon/lat (degrees) for the caller to project.
-"""
-function split_resample_line(pts, project, clip::SphereClip; scale::Float64 = NaN)
-    isnan(scale) && (scale = resample_scale(project))
-    subs = clip_line(clip, pts)
-    out = Point2d[]
-    for (k, s) in enumerate(subs)
-        length(s) < 1 && continue
-        k > 1 && !isempty(out) && push!(out, Point2d(NaN, NaN))
-        append!(out, resample_sphere(s, project; scale = scale))
-    end
-    return out
-end
-
-############################################################
-#              clip_strategy registry (per transform)      #
-############################################################
-
-# The destination transform's definition is a `+proj=pipeline +step …` string with
-# several `+proj=`/`+lon_0=` occurrences; the *destination* projection is the LAST step,
-# so parse the last match (matching the pre-existing seam-registry convention).
-# PROJ writes the pipeline definition without `+` and with a word-boundary before each
-# key (`proj=ortho lat_0=0 lon_0=0 …`), so match `\bkey=` (the `\b` stops `h=` matching
-# inside `path=`, etc.).
-function _proj_param(def::AbstractString, name; default = 0.0)
-    val = default
-    for m in eachmatch(Regex("\\b" * name * "=([-+0-9.eE]+)"), def)
-        val = parse(Float64, m.captures[1])
-    end
-    return val
-end
-function _proj_name(def::AbstractString)
-    name = ""
-    for m in eachmatch(r"\bproj=(\w+)", def)
-        m.captures[1] == "pipeline" && continue
-        name = m.captures[1]
-    end
-    return name
-end
-# +pm may be a number or a named meridian; handle the common numeric case
-_proj_pm(def::AbstractString) = _proj_param(def, "pm"; default = 0.0)
-
-############################################################
-#        Polygon (fill) clipping: d3 clip + rejoin         #
-############################################################
-
-# Signed spherical area of a lon/lat ring (steradians). ROTATION-INVARIANT — unlike a
-# planar lon/lat shoelace it is correct for antimeridian-crossing and pole-enclosing rings.
-# Its sign encodes winding; `_polygon_contains` treats a POSITIVE-area ring as enclosing
-# its bounded interior (calibrated against d3's convention), so exteriors are wound
-# positive and holes negative.
-function _ring_area_sph(r)
-    n = length(r)
-    n < 3 && return 0.0
-    a = 0.0
-    @inbounds for i in 1:n
-        p0 = r[i]; p1 = r[i == n ? 1 : i + 1]
-        dλ = (p1[1] - p0[1]) * _D2R
-        dλ = mod(dλ + π, 2π) - π
-        a += dλ * (2.0 + sin(p0[2] * _D2R) + sin(p1[2] * _D2R))
-    end
-    return a / 2
-end
-# ensure a ring is wound positive (exterior, `want_pos=true`) or negative (hole)
-_rewind(r, want_pos::Bool) = ((_ring_area_sph(r) > 0) == want_pos) ? r : reverse(r)
-
-@inline _cross3(a, b) = (a[2] * b[3] - a[3] * b[2], a[3] * b[1] - a[1] * b[3], a[1] * b[2] - a[2] * b[1])
-@inline function _normalize3(v)
-    n = _norm3(v)
-    n < 1.0e-300 ? v : (v[1] / n, v[2] / n, v[3] / n)
-end
-@inline _pointeq(a, b) = abs(a[1] - b[1]) < 1.0e-9 && abs(a[2] - b[2]) < 1.0e-9
 
 # Spherical point-in-polygon (port of d3-geo polygonContains.js). `polygon` is a vector
 # of rings, each a vector of lon/lat (degrees) points; `point` is lon/lat (degrees).
@@ -382,10 +204,339 @@ function _polygon_contains(polygon, point)
     return xor(angle < -1.0e-6 || (angle < 1.0e-6 && total < -1.0e-12), (winding & 1) == 1)
 end
 
-# --- rejoin (port of d3-geo clip/rejoin.js) ---------------------------------
+# Winding-independent containment: `_polygon_contains` follows d3-geo's convention (which is
+# winding-sensitive), so we normalise each ring to positive spherical area first. `_ring_contains`
+# is true iff `pt` (lon/lat deg) is inside the region bounded by one `ring`; `_inside_polygon`
+# combines an exterior (`rings[1]`) with holes (`rings[2:end]`).
+_ring_contains(ring, pt) = _polygon_contains([_ring_area_sph(ring) < 0 ? reverse(ring) : ring], pt)
+function _inside_polygon(rings, pt)
+    isempty(rings) && return false
+    _ring_contains(rings[1], pt) || return false
+    for i in 2:length(rings)
+        _ring_contains(rings[i], pt) && return false
+    end
+    return true
+end
+
+# Signed spherical area of a lon/lat ring (steradians). Rotation-invariant; its sign encodes
+# winding. Used for ring-nesting in [`_rings_to_polygons`](@ref) and the containment above.
+function _ring_area_sph(r)
+    n = length(r)
+    n < 3 && return 0.0
+    a = 0.0
+    @inbounds for i in 1:n
+        p0 = r[i]; p1 = r[i == n ? 1 : i + 1]
+        dλ = (p1[1] - p0[1]) * _D2R
+        dλ = mod(dλ + π, 2π) - π
+        a += dλ * (2.0 + sin(p0[2] * _D2R) + sin(p1[2] * _D2R))
+    end
+    return a / 2
+end
+
+############################################################
+#                   Clip strategies                        #
+############################################################
+
+"""
+    SphereClip
+
+A preclip strategy (d3's per-projection `preclip` analog). Concrete types supply the four
+hooks the generic clip driver needs: visibility, a line clipper, a boundary interpolate, and
+a start seed, plus a rotation mapping the projection centre to the canonical frame.
+"""
+abstract type SphereClip end
+
+"No discontinuity — pass geometry through unchanged (non-Proj / `+over`)."
+struct NoClip <: SphereClip end
+
+"""
+    AntimeridianClip(lon0)
+
+Tear at the meridian `lon0 ± 180` (the periodicity seam). Port of `clip/antimeridian.js`.
+`lon0` (degrees) is the projection centre (`+lon_0 +pm`).
+"""
+struct AntimeridianClip <: SphereClip
+    lon0::Float64
+end
+
+"""
+    CircleClip(lon0, lat0, radius)
+
+Small-circle horizon of angular `radius` (degrees) about the projection centre
+`(lon0, lat0)` (degrees). Port of `clip/circle.js`: keep only the visible side. Works at
+`radius = 90°` (a hemisphere) via the cartesian visibility test, where a lon/lat disk does
+not exist.
+"""
+struct CircleClip <: SphereClip
+    lon0::Float64
+    lat0::Float64
+    radius::Float64
+end
+
+# Internal clip-core point: (λ, φ, marker) in radians. `marker` carries d3's degeneracy
+# flags (1 = coincident-intersection nudge, 2/3 = boundary-exit markers used by rejoin).
+const _Pt = NTuple{3,Float64}
+@inline _seg_pteq(a, b) = abs(a[1] - b[1]) < _EPS && abs(a[2] - b[2]) < _EPS
+
+# --- rotation (d3 rotation.js): map projection centre → canonical [0,0] and back ----------
+# Returns (forward, invert) closures (λ,φ)->(λ,φ) in radians. The antimeridian invert does
+# NOT wrap longitude, so the two sides of a seam crossing stay on their own side once the
+# downstream Proj transform re-subtracts `+lon_0` (a wrap would collapse them and overlap).
+function _rotation(::NoClip)
+    id = (λ, φ) -> (λ, φ)
+    return id, id
+end
+function _rotation(c::AntimeridianClip)
+    dλ = -c.lon0 * _D2R
+    fwd = (λ, φ) -> (_wrapλ(λ + dλ), φ)
+    inv = (λ, φ) -> (λ - dλ, φ)                # deliberately unwrapped
+    return fwd, inv
+end
+function _rotation(c::CircleClip)
+    dλ = -c.lon0 * _D2R; dφ = -c.lat0 * _D2R
+    cφ = cos(dφ); sφ = sin(dφ)
+    # forward: rotationLambda then rotationPhiGamma (γ=0), d3 compose order
+    function fwd(λ, φ)
+        λ = _wrapλ(λ + dλ)
+        cosφ = cos(φ); x = cos(λ) * cosφ; y = sin(λ) * cosφ; z = sin(φ)
+        k = z * cφ + x * sφ
+        return (atan(y, x * cφ - z * sφ), asin(clamp(k, -1.0, 1.0)))
+    end
+    function inv(λ, φ)
+        cosφ = cos(φ); x = cos(λ) * cosφ; y = sin(λ) * cosφ; z = sin(φ)
+        λ2 = atan(y, x * cφ + z * sφ)
+        φ2 = asin(clamp(z * cφ - x * sφ, -1.0, 1.0))
+        return (λ2 - dλ, φ2)
+    end
+    return fwd, inv
+end
+
+# --- antimeridian crossing latitude (d3 clipAntimeridianIntersect), radians ---------------
+@inline function _antimeridian_lat(λ0, φ0, λ1, φ1)
+    s = sin(λ0 - λ1)
+    abs(s) < _EPS && return (φ0 + φ1) / 2
+    cφ0 = cos(φ0); cφ1 = cos(φ1)
+    atan((sin(φ0) * cφ1 * sin(λ1) - sin(φ1) * cφ0 * sin(λ0)) / (cφ0 * cφ1 * s))
+end
+
+############################################################
+#       Generic clip driver (port of clip/index.js)        #
+############################################################
+
+# Mutable buffer of line segments (d3 clip/buffer.js). A new segment starts on _lineStart!;
+# lineEnd is implicit (the next _lineStart! opens the next segment).
+mutable struct _LineSink
+    lines::Vector{Vector{_Pt}}
+end
+_LineSink() = _LineSink(Vector{_Pt}[])
+@inline _lineStart!(s::_LineSink) = (push!(s.lines, _Pt[]); nothing)
+@inline _point!(s::_LineSink, λ, φ, m = 0.0) = (push!(s.lines[end], (λ, φ, m)); nothing)
+
+# Intersections are sorted along the clip edge; the same comparator serves both antimeridian
+# and circle (d3 compareIntersection).
+@inline _ix_key(p) = p[1] < 0 ? p[2] - π / 2 - _EPS : π / 2 - p[2]
+@inline _compare_ix(a, b) = _ix_key(a) - _ix_key(b)
+
+# ---- antimeridian line clipper (d3 clipAntimeridianLine) --------------------------------
+function _antimeridian_stream(feed)
+    sink = _LineSink()
+    _lineStart!(sink)
+    λ0 = NaN; φ0 = NaN; sign0 = NaN; clean = 1
+    @inbounds for q in feed
+        λ1 = q[1]; φ1 = q[2]
+        sign1 = λ1 > 0 ? π : -π
+        δ = abs(λ1 - λ0)
+        if abs(δ - π) < _EPS                       # crosses a pole
+            φm = (φ0 + φ1) / 2 > 0 ? π / 2 : -π / 2
+            _point!(sink, λ0, φm); _point!(sink, sign0, φm)
+            _lineStart!(sink)
+            _point!(sink, sign1, φm); _point!(sink, λ1, φm)
+            φ0 = φm; clean = 0
+        elseif sign0 != sign1 && δ >= π            # crosses the antimeridian
+            abs(λ0 - sign0) < _EPS && (λ0 -= sign0 * _EPS)
+            abs(λ1 - sign1) < _EPS && (λ1 -= sign1 * _EPS)
+            φx = _antimeridian_lat(λ0, φ0, λ1, φ1)
+            _point!(sink, sign0, φx)
+            _lineStart!(sink)
+            _point!(sink, sign1, φx)
+            clean = 0
+        end
+        _point!(sink, λ1, φ1)
+        λ0 = λ1; φ0 = φ1; sign0 = sign1
+    end
+    return sink.lines, clean
+end
+
+# ---- circle line clipper (d3 clip/circle.js clipLine) -----------------------------------
+@inline function _circle_code(λ, φ, radius, smallR)
+    r = smallR ? radius : π - radius
+    code = 0
+    if λ < -r; code |= 1; elseif λ > r; code |= 2; end
+    if φ < -r; code |= 4; elseif φ > r; code |= 8; end
+    return code
+end
+
+# Intersect great circle a→b with the clip circle (cos radius = cr). `two=false` returns one
+# crossing (a `_Pt` or `nothing`); `two=true` returns the pair `((q,_), (q1,_))` or `nothing`.
+function _circle_intersect(cr, a, b, two)
+    pa = _cartr(a[1], a[2]); pb = _cartr(b[1], b[2])
+    n2 = _cross3(pa, pb)
+    n2n2 = _dot3(n2, n2)
+    n1n2 = n2[1]
+    det = n2n2 - n1n2 * n1n2
+    det == 0 && return two ? nothing : (a[1], a[2], 0.0)
+    c1 = cr * n2n2 / det
+    c2 = -cr * n1n2 / det
+    u = (0.0, -n2[3], n2[2])                       # n1 × n2, n1 = (1,0,0)
+    A = (c1 + c2 * n2[1], c2 * n2[2], c2 * n2[3])
+    w = _dot3(A, u); uu = _dot3(u, u)
+    t2 = w * w - uu * (_dot3(A, A) - 1)
+    t2 < 0 && return nothing
+    t = sqrt(t2)
+    s0 = (-w - t) / uu
+    q = (A[1] + s0 * u[1], A[2] + s0 * u[2], A[3] + s0 * u[3])
+    qλ, qφ = _sphr(q)
+    !two && return (qλ, qφ, 0.0)
+    # is the first crossing between a and b?
+    λ0 = a[1]; λ1 = b[1]; φ0 = a[2]; φ1 = b[2]
+    λ1 < λ0 && ((λ0, λ1) = (λ1, λ0))
+    δ = λ1 - λ0
+    polar = abs(δ - π) < _EPS
+    meridian = polar || δ < _EPS
+    (!polar && φ1 < φ0) && ((φ0, φ1) = (φ1, φ0))
+    cond = meridian ?
+        (polar ? xor(φ0 + φ1 > 0, qφ < (abs(qλ - λ0) < _EPS ? φ0 : φ1)) :
+                 (φ0 <= qφ <= φ1)) :
+        xor(δ > π, λ0 <= qλ <= λ1)
+    cond || return nothing
+    s1 = (-w + t) / uu
+    q1 = (A[1] + s1 * u[1], A[2] + s1 * u[2], A[3] + s1 * u[3])
+    q1λ, q1φ = _sphr(q1)
+    return ((qλ, qφ, 0.0), (q1λ, q1φ, 0.0))
+end
+
+function _circle_stream(c::CircleClip, feed)
+    cr = cos(c.radius * _D2R); smallR = cr > 0; notHemi = abs(cr) > _EPS
+    radius = acos(clamp(cr, -1.0, 1.0))
+    sink = _LineSink()
+    point0 = nothing; code0 = 0; v0 = false; v00 = false; clean = 1
+    @inline vis(λ, φ) = cos(λ) * cos(φ) > cr
+    @inbounds for q in feed
+        λ = q[1]; φ = q[2]
+        point1 = (λ, φ, 0.0)
+        v = vis(λ, φ)
+        cde = smallR ? (v ? 0 : _circle_code(λ, φ, radius, smallR)) :
+                       (v ? _circle_code(λ + (λ < 0 ? π : -π), φ, radius, smallR) : 0)
+        if point0 === nothing
+            v00 = v0 = v
+            v && _lineStart!(sink)
+        end
+        if v != v0
+            p2 = _circle_intersect(cr, point0, point1, false)
+            (p2 === nothing || _seg_pteq(point0, p2) || _seg_pteq(point1, p2)) &&
+                (point1 = (λ, φ, 1.0))
+        end
+        if v != v0
+            clean = 0
+            if v                                   # outside → in
+                _lineStart!(sink)
+                p2 = _circle_intersect(cr, point1, point0, false)
+                _point!(sink, p2[1], p2[2])
+                point0 = p2
+            else                                   # inside → out
+                p2 = _circle_intersect(cr, point0, point1, false)
+                _point!(sink, p2[1], p2[2], 2.0)
+                point0 = (p2[1], p2[2], 2.0)
+            end
+        elseif notHemi && point0 !== nothing && xor(smallR, v)
+            if (cde & code0) == 0
+                t = _circle_intersect(cr, point1, point0, true)
+                if t !== nothing
+                    clean = 0
+                    if smallR
+                        _lineStart!(sink)
+                        _point!(sink, t[1][1], t[1][2])
+                        _point!(sink, t[2][1], t[2][2])
+                    else
+                        _point!(sink, t[2][1], t[2][2])
+                        _lineStart!(sink)
+                        _point!(sink, t[1][1], t[1][2], 3.0)
+                    end
+                end
+            end
+        end
+        if v && (point0 === nothing || !_seg_pteq(point0, point1))
+            _point!(sink, point1[1], point1[2])
+        end
+        point0 = point1; v0 = v; code0 = cde
+    end
+    return sink.lines, (clean | ((v00 && v0) ? 2 : 0))
+end
+
+# ---- per-strategy hooks dispatched by the generic driver --------------------------------
+_clip_ring(c::AntimeridianClip, ring) = (lines = _antimeridian_stream(vcat(ring, [ring[1]])); (lines[1], 2 - lines[2]))
+_clip_ring(c::CircleClip, ring)       = _circle_stream(c, vcat(ring, [ring[1]]))
+
+_clip_open(c::AntimeridianClip, line) = [l for l in _antimeridian_stream(line)[1] if length(l) > 1]
+_clip_open(c::CircleClip, line)       = [l for l in _circle_stream(c, line)[1] if length(l) > 1]
+
+_start(::AntimeridianClip) = (-π, -π / 2)
+function _start(c::CircleClip)
+    radius = c.radius * _D2R
+    cos(radius) > 0 ? (0.0, -radius) : (-π, radius - π)
+end
+
+# boundary interpolate from `from` to `to` (radian `_Pt` or `nothing`), appending to `out`
+function _interpolate!(::AntimeridianClip, from, to, dir, out)
+    if from === nothing                            # whole sphere boundary
+        φ = dir * π / 2
+        for p in ((-π, φ), (0.0, φ), (π, φ), (π, 0.0), (π, -φ), (0.0, -φ), (-π, -φ), (-π, 0.0), (-π, φ))
+            push!(out, (p[1], p[2], 0.0))
+        end
+    elseif abs(from[1] - to[1]) > _EPS             # across a pole
+        λ = from[1] < to[1] ? π : -π
+        φ = dir * λ / 2
+        push!(out, (-λ, φ, 0.0)); push!(out, (0.0, φ, 0.0)); push!(out, (λ, φ, 0.0))
+    else                                           # along the antimeridian
+        push!(out, (to[1], to[2], 0.0))
+    end
+end
+function _interpolate!(c::CircleClip, from, to, dir, out)
+    radius = c.radius * _D2R
+    _circle_stream_arc!(out, radius, 2 * _D2R, dir, from, to)
+end
+
+# d3 circle.js circleStream: walk the canonical circle (centred at origin) from `t0` to `t1`
+function _circle_stream_arc!(out, radius, delta, dir, t0p, t1p)
+    delta == 0 && return
+    cosR = cos(radius); sinR = sin(radius)
+    step = dir * delta
+    if t0p === nothing
+        t0 = radius + dir * 2π
+        t1 = radius - step / 2
+    else
+        t0 = _circle_radius(cosR, t0p)
+        t1 = _circle_radius(cosR, t1p)
+        (dir > 0 ? t0 < t1 : t0 > t1) && (t0 += dir * 2π)
+    end
+    t = t0
+    while dir > 0 ? t > t1 : t < t1
+        λ, φ = _sphr((cosR, -sinR * cos(t), -sinR * sin(t)))
+        push!(out, (λ, φ, 0.0))
+        t -= step
+    end
+end
+function _circle_radius(cosR, p)
+    v = _cartr(p[1], p[2])
+    v = _normalize3((v[1] - cosR, v[2], v[3]))
+    r = acos(clamp(-v[2], -1.0, 1.0))
+    return mod((-v[3] < 0 ? -r : r) + 2π - _EPS, 2π)
+end
+
+# ---- rejoin (port of clip/rejoin.js) ----------------------------------------------------
 mutable struct _Ix
-    x::Point2d
-    z::Union{Nothing,Vector{Point2d}}
+    x::_Pt
+    z::Union{Nothing,Vector{_Pt}}
     o::Union{Nothing,_Ix}
     e::Bool
     v::Bool
@@ -404,18 +555,19 @@ function _link!(arr)
     return
 end
 
-# `interpolate!(from, to, dir, out)` appends boundary-arc points (lon/lat) to `out`;
-# `from`/`to` are `Point2d` or `nothing` (whole boundary). `compare(a,b)` orders the
-# clip intersections along the boundary. Returns closed rings (Vector{Point2d}).
 function _rejoin(segments, compare, start_inside, interpolate!)
-    rings = Vector{Point2d}[]
+    rings = Vector{_Pt}[]
     subject = _Ix[]; clip = _Ix[]
     for seg in segments
         (length(seg) - 1) <= 0 && continue
         p0 = seg[1]; p1 = seg[end]
-        if _pointeq(p0, p1)                      # closed, no intersections
-            push!(rings, seg[1:end-1])
-            continue
+        if _seg_pteq(p0, p1)
+            if p0[3] == 0.0 && p1[3] == 0.0       # closed ring, no intersections
+                push!(rings, seg[1:end-1])
+                continue
+            end
+            p1 = (p1[1] + 2 * _EPS, p1[2], p1[3])  # nudge degenerate
+            seg = vcat(seg[1:end-1], [p1])
         end
         a = _Ix(p0, seg, nothing, true);  ao = _Ix(p0, nothing, a, false); a.o = ao
         b = _Ix(p1, seg, nothing, false); bo = _Ix(p1, nothing, b, true);  b.o = bo
@@ -435,7 +587,7 @@ function _rejoin(segments, compare, start_inside, interpolate!)
             current = current.n
             current === start && return rings
         end
-        ring = Point2d[]
+        ring = _Pt[]
         is_subject = true
         while true
             current.v = true; current.o.v = true
@@ -465,256 +617,55 @@ function _rejoin(segments, compare, start_inside, interpolate!)
     return rings
 end
 
-# rotation closures mapping the cap `axis` to/from the north pole (deg → deg)
-function _pole_rot(axis)
-    α = atan(axis[2], axis[1]); β = asin(clamp(axis[3], -1.0, 1.0))
-    cα, sα = cos(α), sin(α); cβ, sβ = cos(β - π / 2), sin(β - π / 2)
-    function to(lon, lat)            # Rz(-α) then Ry(β-90)
-        v = _cart(lon, lat)
-        x = v[1] * cα + v[2] * sα; y = -v[1] * sα + v[2] * cα; z = v[3]
-        _sph((x * cβ + z * sβ, y, -x * sβ + z * cβ))
-    end
-    cβ2, sβ2 = cos(π / 2 - β), sin(π / 2 - β)
-    function from(lon, lat)          # Ry(90-β) then Rz(α)
-        v = _cart(lon, lat)
-        x = v[1] * cβ2 + v[3] * sβ2; y = v[2]; z = -v[1] * sβ2 + v[3] * cβ2
-        _sph((x * cα - y * sα, x * sα + y * cα, z))
-    end
-    return to, from
-end
-
-# densify a ring on the great circle so no edge exceeds `dl` degrees
-function _densify_ring_sphere(ring, dl)
-    out = Point2d[]
-    n = length(ring)
-    n == 0 && return out
-    for i in 1:n
-        a = ring[i]; b = ring[i == n ? 1 : i + 1]
-        va = _cart(a[1], a[2]); vb = _cart(b[1], b[2])
-        ω = acos(clamp(_dot3(va, vb), -1.0, 1.0)) * _R2D
-        push!(out, Point2d(a[1], a[2]))
-        nseg = max(1, ceil(Int, ω / dl))
-        for k in 1:(nseg-1)
-            l, t = _sph(_slerp(va, vb, k / nseg))
-            push!(out, Point2d(l, t))
-        end
-    end
-    return out
-end
-
-# clip a (densified) ring against the parallel lat=`latb` in the pole frame:
-# keep lat>latb. Returns (segments, clean) à la d3 ringEnd.
-function _clip_ring_parallel(ring, latb)
-    n = length(ring)
-    n == 0 && return (Vector{Vector{Point2d}}[], 1)
-    vis(p) = p[2] > latb
-    function cross(a, b)            # latitude crossing along the edge (linear in lat is fine post-densify)
-        t = (latb - a[2]) / (b[2] - a[2])
-        t = clamp(t, 0.0, 1.0)
-        Point2d(a[1] + t * (b[1] - a[1]), latb)
-    end
-    segs = Vector{Point2d}[]
-    cur = Point2d[]
-    clean = 1
-    v0 = vis(ring[1])
-    vfirst = v0
-    v0 && push!(cur, Point2d(ring[1][1], ring[1][2]))
-    @inbounds for i in 2:(n+1)
-        p = ring[i == n + 1 ? 1 : i]
-        q = ring[i - 1]
-        v = vis(p)
-        if v != v0
-            clean = 0
-            x = cross(q, p)
-            if v   # entering
-                push!(cur, x)            # start point at boundary (cur should be empty)
-            else   # exiting
-                push!(cur, x)
-                push!(segs, cur); cur = Point2d[]
-            end
-        end
-        v && i <= n && push!(cur, Point2d(p[1], p[2]))
-        v0 = v
-    end
-    !isempty(cur) && push!(segs, cur)
-    # whole ring visible (no crossings)
-    clean == 1 && return (vfirst ? Vector{Point2d}[ring isa Vector{Point2d} ? ring : Point2d[Point2d(p[1],p[2]) for p in ring]] : Vector{Point2d}[], 1)
-    # rejoin first & last if both ends visible (d3 clean&2)
-    if length(segs) > 1 && vfirst && vis(ring[n])
-        last = pop!(segs); first = popfirst!(segs)
-        pushfirst!(segs, vcat(last, first))
-        clean = 2
-    end
-    return (segs, clean)
-end
-
-# Clip the rings of ONE polygon (exterior + holes) against `c` on the sphere.
-# Returns a vector of closed lon/lat rings (exteriors and holes mixed, oriented).
-function clip_fill(c::CircleClip, rings; dl = 1.0)
-    to, from = _pole_rot(c.axis)
-    latb = 90.0 - acosd(clamp(c.cosr, -1.0, 1.0))   # boundary colatitude
-    # transform rings to pole frame + densify, then rewind to d3's winding convention
-    # (exterior = positive spherical area, holes = negative) so containment/rejoin are correct
-    pframe = [ _densify_ring_sphere([Point2d(to(p[1], p[2])...) for p in r], dl) for r in rings ]
-    @inbounds for i in eachindex(pframe)
-        pframe[i] = _rewind(pframe[i], i == 1)
-    end
-    segments = Vector{Point2d}[]
-    whole = Vector{Point2d}[]
-    for r in pframe
-        segs, clean = _clip_ring_parallel(r, latb)
-        if clean == 1
-            isempty(segs) || append!(whole, segs)   # wholly visible ring
-        else
-            append!(segments, segs)
-        end
-    end
-    # interpolate along the boundary parallel from `f` to `t`
-    function interp!(f, t, dir, out)
-        if f === nothing
-            for lon in (dir > 0 ? (-180.0:5.0:180.0) : (180.0:-5.0:-180.0))
-                push!(out, Point2d(lon, latb))
-            end
-            return
-        end
-        l0 = f[1]; l1 = t[1]
-        d = l1 - l0
-        d = mod(d + 180.0, 360.0) - 180.0          # shortest signed lon delta
-        nseg = max(1, ceil(Int, abs(d) / 5.0))
-        for k in 1:nseg
-            push!(out, Point2d(l0 + d * k / nseg, latb))
-        end
-    end
-    compare(a, b) = a[1] - b[1]                      # sort intersections by longitude
-    out_rings = whole
-    if !isempty(segments)
-        start_inside = !_polygon_contains(pframe, Point2d(0.0, -90.0))   # south pole = invisible centre
-        append!(out_rings, _rejoin(segments, compare, start_inside, interp!))
-    end
-    # back to lon/lat
-    return [ Point2d[Point2d(from(p[1], p[2])...) for p in r] for r in out_rings ]
-end
-
-# Cut a ring at the antimeridian (tear at ±180 in the lon0-shifted frame); all points
-# stay visible — we only split. Returns (segments, clean) à la d3 clipAntimeridianLine.
-function _clip_ring_antimeridian(ring)
-    n = length(ring)
-    n == 0 && return (Vector{Point2d}[], 1)
-    if n > 1 && _pointeq(ring[1], ring[n])           # drop duplicate closing vertex
-        ring = ring[1:n-1]; n -= 1
-    end
-    segs = Vector{Point2d}[]
-    cur = Point2d[]
-    clean = 1
-    λ0 = ring[1][1]; φ0 = ring[1][2]
-    sign0 = λ0 > 0 ? 180.0 : -180.0
-    push!(cur, Point2d(λ0, φ0))
-    @inbounds for i in 2:(n+1)
-        p = ring[i == n + 1 ? 1 : i]
-        λ1 = p[1]; φ1 = p[2]
-        sign1 = λ1 > 0 ? 180.0 : -180.0
-        Δ = abs(λ1 - λ0)
-        if abs(Δ - 180.0) < 1.0e-9                    # segment crosses a pole
-            φm = (φ0 + φ1) / 2 > 0 ? 90.0 : -90.0
-            push!(cur, Point2d(λ0, φm)); push!(cur, Point2d(sign0, φm))
-            push!(segs, cur); cur = Point2d[]
-            push!(cur, Point2d(sign1, φm)); push!(cur, Point2d(λ1, φm))
-            clean = 0
-        elseif sign0 != sign1 && Δ >= 180.0           # segment crosses the antimeridian
-            φx = _antimeridian_lat(λ0 * _D2R, φ0 * _D2R, λ1 * _D2R, φ1 * _D2R) * _R2D
-            push!(cur, Point2d(sign0, φx))
-            push!(segs, cur); cur = Point2d[]
-            push!(cur, Point2d(sign1, φx))
-            clean = 0
-        end
-        i <= n && push!(cur, Point2d(λ1, φ1))
-        λ0 = λ1; φ0 = φ1; sign0 = sign1
-    end
-    !isempty(cur) && push!(segs, cur)
-    clean == 1 && return (Vector{Point2d}[copy(ring)], 1)
-    if length(segs) > 1                               # closed ring ⇒ rejoin first & last
-        lastseg = pop!(segs); firstseg = popfirst!(segs)
-        pushfirst!(segs, vcat(lastseg, firstseg))
-    end
-    return (segs, 0)
-end
-
-# build a GeometryBasics polygon (exterior + holes) from a vector of lon/lat rings
-function _gb_poly(rings)
-    ext = Point2f[Point2f(p[1], p[2]) for p in rings[1]]
-    length(rings) == 1 && return GeometryBasics.Polygon(ext)
-    return GeometryBasics.Polygon(ext, [Point2f[Point2f(q[1], q[2]) for q in rings[i]] for i in 2:length(rings)])
-end
-# extract exterior + interior rings of a GB polygon as Vector{Vector{Point2d}}
-function _gb_rings(gp)
-    out = Vector{Point2d}[Point2d[Point2d(p[1], p[2]) for p in GeometryBasics.coordinates(gp.exterior)]]
-    for h in gp.interiors
-        push!(out, Point2d[Point2d(p[1], p[2]) for p in GeometryBasics.coordinates(h)])
-    end
-    return out
-end
-
-# Antimeridian fill: clip the polygon against the 360°-wide longitude window
-# `[lon0-180, lon0+180]` (and the translated copies a wrapped/unwrapped ring spans) with
-# `GeometryOps.intersection`, translating each piece back into the window. A meridian strip
-# is a valid lon/lat rectangle, so this is robust for pole-enclosing polygons (Antarctica)
-# and seam-crossing ones (Greenland) — no over-the-pole `interpolate` smear. Result is
-# geometrically identical to d3's antimeridian split.
-function clip_fill(c::AntimeridianClip, rings; dl = 1.0)
-    lo = minimum(p[1] for r in rings for p in r)
-    hi = maximum(p[1] for r in rings for p in r)
-    if c.lon0 - 180.0 - 1.0e-6 <= lo && hi <= c.lon0 + 180.0 + 1.0e-6
-        return [ Point2d[Point2d(p[1], p[2]) for p in r] for r in rings ]   # already inside the window
-    end
-    subj = _gb_poly(rings)
-    kmin = floor(Int, (lo - (c.lon0 - 180.0)) / 360.0)
-    kmax = floor(Int, (hi - (c.lon0 - 180.0)) / 360.0)
-    out = Vector{Point2d}[]
-    for k in kmin:kmax
-        xlo = c.lon0 - 180.0 + 360.0 * k
-        xhi = c.lon0 + 180.0 + 360.0 * k
-        rect = GeometryBasics.Polygon(Point2f[Point2f(xlo, -90), Point2f(xhi, -90),
-                                              Point2f(xhi, 90), Point2f(xlo, 90), Point2f(xlo, -90)])
-        pieces = try
-            GO.intersection(subj, rect; target = GI.PolygonTrait())
-        catch
+# Clip ONE polygon's rings (canonical-frame radian `_Pt`, exterior first) → closed rings.
+# Port of clip/index.js polygonStart/ringEnd/polygonEnd.
+function _clip_polygon(c::SphereClip, rings_rad)
+    segments = Vector{_Pt}[]
+    out = Vector{_Pt}[]
+    for ring in rings_rad
+        length(ring) < 2 && continue
+        segs, clean = _clip_ring(c, ring)
+        isempty(segs) && continue
+        if (clean & 1) != 0                        # no intersections: wholly visible ring
+            length(segs[1]) > 1 && push!(out, segs[1])
             continue
         end
-        for gp in pieces, r in _gb_rings(gp)
-            length(r) >= 4 && push!(out, Point2d[Point2d(p[1] - 360.0 * k, p[2]) for p in r])
+        if length(segs) > 1 && (clean & 2) != 0    # rejoin first & last segment
+            segs = vcat([vcat(segs[end], segs[1])], segs[2:end-1])
         end
+        for s in segs
+            length(s) > 1 && push!(segments, s)
+        end
+    end
+    poly_deg = [[(_R2D * p[1], _R2D * p[2]) for p in ring] for ring in rings_rad]
+    st = _start(c); st_deg = (_R2D * st[1], _R2D * st[2])
+    if !isempty(segments)
+        start_inside = _inside_polygon(poly_deg, st_deg)
+        append!(out, _rejoin(segments, _compare_ix, start_inside, (f, t, d, o) -> _interpolate!(c, f, t, d, o)))
+    elseif isempty(out) && !isempty(rings_rad) && _inside_polygon(poly_deg, st_deg)
+        r = _Pt[]                                  # clip region entirely inside polygon ⇒ fill it
+        _interpolate!(c, nothing, nothing, 1, r)
+        push!(r, r[1])
+        push!(out, r)
     end
     return out
 end
 
-clip_fill(::NoClip, rings; kw...) = [ Point2d[Point2d(p[1], p[2]) for p in r] for r in rings ]
-
 ############################################################
-#     Rings → polygons, and the split_geometry frontend    #
+#        Rings → polygons (nesting for Makie holes)        #
 ############################################################
 
-_collect_polys(p::GeometryBasics.Polygon) = GeometryBasics.Polygon[p]
-_collect_polys(mp::GeometryBasics.MultiPolygon) = GeometryBasics.Polygon[p for p in mp.polygons]
-_collect_polys(v) = isempty(v) ? GeometryBasics.Polygon[] : reduce(vcat, (_collect_polys(g) for g in v))
-
-# rings of one GB polygon (exterior first, then holes) as Vector{Vector{Point2d}}
-function _poly_rings(poly::GeometryBasics.Polygon)
-    rings = Vector{Point2d}[]
-    push!(rings, Point2d[Point2d(p[1], p[2]) for p in GeometryBasics.coordinates(poly.exterior)])
-    for h in poly.interiors
-        push!(rings, Point2d[Point2d(p[1], p[2]) for p in GeometryBasics.coordinates(h)])
-    end
-    return rings
-end
-
-_shoelace(r) = (s = 0.0; n = length(r); @inbounds for i in 1:n
+# planar shoelace area and even-odd point-in-ring (on PROJECTED coordinates)
+function _planar_area(r)
+    s = 0.0; n = length(r)
+    @inbounds for i in 1:n
         j = i == n ? 1 : i + 1
         s += r[i][1] * r[j][2] - r[j][1] * r[i][2]
-    end; s / 2)
-
+    end
+    return s / 2
+end
 function _point_in_ring(pt, r)
-    x = pt[1]; y = pt[2]; inside = false; n = length(r)
-    j = n
+    x = pt[1]; y = pt[2]; inside = false; n = length(r); j = n
     @inbounds for i in 1:n
         yi = r[i][2]; yj = r[j][2]
         if (yi > y) != (yj > y)
@@ -726,26 +677,33 @@ function _point_in_ring(pt, r)
     return inside
 end
 
-# Assemble clipped rings into GB polygons by CONTAINMENT NESTING — robust to the
-# inconsistent winding the rejoin can emit. A ring's nesting depth (how many other rings
-# contain it) decides exterior (even depth) vs hole (odd); each hole attaches to its
-# immediate (smallest-area) containing exterior. Containment uses the spherical
-# `_polygon_contains` on positive-normalised rings, so it is correct across the
-# antimeridian and near the poles (planar tests are not).
-function _rings_to_polygons(rings)
+# Assemble clipped rings into GB polygons by CONTAINMENT NESTING (d3's even-odd fill has no
+# explicit holes; Makie's `Polygon` needs them). A ring's depth (how many rings contain it)
+# decides exterior (even) vs hole (odd); each hole attaches to its smallest containing
+# exterior. Nesting is decided in PROJECTED space — where seam pieces (adjacent on the sphere
+# but at opposite map edges) are genuinely separate and holes nest as the renderer sees them.
+# Output geometry stays lon/lat (the GeoAxis transform re-projects it).
+function _rings_to_polygons(rings, project)
     valid = [r for r in rings if length(r) >= 4]
     isempty(valid) && return GeometryBasics.Polygon{2,Float32}[]
     n = length(valid)
-    areas = [abs(_ring_area_sph(r)) for r in valid]
-    norm = [_ring_area_sph(valid[i]) < 0 ? reverse(valid[i]) : valid[i] for i in 1:n]
+    proj = [[project(p[1], p[2]) for p in r] for r in valid]
+    # a finite representative vertex per ring (rings are visible ⇒ finite, but guard anyway)
+    rep = Vector{NTuple{2,Float64}}(undef, n)
+    keep = trues(n)
+    for i in 1:n
+        k = findfirst(_isfinitexy, proj[i])
+        k === nothing ? (keep[i] = false) : (rep[i] = (proj[i][k][1], proj[i][k][2]))
+    end
+    areas = [keep[i] ? abs(_planar_area([q for q in proj[i] if _isfinitexy(q)])) : 0.0 for i in 1:n]
     contains = falses(n, n)              # contains[j,i] = ring j encloses ring i
     @inbounds for i in 1:n, j in 1:n
-        i == j && continue
-        contains[j, i] = _polygon_contains([norm[j]], valid[i][1])
+        (i == j || !keep[i] || !keep[j]) && continue
+        contains[j, i] = _point_in_ring(rep[i], proj[j])
     end
     depth = [count(j -> contains[j, i], 1:n) for i in 1:n]
-    ext_idx = [i for i in 1:n if iseven(depth[i])]
-    hole_idx = [i for i in 1:n if isodd(depth[i])]
+    ext_idx = [i for i in 1:n if keep[i] && iseven(depth[i])]
+    hole_idx = [i for i in 1:n if keep[i] && isodd(depth[i])]
     assigned = Dict(i => Vector{Vector{Point2d}}() for i in ext_idx)
     for h in hole_idx
         best = 0; bestarea = Inf
@@ -769,21 +727,79 @@ function _rings_to_polygons(rings)
     return polys
 end
 
+############################################################
+#         Geometry I/O (via GeoInterface) + frontends      #
+############################################################
+
+# rings of one polygon (exterior first, then holes) as Vector{Vector{Point2d}}, via GI so any
+# GI-compatible geometry works (and we never touch concrete `.exterior`/`.interiors` fields).
+function _poly_rings(poly)
+    rings = Vector{Point2d}[]
+    ext = GI.getexterior(poly)
+    push!(rings, Point2d[Point2d(GI.x(p), GI.y(p)) for p in GI.getpoint(ext)])
+    for i in 1:GI.nhole(poly)
+        h = GI.gethole(poly, i)
+        push!(rings, Point2d[Point2d(GI.x(p), GI.y(p)) for p in GI.getpoint(h)])
+    end
+    return rings
+end
+
+_collect_polys(p::GeometryBasics.Polygon) = GeometryBasics.Polygon[p]
+_collect_polys(mp::GeometryBasics.MultiPolygon) = GeometryBasics.Polygon[p for p in mp.polygons]
+_collect_polys(v) = isempty(v) ? GeometryBasics.Polygon[] : reduce(vcat, (_collect_polys(g) for g in v))
+
+# project closure for the resampler / scale, from a Proj transform (lon,lat) -> (x,y)
+_projector(t) = (lon, lat) -> (p = t(lon, lat); (Float64(p[1]), Float64(p[2])))
+
+# Seam boundary vertices land at exactly rotated ±π. PROJ's longitude range is half-open, so
+# the +π side (e.g. lon 360°) wraps to the *opposite* map edge (x = −180 instead of +180),
+# smearing the piece across. Pull such vertices a hair inside the range so each lands on its
+# own edge. (Only meaningful for the antimeridian seam; the circle horizon is elsewhere.)
+const _SEAM_NUDGE = 1.0e-9
+@inline function _unrotate(inv, λ, φ, seam)
+    seam && abs(abs(λ) - π) < 1.0e-6 && (λ = sign(λ) * (π - _SEAM_NUDGE))
+    ll = inv(λ, φ)
+    return (ll[1] * _R2D, ll[2] * _R2D)
+end
+
+# Clip one polygon (given as lon/lat rings, exterior first) at `clip`, resample each piece,
+# and assemble into GB polygons. The full d3 pipeline for fills.
+function _split_polygon(clip::SphereClip, rings_deg, project, scale)
+    clip isa NoClip && return _rings_to_polygons(rings_deg, project)
+    fwd, inv = _rotation(clip)
+    seam = clip isa AntimeridianClip
+    rings_rad = [[(q = fwd(p[1] * _D2R, p[2] * _D2R); (q[1], q[2], 0.0)) for p in r] for r in rings_deg]
+    clipped = _clip_polygon(clip, rings_rad)
+    isempty(clipped) && return GeometryBasics.Polygon{2,Float32}[]
+    out_deg = Vector{Point2d}[]
+    for r in clipped
+        rd = Point2d[]
+        for q in r
+            lon, lat = _unrotate(inv, q[1], q[2], seam)
+            push!(rd, Point2d(lon, lat))
+        end
+        isempty(rd) && continue
+        rd[end] != rd[1] && push!(rd, rd[1])                  # close
+        push!(out_deg, resample_sphere(rd, project; scale = scale))
+    end
+    return _rings_to_polygons(out_deg, project)
+end
+
 """
     split_geometry(geom, t::Proj.Transformation) -> Vector{Polygon}
     split_geometry(geom, dest::AbstractString)    -> Vector{Polygon}
 
 Split polygonal `geom` at the destination transform's projection discontinuity (on the
-sphere, via [`clip_strategy`](@ref)/[`clip_fill`](@ref)), returning lon/lat polygons ready
+sphere, via [`clip_strategy`](@ref)), adaptively resample, and return lon/lat polygons ready
 to `poly!` onto a matching `GeoAxis` without smearing across the tear.
 """
 function split_geometry(geom, t::Proj.Transformation)
     clip = clip_strategy(t)
+    project = _projector(t)
+    scale = resample_scale(project)
     out = GeometryBasics.Polygon{2,Float32}[]
     for p in _collect_polys(geom)
-        clipped = clip_fill(clip, _poly_rings(p))
-        densified = [ _densify_ring_sphere(r, 1.0) for r in clipped ]
-        append!(out, _rings_to_polygons(densified))
+        append!(out, _split_polygon(clip, _poly_rings(p), project, scale))
     end
     return out
 end
@@ -791,12 +807,60 @@ split_geometry(geom, dest::AbstractString) =
     split_geometry(geom, create_transform(dest, "+proj=longlat +datum=WGS84"))
 
 """
+    split_resample_line(pts, t::Proj.Transformation; scale=auto) -> Vector{Point2d}
+
+Clip an open lon/lat polyline `pts` at `t`'s discontinuity, adaptively resample each visible
+sub-line, and join with `NaN` breaks. Output is lon/lat for the caller's transform to project.
+"""
+function split_resample_line(pts, t::Proj.Transformation; scale::Float64 = NaN)
+    clip = clip_strategy(t)
+    project = _projector(t)
+    isnan(scale) && (scale = resample_scale(project))
+    clip isa NoClip &&
+        return resample_sphere(Point2d[Point2d(_lon(p), _lat(p)) for p in pts], project; scale = scale)
+    fwd, inv = _rotation(clip)
+    seam = clip isa AntimeridianClip
+    line_rad = [(q = fwd(_lon(p) * _D2R, _lat(p) * _D2R); (q[1], q[2], 0.0)) for p in pts]
+    out = Point2d[]
+    for (k, s) in enumerate(_clip_open(clip, line_rad))
+        isempty(s) && continue
+        sd = [Point2d(_unrotate(inv, q[1], q[2], seam)...) for q in s]
+        k > 1 && !isempty(out) && push!(out, Point2d(NaN, NaN))
+        append!(out, resample_sphere(sd, project; scale = scale))
+    end
+    return out
+end
+
+############################################################
+#        clip_strategy registry (per-transform preclip)    #
+############################################################
+
+# The destination transform's definition is a `+proj=pipeline +step …` string; the
+# *destination* projection is the LAST step, so the last `proj=`/`lon_0=`/… match wins. PROJ
+# writes keys without `+` and with a word boundary, so match `\bkey=`.
+function _proj_param(def::AbstractString, name; default = 0.0)
+    val = default
+    for m in eachmatch(Regex("\\b" * name * "=([-+0-9.eE]+)"), def)
+        val = parse(Float64, m.captures[1])
+    end
+    return val
+end
+function _proj_name(def::AbstractString)
+    name = ""
+    for m in eachmatch(r"\bproj=(\w+)", def)
+        m.captures[1] == "pipeline" && continue
+        name = m.captures[1]
+    end
+    return name
+end
+_proj_pm(def::AbstractString) = _proj_param(def, "pm"; default = 0.0)
+
+"""
     clip_strategy(t) -> SphereClip
 
-The discontinuity a destination transform `t` tears geometry along, as a sphere clip
-(d3's per-projection `preclip` analog). `NoClip` for a non-`Proj` transform or `+over`.
-Antimeridian by default; a `CircleClip` for azimuthal/perspective horizons. (Interrupted
-and oblique-square boundaries are added in later phases as `PolygonClip`.)
+The discontinuity a destination transform `t` tears geometry along, as a [`SphereClip`](@ref)
+(d3's per-projection `preclip` analog). `NoClip` for a non-`Proj` transform or `+over`;
+`CircleClip` for azimuthal/perspective horizons; `AntimeridianClip` otherwise.
 """
 function clip_strategy(t::Proj.Transformation)
     info = Proj.proj_pj_info(t.pj)
@@ -807,12 +871,12 @@ function clip_strategy(t::Proj.Transformation)
     lon0 = _proj_param(def, "lon_0") + _proj_pm(def)
     lat0 = _proj_param(def, "lat_0")
     if name in ("ortho", "airy", "adams_hemi")
-        return circle_clip(lon0, lat0, 89.5; mode = :horizon)
+        return CircleClip(lon0, lat0, 89.5)
     elseif name in ("geos", "nsper", "tpers")
         R = 6378137.0
         h = _proj_param(def, "h"; default = 35786000.0)
         ρ = h > 0 ? acosd(R / (R + h)) : 89.5
-        return circle_clip(lon0, lat0, max(ρ - 0.5, 1.0); mode = :horizon)
+        return CircleClip(lon0, lat0, max(ρ - 0.5, 1.0))
     end
     return AntimeridianClip(lon0)
 end
