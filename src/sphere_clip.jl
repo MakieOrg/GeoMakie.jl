@@ -443,6 +443,14 @@ const _IGH_LOBES = (
     (((-180.0, 0.0), (-160.0, -90.0), (-100.0, 0.0)), ((-100.0, 0.0), (-60.0, -90.0), (-20.0, 0.0)),
      ((-20.0, 0.0), (20.0, -90.0), (80.0, 0.0)), ((80.0, 0.0), (140.0, -90.0), (180.0, 0.0))),
 )
+# Oceanic Goode (PROJ igh_o): N split at lon −90/60, S split at −60/90; central meridians from
+# igh_o.cpp's zone setup (N: −140/−10/130, S: −110/20/150).
+const _IGH_O_LOBES = (
+    (((-180.0, 0.0), (-140.0, 90.0), (-90.0, 0.0)), ((-90.0, 0.0), (-10.0, 90.0), (60.0, 0.0)),
+     ((60.0, 0.0), (130.0, 90.0), (180.0, 0.0))),
+    (((-180.0, 0.0), (-110.0, -90.0), (-60.0, 0.0)), ((-60.0, 0.0), (20.0, -90.0), (90.0, 0.0)),
+     ((90.0, 0.0), (150.0, -90.0), (180.0, 0.0))),
+)
 function _geo_interp(a, b, s)
     va = _cartr(a[1] * _D2R, a[2] * _D2R); vb = _cartr(b[1] * _D2R, b[2] * _D2R)
     d = clamp(_dot3(va, vb), -1.0, 1.0); Ω = acos(d)
@@ -1471,7 +1479,8 @@ function clip_strategy(t::Proj.Transformation)
         bnd = get!(() -> _interrupted_boundary(_IGH_LOBES, lon0), _BOUNDARY_CACHE, def)
         return PolygonClip(bnd)
     elseif name == "igh_o"
-        return ProjectedClip()        # oceanic lobes differ; projected-jump lines for now
+        bnd = get!(() -> _interrupted_boundary(_IGH_O_LOBES, lon0), _BOUNDARY_CACHE, def)
+        return PolygonClip(bnd)
     end
     return AntimeridianClip(lon0)
 end
