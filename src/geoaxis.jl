@@ -595,15 +595,33 @@ function Makie.initialize_block!(axis::GeoAxis)
 
         spines = spines_obs[]
         foreach(empty!, [spines.left, spines.right, spines.bottom, spines.top])
+
+        # Grid line geometry goes through the same sphere-clip dispatch as everything else, so
+        # meridians/parallels break at the projection's discontinuity instead of smearing across
+        # it (antimeridian uses the centred frame, Option B). project_tick_points! is still used
+        # for the spine/tick-label anchors at the limit-rect edges.
+        clip = clip_strategy(trans)
+        rotated = clip isa AntimeridianClip
+        gridproj = _projector(rotated ?
+            create_transform(_centred_dest(to_value(axis.dest)), "+proj=longlat +datum=WGS84") : trans)
+        gridscale = resample_scale(gridproj)
+        function _gridline!(out, pts)
+            for p in split_resample_line(pts, trans; project = gridproj, scale = gridscale, rotated = rotated)
+                push!(out, isnan(p[1]) ? Point2d(NaN, NaN) : Point2d(gridproj(p[1], p[2])...))
+            end
+            push!(out, Point2d(NaN, NaN))
+        end
+
         for lon in xticks
             range = LinRange(yticks[1], yticks[end], 100)
-            project_tick_points!(lon_transformed, trans, trans_inverse, range, lon, 1, limit_rect, spines.bottom, spines.top)
+            project_tick_points!(Point2d[], trans, trans_inverse, range, lon, 1, limit_rect, spines.bottom, spines.top)
+            _gridline!(lon_transformed, Point2d[Point2d(lon, lat) for lat in range])
         end
 
         for lat in yticks
             range = LinRange(xticks[1], xticks[end], 100)
-            project_tick_points!(lat_transformed, trans, trans_inverse, range, lat, 2, limit_rect,
-                                 spines.left, spines.right)
+            project_tick_points!(Point2d[], trans, trans_inverse, range, lat, 2, limit_rect, spines.left, spines.right)
+            _gridline!(lat_transformed, Point2d[Point2d(lon, lat) for lon in range])
         end
         lonticks_line_obs[] = lon_transformed
         latticks_line_obs[] = lat_transformed
