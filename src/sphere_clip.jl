@@ -40,6 +40,7 @@ math (containment, great-circle intersections, rejoin) has no GO/GI equivalent a
 const _D2R = π / 180
 const _R2D = 180 / π
 const _EPS = 1.0e-6             # d3 epsilon (radians)
+const _EPS2 = 1.0e-12           # d3 epsilon2 (squared tolerance for exact-point tests)
 
 # unit cartesian of a lon/lat (degrees)
 @inline _cart(lon, lat) = (c = cos(lat * _D2R); (c * cos(lon * _D2R), c * sin(lon * _D2R), sin(lat * _D2R)))
@@ -60,7 +61,7 @@ end
     n < 1.0e-300 ? v : (v[1] / n, v[2] / n, v[3] / n)
 end
 
-@inline _cart_eq(a, b) = abs(a[1] - b[1]) < _EPS && abs(a[2] - b[2]) < _EPS && abs(a[3] - b[3]) < _EPS
+@inline _cart_eq(a, b) = abs(a[1] - b[1]) < _EPS2 && abs(a[2] - b[2]) < _EPS2 && abs(a[3] - b[3]) < _EPS2
 
 # Great-circle segment intersection (port of d3-geo-polygon intersect.js). `_IxSeg` precomputes
 # the edge normals; `_gc_intersect` returns the intersection unit vector of two segments (or
@@ -83,7 +84,12 @@ function _gc_intersect(a::_IxSeg, b::_IxSeg)
     lc = (a.l + b.l < π) ? cos(a.l + b.l) - _EPS : -1.0
     (_dot3(a.from, b.from) < lc || _dot3(a.from, b.to) < lc ||
      _dot3(a.to, b.from) < lc || _dot3(a.to, b.to) < lc) && return nothing
-    axb = _normalize3(_cross3(a.normal, b.normal))
+    cx = _cross3(a.normal, b.normal)
+    # degenerate (zero-length segment → zero normal, or parallel great circles): d3's
+    # cartesianNormalize yields NaN here, which fails the on-arc comparisons → no intersection.
+    # `_normalize3` instead returns the zero vector, which would spuriously pass `0≥0 && 0≤0`.
+    _norm3(cx) < _EPS2 && return nothing
+    axb = _normalize3(cx)
     a0 = _dot3(axb, a.fromNormal); a1 = _dot3(axb, a.toNormal)
     b0 = _dot3(axb, b.fromNormal); b1 = _dot3(axb, b.toNormal)
     (a0 >= 0 && a1 <= 0 && b0 >= 0 && b1 <= 0) && return axb
@@ -415,7 +421,7 @@ function _oblique_boundary(t)
     rmax = 1.25 * max(maximum(abs.(xs .- cx)), maximum(abs.(ys .- cy)))
     R = 1 - 1.0e-6
     ring = Point2d[]
-    for θ in range(0, 2π; length = 721)
+    for θ in range(0, 2π; length = 1441)
         lo, hi = 0.0, rmax
         for _ in 1:44
             m = (lo + hi) / 2
@@ -460,7 +466,21 @@ function _interrupted_boundary(lobes, lon0)
         append!(poly, pts)
     end
     push!(poly, poly[1])
-    return Vector{Point2d}[poly]
+    # Densify each lobe edge with great-circle points so the clipped fills and the spine trace
+    # smooth pole-to-equator arcs (the raw lobe triangles are just corner vertices).
+    K = 24
+    dense = Point2d[]
+    for i in 2:length(poly)
+        a = poly[i-1]; b = poly[i]; push!(dense, a)
+        if abs(a[1] - b[1]) > 1.0e-3 || abs(a[2] - b[2]) > 1.0e-3      # skip ~zero junction edges
+            for t in 1:(K-1)
+                q = _geo_interp((a[1], a[2]), (b[1], b[2]), t / K)
+                push!(dense, Point2d(q[1], q[2]))
+            end
+        end
+    end
+    push!(dense, poly[end])
+    return Vector{Point2d}[dense]
 end
 
 ############################################################
@@ -1446,10 +1466,12 @@ function clip_strategy(t::Proj.Transformation)
         # outline derivation yields nothing (e.g. guyou, whose PROJ inverse is unavailable).
         bnd = get!(() -> _oblique_boundary(t), _BOUNDARY_CACHE, def)
         return (isempty(bnd) || length(bnd[1]) < 4) ? ProjectedClip() : PolygonClip(bnd)
-    elseif name in ("igh", "igh_o", "imoll", "goode")
-        # interrupted lobes: lobe-polygon clipPolygon still mishandles the deeply non-convex
-        # boundary (WIP); use the projected-jump split (working lines) until that's fixed.
-        return ProjectedClip()
+    elseif name in ("igh", "imoll", "goode")
+        # interrupted Goode/Mollweide: clip against the explicit lobe polygon (d3 clipInterrupted)
+        bnd = get!(() -> _interrupted_boundary(_IGH_LOBES, lon0), _BOUNDARY_CACHE, def)
+        return PolygonClip(bnd)
+    elseif name == "igh_o"
+        return ProjectedClip()        # oceanic lobes differ; projected-jump lines for now
     end
     return AntimeridianClip(lon0)
 end
