@@ -24,11 +24,11 @@ end
 # Split each band polygon at the clip's discontinuity (full d3 pipeline: rotate → clip →
 # resample), replicating its colour onto every resulting piece. `polys`/`colors` are parallel
 # vectors from the `contourf` recipe; `project`/`scale` drive the adaptive resampler.
-function _split_polys_colors(polys, colors, clip::SphereClip, project, scale)
+function _split_polys_colors(polys, colors, clip::SphereClip, project, scale; rotated::Bool = false)
     newpolys = GeometryBasics.Polygon{2,Float32}[]
     newcolors = eltype(colors)[]
     for (poly, col) in zip(polys, colors)
-        for np in _split_polygon(clip, _poly_rings(poly), project, scale)
+        for np in _split_polygon(clip, _poly_rings(poly), project, scale; rotated = rotated)
             push!(newpolys, np); push!(newcolors, col)
         end
     end
@@ -53,9 +53,25 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Contourf)
     ) do (polys, colors, tfunc), changed, cached
         clip = clip_strategy(tfunc)
         clip isa NoClip && return (polys, colors)
-        project = _projector(tfunc)
-        scale = resample_scale(project)
-        return _split_polys_colors(polys, colors, clip, project, scale)
+        if clip isa AntimeridianClip
+            # Option B: clip/resample in the rotated canonical frame and draw with the
+            # centred projector (lon_0=0); avoids PROJ's half-open longitude-wrap collapsing
+            # the seam onto one map edge (the moll +lon_0=180 bug).
+            ctf = create_transform(_centred_dest(to_value(axis.dest)), to_value(source))
+            project = _projector(ctf); scale = resample_scale(project)
+            return _split_polys_colors(polys, colors, clip, project, scale; rotated = true)
+        else
+            project = _projector(tfunc); scale = resample_scale(project)
+            return _split_polys_colors(polys, colors, clip, project, scale; rotated = false)
+        end
+    end
+
+    # the split child must draw in the SAME frame the split polys were emitted in: centred
+    # transform for the antimeridian (rotated frame), full transform otherwise. Decide inside
+    # one lift so the geometry frame and the transform switch atomically when `dest` changes.
+    childfunc = lift(axis.dest, source) do dest, src
+        ftf = create_transform(dest, src)
+        clip_strategy(ftf) isa AntimeridianClip ? create_transform(_centred_dest(dest), src) : ftf
     end
 
     child = _find_child(plot, Makie.Poly)
@@ -63,6 +79,7 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Contourf)
         _drop_child!(axis.scene, plot, child)
         Makie.poly!(
             plot, plot.split_polys;
+            transformation = Makie.Transformation(childfunc),
             colormap = plot.computed_colormap,
             colorrange = plot.computed_colorrange,
             highclip = plot.computed_highcolor,
@@ -81,5 +98,115 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Contourf)
         Makie.needs_tight_limits(plot) && Makie.tightlimits!(axis)
         Makie.is_open_or_any_parent(axis.scene) && Makie.reset_limits!(axis)
     end
+    return plot
+end
+
+# The transform the split child must draw with: centred (lon_0=0) for the antimeridian seam
+# (Option B — geometry is emitted in the rotated frame), the full transform otherwise.
+function _child_transformfunc(axis, source)
+    lift(axis.dest, source) do dest, src
+        ftf = create_transform(dest, src)
+        clip_strategy(ftf) isa AntimeridianClip ? create_transform(_centred_dest(dest), src) : ftf
+    end
+end
+
+# Split a vector of polygons at the destination discontinuity in the correct frame, returning
+# the split polygons and a `group` vector mapping each output piece back to its input polygon
+# (so per-polygon colours can be replicated). Mirrors the contourf path for `poly!`/`land`.
+function _split_geom(geom, dest, source)
+    ftf = create_transform(dest, source); clip = clip_strategy(ftf)
+    polys = GeometryBasics.Polygon{2,Float32}[]; group = Int[]
+    clip isa NoClip && (for (k, p) in enumerate(_collect_polys(geom)); push!(polys, p); push!(group, k); end; return (polys, group))
+    rotated = clip isa AntimeridianClip
+    project = _projector(rotated ? create_transform(_centred_dest(dest), source) : ftf)
+    scale = resample_scale(project)
+    for (k, p) in enumerate(_collect_polys(geom))
+        pieces = _split_polygon(clip, _poly_rings(p), project, scale; rotated = rotated)
+        append!(polys, pieces); append!(group, fill(k, length(pieces)))
+    end
+    return (polys, group)
+end
+
+# Seam-aware polygon fills: `poly!(ga, geometry)` clips/splits the geometry on the sphere and
+# draws it in the matching frame, so land/coastline fills don't smear across the tear (and stay
+# correct at lon_0 = 180 via Option B). Per-polygon colour vectors are replicated onto pieces.
+function Makie.plot!(axis::GeoAxis, plot::Makie.Poly{<:Tuple{<:AbstractVector{<:GeometryBasics.Polygon}}})
+    source = pop!(plot.kw, :source, axis.source)
+    reset_limits = to_value(pop!(plot.kw, :reset_limits, true))
+    split = lift(_split_geom, plot[1], axis.dest, source)
+    splitpolys = lift(first, split)
+    splitcolor = lift(plot.color, split) do col, s
+        (col isa AbstractVector && length(col) == maximum(s[2]; init = 0)) ? col[s[2]] : col
+    end
+    # draw the split geometry straight into the axis scene with the matching (centred/full)
+    # transform; the original `plot` stays an unrealised handle (returned to the caller).
+    Makie.poly!(
+        axis.scene, splitpolys;
+        color = splitcolor,
+        colormap = plot.colormap,
+        colorrange = plot.colorrange,
+        strokecolor = plot.strokecolor,
+        strokewidth = plot.strokewidth,
+        transparency = plot.transparency,
+        transformation = Makie.Transformation(_child_transformfunc(axis, source)),
+    )
+    reset_limits && Makie.is_open_or_any_parent(axis.scene) && Makie.reset_limits!(axis)
+    return plot
+end
+
+# Seam-aware line contours: run the `contour` recipe, then swap its `Lines` child for the
+# clipped/resampled version (drawn in the matching centred/full frame).
+function Makie.plot!(axis::GeoAxis, plot::Makie.Contour)
+    source = pop!(plot.kw, :source, axis.source)
+    reset_limits = to_value(pop!(plot.kw, :reset_limits, true))
+    plot.kw[:transformation] = Makie.Transformation(lift(create_transform, axis.dest, source))
+    Makie.plot!(axis.scene, plot)        # contour recipe → Text (labels) + Lines
+
+    child = _find_child(plot, Makie.Lines)
+    if child !== nothing
+        splitpts = lift(child[1], axis.dest, source) do pts, dest, src
+            ftf = create_transform(dest, src); clip = clip_strategy(ftf)
+            rotated = clip isa AntimeridianClip
+            project = _projector(rotated ? create_transform(_centred_dest(dest), src) : ftf)
+            split_resample_line(pts, ftf; project = project, rotated = rotated)
+        end
+        col = lift(c -> c isa AbstractVector ? :black : c, child.color)   # per-vertex colour can't survive resampling
+        _drop_child!(axis.scene, plot, child)
+        Makie.lines!(
+            plot, splitpts;
+            color = col,
+            linewidth = child.linewidth,
+            linestyle = child.linestyle,
+            transparency = plot.transparency,
+            transformation = Makie.Transformation(_child_transformfunc(axis, source)),
+        )
+    end
+    reset_limits && Makie.is_open_or_any_parent(axis.scene) && Makie.reset_limits!(axis)
+    return plot
+end
+
+# Seam-aware polylines: `lines!(ga, points_or_geometry)` clips/resamples the line on the sphere
+# and draws it in the matching frame, so coastlines/contour lines don't shoot across the tear
+# (and stay correct at lon_0 = 180 via Option B).
+function Makie.plot!(axis::GeoAxis, plot::Makie.Lines{<:Tuple{<:AbstractVector{<:Point2}}})
+    source = pop!(plot.kw, :source, axis.source)
+    reset_limits = to_value(pop!(plot.kw, :reset_limits, true))
+    splitpts = lift(plot[1], axis.dest, source) do pts, dest, src
+        ftf = create_transform(dest, src); clip = clip_strategy(ftf)
+        rotated = clip isa AntimeridianClip
+        project = _projector(rotated ? create_transform(_centred_dest(dest), src) : ftf)
+        split_resample_line(pts, ftf; project = project, rotated = rotated)
+    end
+    Makie.lines!(
+        axis.scene, splitpts;
+        color = plot.color,
+        colormap = plot.colormap,
+        colorrange = plot.colorrange,
+        linewidth = plot.linewidth,
+        linestyle = plot.linestyle,
+        transparency = plot.transparency,
+        transformation = Makie.Transformation(_child_transformfunc(axis, source)),
+    )
+    reset_limits && Makie.is_open_or_any_parent(axis.scene) && Makie.reset_limits!(axis)
     return plot
 end

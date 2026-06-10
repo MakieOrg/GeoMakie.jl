@@ -191,9 +191,9 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         "The width of the y grid lines."
         ygridwidth::Float64 = 1f0
         "The color of the x grid lines."
-        xgridcolor::RGBAf = RGBAf(0, 0, 0, 0.5)
+        xgridcolor::RGBAf = RGBAf(0, 0, 0, 0.12)   # match Makie's default Axis gridline
         "The color of the y grid lines."
-        ygridcolor::RGBAf = RGBAf(0.0, 0, 0, 0.5)
+        ygridcolor::RGBAf = RGBAf(0.0, 0, 0, 0.12)
         "The linestyle of the x grid lines."
         xgridstyle = nothing
         "The linestyle of the y grid lines."
@@ -238,11 +238,12 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         xminorgridstyle = nothing
         "The linestyle of the y minor grid lines."
         yminorgridstyle = nothing
-        # "Controls if the axis spine is visible."
-        # spinevisible::Bool = true
-        # "The color of the axis spine."
-        # spinecolor::RGBAf = :black
-        # spinetype::Symbol = :geospine
+        "Controls if the projection-boundary spine is visible."
+        spinevisible::Bool = true
+        "The width of the projection-boundary spine."
+        spinewidth::Float64 = 1f0
+        "The color of the projection-boundary spine."
+        spinecolor::RGBAf = RGBAf(0, 0, 0, 1)   # match Makie's default Axis spine
         "The button for panning."
         panbutton::Makie.Mouse.Button = Makie.Mouse.right
         "The key for limiting panning to the x direction."
@@ -616,6 +617,19 @@ function Makie.initialize_block!(axis::GeoAxis)
     latgridplot = lines!(scene, latticks_line_obs; color=axis.ygridcolor, linewidth=axis.ygridwidth,
         visible=axis.ygridvisible, linestyle=axis.ygridstyle, transparency=true, inspectable=false)
     translate!(latgridplot, 0, 0, 100)
+
+    # Projection-domain outline (the d3 `.sphere()` boundary of the active clip), drawn as the
+    # axis spine: limb circle for azimuthal horizons, ellipse/rectangle for cylindricals.
+    boundary_obs = lift(axis.dest, axis.source) do dest, src
+        try
+            boundary_points(dest, src)
+        catch
+            Point2d[]
+        end
+    end
+    spineplot = lines!(scene, boundary_obs; color=axis.spinecolor, linewidth=axis.spinewidth,
+        visible=axis.spinevisible, transparency=true, inspectable=false)
+    translate!(spineplot, 0, 0, 100)
 
     # This creates the spines and ticklabels plots for the grid.
     cam = scene.camera
