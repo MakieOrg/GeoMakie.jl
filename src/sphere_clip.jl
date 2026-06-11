@@ -665,6 +665,10 @@ function _cp_interpolate!(pc::PolygonClip, from, to, dir, out)
         for ring in pc.boundary, p in ring
             push!(out, _CPt(p[1] * _D2R, p[2] * _D2R, -1, 0.0))
         end
+    elseif from.index < 0 || to.index < 0
+        return                              # defensive: an ordinary (non-boundary) point reached
+                                            # interpolate (a clipPolygon multi-hole edge case);
+                                            # skip the boundary walk rather than index segs[0]
     elseif from.index != to.index
         i = from.index
         while i != to.index
@@ -757,11 +761,9 @@ end
 # Clip the rings of one polygon against the spherical boundary; returns lon/lat-degree rings.
 function _clip_against_polygon(pc::PolygonClip, rings_deg)
     isempty(pc.segs) && return [Point2d[Point2d(p[1], p[2]) for p in r] for r in rings_deg]
-    # Canonicalise the SUBJECT winding (exterior bounds its smaller region, holes the larger),
-    # robust across antimeridian/poles via spherical area, so the rejoin parity and emit
-    # orientation are consistent — otherwise some continents fill their complement.
-    rings_deg = [i == 1 ? (_geo_area(r) > 2π ? reverse(r) : r) :
-                          (_geo_area(r) < 2π ? reverse(r) : r) for (i, r) in enumerate(rings_deg)]
+    # Rings arrive already canonically wound from `_split_polygon` (role-based PLANAR rewind,
+    # robust regardless of band size). Do NOT re-wind here — the old spherical-area heuristic
+    # (_geo_area > 2π) flips bands covering >½ the globe (igh/imoll negative contourf bands).
     start_pt = (pc.flat[1][1], pc.flat[1][2])           # the clip boundary's start vertex (deg)
     segments = Vector{_CPt}[]
     whole = Vector{_CPt}[]
