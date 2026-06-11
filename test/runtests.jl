@@ -8,6 +8,7 @@ Makie.set_theme!(Theme(
 ))
 @testset "GeoMakie" begin
     @testset "Basics" include("basics.jl")
+    @testset "SphereClip" include("sphere_clip.jl")
     @testset "MeshImage" include("meshimage.jl")
     @testset "GeoAxis" include("geoaxis.jl")
     @testset "GlobeAxis" include("globeaxis.jl")

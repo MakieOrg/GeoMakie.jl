@@ -407,10 +407,13 @@ const _BOUNDARY_CACHE = Dict{String,Vector{Vector{Point2d}}}()
 # Oblique squares (spilhaus/guyou/…): trace the projected outline by binary-searching, in many
 # directions from the projected centre, the radius where the inverse stops being finite, then
 # inverse-project (inset by R) to get a single spherical boundary ring. (d3 streams `.sphere()`.)
+# great-circle distance (degrees) between two lon/lat points
+_gcdist_deg(a, b) = acosd(clamp(_dot3(_cart(a[1], a[2]), _cart(b[1], b[2])), -1.0, 1.0))
+
 function _oblique_boundary(t)
     tinv = Base.inv(t; always_xy = true)
-    proj(lo, la) = (xy = t((Float64(lo), Float64(la))); (xy[1], xy[2]))
-    invp(x, y) = (ll = tinv((Float64(x), Float64(y))); (ll[1], ll[2]))
+    proj(lo, la) = (try; xy = t((Float64(lo), Float64(la))); (Float64(xy[1]), Float64(xy[2])); catch; (NaN, NaN); end)
+    invp(x, y) = (try; ll = tinv((Float64(x), Float64(y))); (Float64(ll[1]), Float64(ll[2])); catch; (NaN, NaN); end)
     xs = Float64[]; ys = Float64[]
     for lo in -180.0:3.0:180.0, la in -89.0:3.0:89.0
         x, y = proj(lo, la)
@@ -421,7 +424,7 @@ function _oblique_boundary(t)
     rmax = 1.25 * max(maximum(abs.(xs .- cx)), maximum(abs.(ys .- cy)))
     R = 1 - 1.0e-6
     ring = Point2d[]
-    for θ in range(0, 2π; length = 1441)
+    for θ in range(0, 2π; length = 361)        # moderate density: clip cost is O(land × segs)
         lo, hi = 0.0, rmax
         for _ in 1:44
             m = (lo + hi) / 2
@@ -431,6 +434,12 @@ function _oblique_boundary(t)
         ll = invp(cx + R * lo * cos(θ), cy + R * lo * sin(θ))
         (isfinite(ll[1]) && isfinite(ll[2])) && push!(ring, Point2d(ll[1], ll[2]))
     end
+    # The radial scan assumes a star-shaped domain. A derived outline with big jumps between
+    # consecutive samples is malformed (non-star-shaped / multivalued inverse, e.g. adams_ws2);
+    # bail so the caller falls back to the projected-jump path instead of clipping against garbage.
+    length(ring) < 16 && return Vector{Point2d}[]
+    jumps = count(i -> _gcdist_deg(ring[i-1], ring[i]) > 20.0, 2:length(ring))
+    jumps > 3 && return Vector{Point2d}[]
     return Vector{Point2d}[ring]
 end
 
@@ -637,7 +646,12 @@ function _cp_rejoin(segments, start_inside, pc)
     si = start_inside
     for c in clip; si = !si; c.e = si; end
     start = subject[1]
+    # Each intersection is visited once, so total work is bounded by the number of intersections.
+    # Cap iterations defensively: a malformed boundary (e.g. a self-intersecting derived outline)
+    # could otherwise spin forever in the entry/exit walk.
+    guard = 0; lim = 4 * (length(subject) + length(clip)) + 64
     while true
+        (guard += 1) > lim && break
         current = start
         while current.v
             current = current.n
@@ -645,6 +659,7 @@ function _cp_rejoin(segments, start_inside, pc)
         end
         ring = _CPt[]; is_subject = true
         while true
+            (guard += 1) > lim && break
             current.v = true; current.o.v = true
             if current.e
                 is_subject ? append!(ring, current.z) : _cp_interpolate!(pc, current.x, current.n.x, 1, ring)
@@ -1412,7 +1427,7 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
     clip isa ProjectedClip && return Point2d[]      # no analytic outline (interrupted/guyou)
     if clip isa PolygonClip                         # spine = the derived boundary, projected
         project = _projector(ftf)
-        return _proj_ring(clip.boundary[1], project)
+        return _proj_ring(_densify_geo(clip.boundary[1], 6), project)   # densify for a smooth spine
     end
     if clip isa NoClip
         project = _projector(ftf)

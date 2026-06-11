@@ -133,6 +133,10 @@ end
 function Makie.plot!(axis::GeoAxis, plot::Makie.Poly{<:Tuple{<:AbstractVector{<:GeometryBasics.Polygon}}})
     source = pop!(plot.kw, :source, axis.source)
     reset_limits = to_value(pop!(plot.kw, :reset_limits, true))
+    # Connect the original plot so its cycle colour / palette resolves from the scene (e.g.
+    # `poly!(ga, geom)` with no explicit colour), but hide its unsplit drawing — the split
+    # geometry is rendered separately below.
+    Makie.plot!(axis.scene, plot); plot.visible = false
     split = lift(_split_geom, plot[1], axis.dest, source)
     splitpolys = lift(first, split)
     splitcolor = lift(plot.color, split) do col, s
@@ -191,6 +195,8 @@ end
 function Makie.plot!(axis::GeoAxis, plot::Makie.Lines{<:Tuple{<:AbstractVector{<:Point2}}})
     source = pop!(plot.kw, :source, axis.source)
     reset_limits = to_value(pop!(plot.kw, :reset_limits, true))
+    # connect so cycle colour/palette resolves from the scene, but hide the unsplit drawing
+    Makie.plot!(axis.scene, plot); plot.visible = false
     splitpts = lift(plot[1], axis.dest, source) do pts, dest, src
         ftf = create_transform(dest, src); clip = clip_strategy(ftf)
         rotated = clip isa AntimeridianClip
