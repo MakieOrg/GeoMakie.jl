@@ -10,9 +10,13 @@ _t(d) = G.create_transform(d, _LL)
     @test ct("+proj=moll +lon_0=180") isa G.AntimeridianClip
     @test ct("+proj=eqc") isa G.AntimeridianClip
     @test ct("+proj=ortho") isa G.CircleClip
+    @test ct("+proj=aeqd") isa G.CircleClip          # full-disk azimuthal: antipode cap, not seam
+    @test ct("+proj=laea") isa G.CircleClip
+    @test ct("+proj=merc").lat_max < 90              # Mercator pole clamp
     @test ct("+proj=spilhaus") isa G.PolygonClip
     @test ct("+proj=igh") isa G.PolygonClip
     @test ct("+proj=igh_o") isa G.PolygonClip
+    @test ct("+proj=imoll_o") isa G.PolygonClip      # oceanic interrupted Mollweide
     @test ct("+proj=longlat +over") isa G.NoClip
 end
 
