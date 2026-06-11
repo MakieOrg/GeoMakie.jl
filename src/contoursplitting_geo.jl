@@ -210,3 +210,66 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Lines{<:Tuple{<:AbstractVector{<
     reset_limits && Makie.is_open_or_any_parent(axis.scene) && Makie.reset_limits!(axis)
     return plot
 end
+
+# Build a projected, discontinuity-clipped triangle mesh from a rectilinear lon/lat grid
+# (`xs`, `ys` vectors) with per-vertex values `vals`. The grid is projected (Option B — rotated
+# frame + centred projector — for the antimeridian, so lon_0=180 doesn't collapse), triangulated,
+# and faces straddling the tear are dropped (`_visible_faces`). Returns (mesh, flat colour vector).
+function _geo_grid_mesh(dest, source, xs, ys, vals)
+    ftf = create_transform(dest, source); clip = clip_strategy(ftf)
+    rotated = clip isa AntimeridianClip
+    tf = rotated ? create_transform(_centred_dest(dest), source) : ftf
+    lon0 = rotated ? clip.lon0 : 0.0
+    # heatmap passes cell EDGES (n+1) with per-cell data (n); use centres so the vertex grid
+    # matches `vals`. surface passes coordinate vectors matching `vals` already.
+    nx = size(vals, 1); ny = size(vals, 2)
+    xs = length(xs) == nx + 1 ? [(xs[i] + xs[i+1]) / 2 for i in 1:nx] : xs
+    ys = length(ys) == ny + 1 ? [(ys[j] + ys[j+1]) / 2 for j in 1:ny] : ys
+    points = Vector{Point3d}(undef, nx * ny)
+    latlon = Vector{Point2d}(undef, nx * ny)
+    cols = Vector{Float64}(undef, nx * ny)
+    for (k, ci) in enumerate(CartesianIndices((nx, ny)))
+        lo = Float64(xs[ci[1]]); la = Float64(ys[ci[2]])
+        rotated && (lo = mod(lo - lon0 + 180.0, 360.0) - 180.0)   # canonical rotated frame
+        latlon[k] = Point2d(lo, la)
+        points[k] = Makie.to_ndim(Point3d, Makie.apply_transform(tf, Point3d(lo, la, 0.0)), 0.0)
+        cols[k] = Float64(vals[ci[1], ci[2]])
+    end
+    rect = GeometryBasics.Tesselation(Rect2f(0, 0, 1, 1), (nx, ny))
+    faces = GeometryBasics.decompose(Makie.GLTriangleFace, rect)
+    return (GeometryBasics.Mesh(points, _visible_faces(points, latlon, faces, tf, 0.0)), cols)
+end
+
+# `surface!`/`heatmap!` on a GeoAxis: project the rectilinear lon/lat grid to a seam-clipped mesh
+# (Option B for the antimeridian) and draw it with the data as per-vertex colour. Heatmap can't
+# render curvilinear cells natively; surface projects but smears/collapses without this.
+function _geo_grid_plot!(axis, plot, vals_node)
+    source = pop!(plot.kw, :source, axis.source)
+    reset_limits = to_value(pop!(plot.kw, :reset_limits, true))
+    mc = lift(plot[1], plot[2], vals_node, axis.dest, source) do xs, ys, vals, dest, src
+        _geo_grid_mesh(dest, src, xs, ys, vals)
+    end
+    Makie.mesh!(
+        axis.scene, lift(first, mc);
+        color = lift(last, mc),
+        colormap = plot.colormap,
+        colorrange = plot.colorrange,
+        nan_color = plot.nan_color,
+        shading = Makie.NoShading,
+        transparency = plot.transparency,
+    )
+    if reset_limits
+        Makie.needs_tight_limits(plot) && (axis.xautolimitmargin = (0.01, 0.01); axis.yautolimitmargin = (0.01, 0.01))
+        Makie.is_open_or_any_parent(axis.scene) && Makie.reset_limits!(axis)
+    end
+    return plot
+end
+
+function Makie.plot!(axis::GeoAxis, plot::Makie.Surface)
+    vals = lift(plot[3], plot.color) do zs, col
+        (col isa AbstractMatrix && size(col) == size(zs)) ? col : zs
+    end
+    return _geo_grid_plot!(axis, plot, vals)
+end
+
+Makie.plot!(axis::GeoAxis, plot::Makie.Heatmap) = _geo_grid_plot!(axis, plot, plot[3])
