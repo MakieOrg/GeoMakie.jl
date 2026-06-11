@@ -1364,20 +1364,21 @@ _projected_fill(rings_deg, project, scale) = _rings_to_polygons(rings_deg, proje
 function _split_polygon(clip::SphereClip, rings_deg, project, scale; rotated::Bool = false)
     clip isa NoClip && return _rings_to_polygons(rings_deg, project)
     clip isa ProjectedClip && return _projected_fill(rings_deg, project, scale)
+    # Reconcile winding conventions. Makie's isobands follow RFC 7946 (exterior CCW / +planar
+    # area, holes CW / −); d3-geo's spherical clip uses the OPPOSITE convention, so a ring left
+    # as-is is read as bounding its complement and clips to fill ~the whole map (the band_0p1
+    # case). Re-orient by RING ROLE using the planar (lon/lat) winding — robust regardless of band
+    # size. BOTH the clipPolygon (PolygonClip) and rotation-clip paths need this; without it on the
+    # PolygonClip path, contourf negative bands (igh/imoll) clip to the complement and vanish.
+    rings_deg = [i == 1 ? (_planar_area(r) > 0 ? reverse(r) : r) :   # exterior → d3 (CW)
+                          (_planar_area(r) < 0 ? reverse(r) : r)     # holes    → d3 (CCW)
+                 for (i, r) in enumerate(rings_deg)]
     if clip isa PolygonClip      # d3 clipPolygon against the derived spherical boundary
         clipped = _clip_against_polygon(clip, rings_deg)
         return _rings_to_polygons([resample_sphere(r, project; scale = scale) for r in clipped], project)
     end
     fwd, inv = _rotation(clip)
     seam = clip isa AntimeridianClip || clip isa ObliqueAntimeridianClip
-    # Reconcile winding conventions. Makie's isobands follow RFC 7946 (exterior CCW / +planar
-    # area, holes CW / −); d3-geo's spherical clip uses the OPPOSITE convention, so a ring left
-    # as-is is read as bounding its complement and clips to fill ~the whole map (the band_0p1
-    # case). Re-orient by RING ROLE using the planar (lon/lat) winding — robust regardless of band
-    # size, unlike a spherical-area heuristic which mis-orients a band covering >½ the globe.
-    rings_deg = [i == 1 ? (_planar_area(r) > 0 ? reverse(r) : r) :   # exterior → d3 (CW)
-                          (_planar_area(r) < 0 ? reverse(r) : r)     # holes    → d3 (CCW)
-                 for (i, r) in enumerate(rings_deg)]
     rings_rad = [[(q = fwd(p[1] * _D2R, p[2] * _D2R); (q[1], q[2], 0.0)) for p in r] for r in rings_deg]
     clipped = _clip_polygon(clip, rings_rad)
     isempty(clipped) && return GeometryBasics.Polygon{2,Float32}[]
@@ -1638,8 +1639,9 @@ function clip_strategy(t::Proj.Transformation)
         # needs a native (centred-frame) port. So we keep the no-smear hull and accept round corners.
         bnd = get!(() -> _oblique_boundary(t), _BOUNDARY_CACHE, def)
         return (isempty(bnd) || length(bnd[1]) < 4) ? ProjectedClip() : PolygonClip(bnd)
-    elseif name in ("igh", "imoll", "goode")
-        # interrupted Goode/Mollweide: clip against the explicit lobe polygon (d3 clipInterrupted)
+    elseif name in ("igh", "imoll")
+        # interrupted Goode/Mollweide: clip against the explicit lobe polygon (d3 clipInterrupted).
+        # NB: PROJ's `goode` is the *continuous* homolosine (not interrupted) → AntimeridianClip.
         bnd = get!(() -> _interrupted_boundary(_IGH_LOBES, lon0), _BOUNDARY_CACHE, def)
         return PolygonClip(bnd)
     elseif name == "igh_o"
