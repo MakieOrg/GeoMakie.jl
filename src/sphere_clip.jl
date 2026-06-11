@@ -1648,6 +1648,11 @@ function clip_strategy(t::Proj.Transformation)
         h = _proj_param(def, "h"; default = 35786000.0)
         ρ = h > 0 ? acosd(R / (R + h)) : 89.5
         return CircleClip(lon0, lat0, max(ρ - 0.5, 1.0))
+    elseif name in ("aeqd", "laea")
+        # full-disk azimuthal: the ANTIPODE (180° from the centre) is the singularity — it maps to
+        # the whole boundary circle, so geometry crossing it smears along the rim (NOT an
+        # antimeridian seam). Clip a thin cap at the antipode; the rim becomes the spine.
+        return CircleClip(lon0, lat0, 179.5)
     elseif name in ("spilhaus", "guyou", "gringorten", "peirce_q", "ob_tran", "ocea", "oea")
         # Oblique squares: derive the spherical boundary (convex hull of the projected grid,
         # inverse-projected — our stand-in for d3 `reclip`, which traces the in-order outline) and
@@ -1666,7 +1671,8 @@ function clip_strategy(t::Proj.Transformation)
         # NB: PROJ's `goode` is the *continuous* homolosine (not interrupted) → AntimeridianClip.
         bnd = get!(() -> _interrupted_boundary(_IGH_LOBES, lon0), _BOUNDARY_CACHE, def)
         return PolygonClip(bnd)
-    elseif name == "igh_o"
+    elseif name in ("igh_o", "imoll_o")
+        # oceanic interrupted Goode/Mollweide: same ocean-centred lobe layout, different raw.
         bnd = get!(() -> _interrupted_boundary(_IGH_O_LOBES, lon0), _BOUNDARY_CACHE, def)
         return PolygonClip(bnd)
     elseif name in ("merc", "webmerc")
