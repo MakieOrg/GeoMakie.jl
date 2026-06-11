@@ -237,7 +237,13 @@ function _geo_grid_mesh(dest, source, xs, ys, vals)
     end
     rect = GeometryBasics.Tesselation(Rect2f(0, 0, 1, 1), (nx, ny))
     faces = GeometryBasics.decompose(Makie.GLTriangleFace, rect)
-    return (GeometryBasics.Mesh(points, _visible_faces(points, latlon, faces, tf, 0.0)), cols)
+    # clip faces at the discontinuity (subdivides toward the seam); interpolate colour onto the
+    # inserted midpoint vertices so the mesh fills to the boundary instead of leaving a sliver.
+    pts, _, faces2, parents = _clip_faces(points, latlon, faces, _mesh_projector(tf, 0.0))
+    for k in (nx*ny+1):length(pts)
+        a, b = parents[k]; push!(cols, (cols[a] + cols[b]) / 2)
+    end
+    return (GeometryBasics.Mesh(pts, faces2), cols)
 end
 
 # `surface!`/`heatmap!` on a GeoAxis: project the rectilinear lon/lat grid to a seam-clipped mesh

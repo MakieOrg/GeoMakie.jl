@@ -65,17 +65,57 @@ function _gc_midpoint(lo1, la1, lo2, la2)
     return (atand(my, mx), asind(clamp(mz / n, -1.0, 1.0)))
 end
 
-# Drop mesh faces that straddle the projection's discontinuity. Edge LENGTH alone can't tell a
-# real tear from heavy projection distortion, so we test each edge for a DISCONTINUITY: project
-# the edge's great-circle midpoint and compare it to the midpoint of the two projected
-# endpoints. A continuous (even badly distorted) edge keeps the two close; a tear
-# (antimeridian / horizon / interrupted lobe / oblique seam) makes them jump apart. `latlon`
-# is the per-vertex lon/lat parallel to the projected `points`. No-op under an identity
-# transform except for genuine antimeridian wrap-around.
-function _visible_faces(points, latlon, faces, tfunc, z; factor = 0.3)
-    isempty(faces) && return faces
+# Clip mesh faces at the projection's discontinuity. An edge "crosses" a tear if projecting its
+# great-circle midpoint lands far from the midpoint of the two projected endpoints — this tells a
+# real tear (antimeridian / horizon / interrupted lobe / oblique seam) from mere projection
+# distortion (which keeps them close), regardless of edge length. A straddling triangle is
+# SUBDIVIDED toward the seam (keep the clean sub-triangles, recurse on the rest up to `depth`)
+# rather than dropped, so only a sub-pixel remnant is lost instead of a whole-cell sliver.
+#
+# `points`/`latlon` are the projected points and their parallel lon/lat. Returns
+# `(points′, latlon′, faces′, parents)`: `points′`/`latlon′` are the originals plus the inserted
+# edge-midpoint vertices; `parents[k] = (a, b)` says new vertex `k` is the midpoint of `a, b`
+# (originals have `(0, 0)`), so callers can interpolate UVs/colours for the new vertices.
+function _clip_faces(points, latlon, faces, proj; factor = 0.3, depth = 4)
     _fin(p) = isfinite(p[1]) && isfinite(p[2])
-    function proj(lo, la)
+    pts = collect(Point3d, points)
+    ll = collect(Point2d, latlon)
+    parents = Tuple{Int,Int}[(0, 0) for _ in eachindex(points)]
+    midcache = Dict{Tuple{Int,Int},Int}()
+    function mid(a, b)
+        key = a < b ? (a, b) : (b, a)
+        haskey(midcache, key) && return midcache[key]
+        la = ll[a]; lb = ll[b]
+        m = _gc_midpoint(la[1], la[2], lb[1], lb[2])
+        pm = proj(m[1], m[2])
+        push!(ll, Point2d(m[1], m[2])); push!(pts, Point3d(pm[1], pm[2], 0.0)); push!(parents, (a, b))
+        idx = length(pts); midcache[key] = idx; return idx
+    end
+    function crosses(a, b)
+        p1 = pts[a]; p2 = pts[b]
+        (_fin(p1) && _fin(p2)) || return true
+        la = ll[a]; lb = ll[b]
+        m = _gc_midpoint(la[1], la[2], lb[1], lb[2]); pm = proj(m[1], m[2])
+        _fin(pm) || return true
+        ex = (p1[1] + p2[1]) / 2; ey = (p1[2] + p2[2]) / 2
+        return hypot(pm[1] - ex, pm[2] - ey) > factor * hypot(p1[1] - p2[1], p1[2] - p2[2]) + 1.0e-9
+    end
+    out = eltype(faces)[]
+    function emit(a, b, c, d)
+        (crosses(a, b) || crosses(b, c) || crosses(c, a)) || (push!(out, eltype(faces)(a, b, c)); return)
+        d <= 0 && return                      # sub-pixel remnant at the seam: drop
+        ab = mid(a, b); bc = mid(b, c); ca = mid(c, a)
+        emit(a, ab, ca, d - 1); emit(ab, b, bc, d - 1); emit(ca, bc, c, d - 1); emit(ab, bc, ca, d - 1)
+    end
+    @inbounds for f in faces
+        emit(f[1], f[2], f[3], depth)
+    end
+    return pts, ll, out, parents
+end
+
+# project closure (lon,lat)->(x,y) for a Makie transform_func, error-safe
+function _mesh_projector(tfunc, z)
+    return function (lo, la)
         try
             p = Makie.apply_transform(tfunc, Point3d(lo, la, z))
             return (Float64(p[1]), Float64(p[2]))
@@ -83,22 +123,6 @@ function _visible_faces(points, latlon, faces, tfunc, z; factor = 0.3)
             return (NaN, NaN)
         end
     end
-    function crosses(i1, i2)
-        p1 = points[i1]; p2 = points[i2]
-        (_fin(p1) && _fin(p2)) || return true
-        l1 = latlon[i1]; l2 = latlon[i2]
-        m = _gc_midpoint(l1[1], l1[2], l2[1], l2[2])
-        pm = proj(m[1], m[2])
-        _fin(pm) || return true
-        ex = (p1[1] + p2[1]) / 2; ey = (p1[2] + p2[2]) / 2
-        el = hypot(p1[1] - p2[1], p1[2] - p2[2])
-        return hypot(pm[1] - ex, pm[2] - ey) > factor * el + 1.0e-9
-    end
-    keep = eltype(faces)[]
-    @inbounds for f in faces
-        (crosses(f[1], f[2]) || crosses(f[2], f[3]) || crosses(f[3], f[1])) || push!(keep, f)
-    end
-    return keep
 end
 
 function Makie.plot!(plot::MeshImage)
@@ -154,12 +178,13 @@ function Makie.plot!(plot::MeshImage)
             )
         end
 
-        return (GeometryBasics.Mesh(
-                points,
-                # drop faces straddling the projection discontinuity
-                _visible_faces(points, latlon, faces, tfunc, z_level);
-                uv = uvs, # each point gets a UV, they're interpolated on faces
-            ),)
+        # clip faces straddling the projection discontinuity (subdivides toward the seam)
+        pts, _, faces2, parents = _clip_faces(points, latlon, faces, _mesh_projector(tfunc, z_level))
+        uvs2 = collect(Vec2f, uvs)
+        for k in (length(uvs)+1):length(pts)            # UV for each inserted midpoint vertex
+            a, b = parents[k]; push!(uvs2, (uvs2[a] + uvs2[b]) / 2)
+        end
+        return (GeometryBasics.Mesh(pts, faces2; uv = uvs2),)
     end
 
     # Finally, we plot the mesh.
