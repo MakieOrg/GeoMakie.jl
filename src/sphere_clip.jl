@@ -1378,6 +1378,21 @@ function split_resample_line(pts, t::Proj.Transformation; scale::Float64 = NaN,
     return out
 end
 
+# great-circle densify a lon/lat ring (k points per edge) so coarse boundary loops trace smooth
+# arcs even before the projected-error resampler runs
+function _densify_geo(ring, k)
+    out = Point2d[]
+    for i in 2:length(ring)
+        a = ring[i-1]; b = ring[i]; push!(out, a)
+        for t in 1:(k-1)
+            q = _geo_interp((a[1], a[2]), (b[1], b[2]), t / k)
+            push!(out, Point2d(q[1], q[2]))
+        end
+    end
+    !isempty(ring) && push!(out, ring[end])
+    return out
+end
+
 # resample a lon/lat ring for projected smoothness and return the PROJECTED points
 _proj_ring(ring, project; scale = resample_scale(project)) =
     Point2d[Point2d(project(p[1], p[2])...) for p in resample_sphere(ring, project; scale = scale)]
@@ -1413,7 +1428,7 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
     _interpolate!(clip, nothing, nothing, 1, raw)        # full clip boundary, rotated frame
     if clip isa AntimeridianClip
         project = _projector(create_transform(_centred_dest(dest), source))
-        ring = Point2d[Point2d(q[1] * _R2D, q[2] * _R2D) for q in raw]      # stay in rotated frame
+        ring = _densify_geo(Point2d[Point2d(q[1] * _R2D, q[2] * _R2D) for q in raw], 24)  # smooth ellipse/rect
     else
         project = _projector(ftf)
         ring = Point2d[Point2d(_unrotate(inv, q[1], q[2], false)...) for q in raw]

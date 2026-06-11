@@ -56,6 +56,51 @@ Makie.needs_tight_limits(::MeshImage) = true
 
 # This is the recipe implementation.
 
+# Great-circle midpoint of a lon/lat edge (degrees).
+function _gc_midpoint(lo1, la1, lo2, la2)
+    x1 = cosd(la1) * cosd(lo1); y1 = cosd(la1) * sind(lo1); z1 = sind(la1)
+    x2 = cosd(la2) * cosd(lo2); y2 = cosd(la2) * sind(lo2); z2 = sind(la2)
+    mx = x1 + x2; my = y1 + y2; mz = z1 + z2; n = sqrt(mx^2 + my^2 + mz^2)
+    n < 1.0e-12 && return ((lo1 + lo2) / 2, (la1 + la2) / 2)
+    return (atand(my, mx), asind(clamp(mz / n, -1.0, 1.0)))
+end
+
+# Drop mesh faces that straddle the projection's discontinuity. Edge LENGTH alone can't tell a
+# real tear from heavy projection distortion, so we test each edge for a DISCONTINUITY: project
+# the edge's great-circle midpoint and compare it to the midpoint of the two projected
+# endpoints. A continuous (even badly distorted) edge keeps the two close; a tear
+# (antimeridian / horizon / interrupted lobe / oblique seam) makes them jump apart. `latlon`
+# is the per-vertex lon/lat parallel to the projected `points`. No-op under an identity
+# transform except for genuine antimeridian wrap-around.
+function _visible_faces(points, latlon, faces, tfunc, z; factor = 0.3)
+    isempty(faces) && return faces
+    _fin(p) = isfinite(p[1]) && isfinite(p[2])
+    function proj(lo, la)
+        try
+            p = Makie.apply_transform(tfunc, Point3d(lo, la, z))
+            return (Float64(p[1]), Float64(p[2]))
+        catch
+            return (NaN, NaN)
+        end
+    end
+    function crosses(i1, i2)
+        p1 = points[i1]; p2 = points[i2]
+        (_fin(p1) && _fin(p2)) || return true
+        l1 = latlon[i1]; l2 = latlon[i2]
+        m = _gc_midpoint(l1[1], l1[2], l2[1], l2[2])
+        pm = proj(m[1], m[2])
+        _fin(pm) || return true
+        ex = (p1[1] + p2[1]) / 2; ey = (p1[2] + p2[2]) / 2
+        el = hypot(p1[1] - p2[1], p1[2] - p2[2])
+        return hypot(pm[1] - ex, pm[2] - ey) > factor * el + 1.0e-9
+    end
+    keep = eltype(faces)[]
+    @inbounds for f in faces
+        (crosses(f[1], f[2]) || crosses(f[2], f[3]) || crosses(f[3], f[1])) || push!(keep, f)
+    end
+    return keep
+end
+
 function Makie.plot!(plot::MeshImage)
     # Initialize some Ref's that can hold references
     # to pre-defined arrays.
@@ -95,21 +140,24 @@ function Makie.plot!(plot::MeshImage)
         faces = faces_buffer[]
         uvs = uv_buffer[]
 
+        latlon = Vector{Point2d}(undef, nx * ny)   # lon/lat parallel to `points`, for the tear test
         for (linear_ind, cartesian_ind) in enumerate(CartesianIndices((nx, ny)))
-            p = Point3d(xs[cartesian_ind[1]], ys[cartesian_ind[2]], z_level)
+            lo = xs[cartesian_ind[1]]; la = ys[cartesian_ind[2]]
+            latlon[linear_ind] = Point2d(lo, la)
             points[linear_ind] = Makie.to_ndim(
-                Point3d, 
+                Point3d,
                 Makie.apply_transform(
-                    tfunc, 
-                    p,
-                ), 
+                    tfunc,
+                    Point3d(lo, la, z_level),
+                ),
                 0.0
             )
         end
 
         return (GeometryBasics.Mesh(
-                points, 
-                faces;
+                points,
+                # drop faces straddling the projection discontinuity
+                _visible_faces(points, latlon, faces, tfunc, z_level);
                 uv = uvs, # each point gets a UV, they're interpolated on faces
             ),)
     end

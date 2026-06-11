@@ -900,9 +900,13 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
 
     # reset limits ONLY IF the user has not said otherwise
     if reset_limits
-        # some area-like plots basically always look better if they cover the whole plot area.
-        # adjust the limit margins in those cases automatically.
-        Makie.needs_tight_limits(plot) && Makie.tightlimits!(axis)
+        # some area-like plots (meshimage/surface) look better covering the whole plot area, so
+        # tighten the margins — but keep a 1% sliver rather than (0,0) so the projection-boundary
+        # spine, drawn at the very edge of the projected domain, isn't half-clipped by the axis.
+        if Makie.needs_tight_limits(plot)
+            axis.xautolimitmargin = (0.01, 0.01)
+            axis.yautolimitmargin = (0.01, 0.01)
+        end
 
         if Makie.is_open_or_any_parent(axis.scene)
             Makie.reset_limits!(axis)
