@@ -340,14 +340,18 @@ abstract type SphereClip end
 struct NoClip <: SphereClip end
 
 """
-    AntimeridianClip(lon0)
+    AntimeridianClip(lon0, lat_max = 90)
 
 Tear at the meridian `lon0 ± 180` (the periodicity seam). Port of `clip/antimeridian.js`.
-`lon0` (degrees) is the projection centre (`+lon_0 +pm`).
+`lon0` (degrees) is the projection centre (`+lon_0 +pm`). `lat_max < 90` additionally clamps
+geometry/boundary to ±`lat_max` for normal Mercator (merc/webmerc), whose y → ±∞ at the poles —
+otherwise Antarctica (and the spine's ±90) blow the y-limits to ~12× the useful map.
 """
 struct AntimeridianClip <: SphereClip
     lon0::Float64
+    lat_max::Float64
 end
+AntimeridianClip(lon0) = AntimeridianClip(lon0, 90.0)
 
 """
     CircleClip(lon0, lat0, radius)
@@ -1363,9 +1367,19 @@ end
 # already handled via `_jump_split_line`.
 _projected_fill(rings_deg, project, scale) = _rings_to_polygons(rings_deg, project)
 
+# clamp ring/line latitudes to ±lat_max (pole-blowup cylindricals, e.g. merc); identity at 90.
+_clamp_lat(r, lm) = lm >= 90.0 ? r : [Point2d(p[1], clamp(p[2], -lm, lm)) for p in r]
+
 function _split_polygon(clip::SphereClip, rings_deg, project, scale; rotated::Bool = false)
     clip isa NoClip && return _rings_to_polygons(rings_deg, project)
     clip isa ProjectedClip && return _projected_fill(rings_deg, project, scale)
+    # ±lat clamp for pole-blowup cylindricals (merc): clamp the subject, resample through a
+    # clamped projector (great-circle midpoints arc over the pole; the antimeridian clip adds the
+    # ±90 pole boundary — both project to merc(±90) ≈ 12× the useful map and explode the
+    # resampler), then clamp the OUTPUT lat so the child plot's own projection stays bounded too.
+    lm = clip isa AntimeridianClip ? clip.lat_max : 90.0
+    lm < 90 && (rings_deg = [_clamp_lat(r, lm) for r in rings_deg])
+    prc = lm < 90 ? ((lo, la) -> project(lo, clamp(la, -lm, lm))) : project
     # Reconcile winding conventions. Makie's isobands follow RFC 7946 (exterior CCW / +planar
     # area, holes CW / −); d3-geo's spherical clip uses the OPPOSITE convention, so a ring left
     # as-is is read as bounding its complement and clips to fill ~the whole map (the band_0p1
@@ -1397,7 +1411,7 @@ function _split_polygon(clip::SphereClip, rings_deg, project, scale; rotated::Bo
         end
         isempty(rd) && continue
         rd[end] != rd[1] && push!(rd, rd[1])                  # close
-        push!(out_deg, resample_sphere(rd, project; scale = scale))
+        push!(out_deg, _clamp_lat(resample_sphere(rd, prc; scale = scale), lm))
     end
     return _rings_to_polygons(out_deg, project)
 end
@@ -1479,6 +1493,8 @@ function split_resample_line(pts, t::Proj.Transformation; scale::Float64 = NaN,
     clip = clip_strategy(t)
     project === nothing && (project = _projector(t))
     isnan(scale) && (scale = resample_scale(project))
+    clip isa AntimeridianClip && clip.lat_max < 90 &&
+        (pts = _clamp_lat(Point2d[Point2d(_lon(p), _lat(p)) for p in pts], clip.lat_max))
     clip isa NoClip &&
         return resample_sphere(Point2d[Point2d(_lon(p), _lat(p)) for p in pts], project; scale = scale)
     clip isa ProjectedClip && return _jump_split_line(pts, project, scale)
@@ -1496,6 +1512,8 @@ function split_resample_line(pts, t::Proj.Transformation; scale::Float64 = NaN,
     end
     fwd, inv = _rotation(clip)
     seam = clip isa AntimeridianClip || clip isa ObliqueAntimeridianClip
+    lm = clip isa AntimeridianClip ? clip.lat_max : 90.0       # ±lat clamp for merc (see _split_polygon)
+    prc = lm < 90 ? ((lo, la) -> project(lo, clamp(la, -lm, lm))) : project
     out = Point2d[]
     for seg in _nan_segments(pts)
         line_rad = [(q = fwd(p[1] * _D2R, p[2] * _D2R); (q[1], q[2], 0.0)) for p in seg]
@@ -1504,7 +1522,7 @@ function split_resample_line(pts, t::Proj.Transformation; scale::Float64 = NaN,
             sd = rotated ? [Point2d(q[1] * _R2D, q[2] * _R2D) for q in s] :
                            [Point2d(_unrotate(inv, q[1], q[2], seam)...) for q in s]
             !isempty(out) && push!(out, Point2d(NaN, NaN))
-            append!(out, resample_sphere(sd, project; scale = scale))
+            append!(out, _clamp_lat(resample_sphere(sd, prc; scale = scale), lm))
         end
     end
     return out
@@ -1572,8 +1590,10 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
     raw = _Pt[]
     _interpolate!(clip, nothing, nothing, 1, raw)        # full clip boundary, rotated frame
     if clip isa AntimeridianClip
-        project = _projector(create_transform(_centred_dest(dest), source))
-        ring = _densify_geo(Point2d[Point2d(q[1] * _R2D, q[2] * _R2D) for q in raw], 24)  # smooth ellipse/rect
+        base = _projector(create_transform(_centred_dest(dest), source))
+        lm = clip.lat_max                       # clamp lat (merc): the great-circle densify arcs
+        project = lm < 90 ? ((lo, la) -> base(lo, clamp(la, -lm, lm))) : base   # over the pole
+        ring = _densify_geo(Point2d[Point2d(q[1] * _R2D, q[2] * _R2D) for q in raw], 24)
     else
         project = _projector(ftf)
         sm = clip isa ObliqueAntimeridianClip          # nudge off the exact rotated ±π seam
@@ -1649,6 +1669,10 @@ function clip_strategy(t::Proj.Transformation)
     elseif name == "igh_o"
         bnd = get!(() -> _interrupted_boundary(_IGH_O_LOBES, lon0), _BOUNDARY_CACHE, def)
         return PolygonClip(bnd)
+    elseif name in ("merc", "webmerc")
+        # normal Mercator: antimeridian seam PLUS a ±lat clamp — y→±∞ at the poles, so without
+        # this Antarctica/Greenland and the spine's ±90 blow the y-limits ~12× past the useful map.
+        return AntimeridianClip(lon0, 85.0)
     end
     return AntimeridianClip(lon0)
 end
