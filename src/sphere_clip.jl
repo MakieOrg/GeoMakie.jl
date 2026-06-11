@@ -364,6 +364,26 @@ struct CircleClip <: SphereClip
 end
 
 """
+    ObliqueAntimeridianClip(fwd, inv)
+
+Antimeridian seam in a *rotated* (oblique) frame — e.g. spilhaus is `adams_ws2` in a Snyder
+oblique aspect, so its seam is the antimeridian of that frame. `fwd`/`inv` rotate geographic ↔
+the oblique frame (radians); the clip cuts at the rotated antimeridian (so the square corners —
+the oblique poles and anti-equator — land exactly), then rotates back to geographic and draws
+with the full projection (unlike the pure-longitude `AntimeridianClip`, which uses Option B).
+
+NOTE: currently unused — `clip_strategy` routes spilhaus through the no-smear hull
+([`PolygonClip`]) instead. This clip gives exact corners but, lacking a "centred" projector for
+the oblique frame, can't apply Option B, so polygons wrapping the oblique pole smear. It's kept
+as the d3-faithful seam definition; activating it needs a native centred-frame projector
+(`adams_ws2` + spilhaus's 2-D rotation/scale).
+"""
+struct ObliqueAntimeridianClip <: SphereClip
+    fwd::Function
+    inv::Function
+end
+
+"""
     ProjectedClip()
 
 Lighter fallback for projections whose tear is an arbitrary curve with no simple analytic
@@ -410,36 +430,88 @@ const _BOUNDARY_CACHE = Dict{String,Vector{Vector{Point2d}}}()
 # great-circle distance (degrees) between two lon/lat points
 _gcdist_deg(a, b) = acosd(clamp(_dot3(_cart(a[1], a[2]), _cart(b[1], b[2])), -1.0, 1.0))
 
+# Douglas–Peucker simplification of a closed ring (projected 2-D points), tolerance `tol`.
+# Collapses near-collinear runs so a (grid-sampled) square hull becomes 4 sharp corners while a
+# smoothly-curved hull (ellipse) keeps enough points to stay within `tol` of the curve.
+function _dp_simplify(ring, tol)
+    n = length(ring); n < 4 && return ring
+    keep = falses(n); keep[1] = true
+    # farthest-from-[1] anchor so the closed ring is split into two well-defined chains
+    far = argmax(i -> hypot(ring[i][1] - ring[1][1], ring[i][2] - ring[1][2]), 1:n)
+    keep[far] = true
+    stack = Tuple{Int,Int}[(1, far), (far, n + 1)]
+    idxof(i) = i > n ? 1 : i
+    while !isempty(stack)
+        i, j = pop!(stack)
+        j <= i + 1 && continue
+        ax, ay = ring[idxof(i)]; bx, by = ring[idxof(j)]
+        dx = bx - ax; dy = by - ay; L = hypot(dx, dy)
+        dmax = 0.0; m = i
+        for k in (i+1):(j-1)
+            px, py = ring[idxof(k)]
+            d = L < 1.0e-12 ? hypot(px - ax, py - ay) : abs(dy * (px - ax) - dx * (py - ay)) / L
+            d > dmax && (dmax = d; m = k)
+        end
+        if dmax > tol
+            keep[idxof(m)] = true; push!(stack, (i, m)); push!(stack, (m, j))
+        end
+    end
+    return ring[keep]
+end
+
+# Andrew's monotone-chain convex hull (CCW, collinear points dropped) of 2-D points.
+function _convex_hull(pts)
+    p = sort(unique(pts); by = q -> (q[1], q[2]))
+    length(p) < 3 && return p
+    cr(o, a, b) = (a[1] - o[1]) * (b[2] - o[2]) - (a[2] - o[2]) * (b[1] - o[1])
+    half(seq) = (h = eltype(p)[]; for q in seq
+            while length(h) >= 2 && cr(h[end-1], h[end], q) <= 0; pop!(h); end
+            push!(h, q)
+        end; h)
+    lower = half(p); upper = half(Iterators.reverse(p))
+    return vcat(lower[1:end-1], upper[1:end-1])
+end
+
+# Derive the spherical clip boundary of an oblique projection (d3 `reclip`, in-order variant).
+# These projections map the whole sphere into a CONVEX projected domain (square / ellipse), so
+# the in-order domain outline is exactly the convex hull of the projected points — which hits the
+# corners (the radial scan rounded them) and is naturally ordered. Densify the hull edges
+# (straight in projected space), inset slightly toward the centroid, and inverse-project each →
+# the spherical boundary with sharp corners. Bail (→ ProjectedClip) if the inverse is unavailable
+# (e.g. guyou) or the result is malformed.
 function _oblique_boundary(t)
     tinv = Base.inv(t; always_xy = true)
     proj(lo, la) = (try; xy = t((Float64(lo), Float64(la))); (Float64(xy[1]), Float64(xy[2])); catch; (NaN, NaN); end)
     invp(x, y) = (try; ll = tinv((Float64(x), Float64(y))); (Float64(ll[1]), Float64(ll[2])); catch; (NaN, NaN); end)
-    xs = Float64[]; ys = Float64[]
-    for lo in -180.0:3.0:180.0, la in -89.0:3.0:89.0
+    proj_pts = Point2d[]
+    for lo in -180.0:0.5:180.0, la in -89.5:0.5:89.5
         x, y = proj(lo, la)
-        (isfinite(x) && isfinite(y)) && (push!(xs, x); push!(ys, y))
+        (isfinite(x) && isfinite(y)) && push!(proj_pts, Point2d(x, y))
     end
-    isempty(xs) && return Vector{Point2d}[]
-    cx = (minimum(xs) + maximum(xs)) / 2; cy = (minimum(ys) + maximum(ys)) / 2
-    rmax = 1.25 * max(maximum(abs.(xs .- cx)), maximum(abs.(ys .- cy)))
+    length(proj_pts) < 16 && return Vector{Point2d}[]
+    hull = _convex_hull(proj_pts)
+    length(hull) < 3 && return Vector{Point2d}[]
+    # collapse grid-sampling noise at the corners: straight edges → sharp corners, curves kept
+    diag = hypot(maximum(p -> p[1], hull) - minimum(p -> p[1], hull),
+                 maximum(p -> p[2], hull) - minimum(p -> p[2], hull))
+    hull = _dp_simplify(hull, 0.004 * diag)
+    length(hull) < 3 && return Vector{Point2d}[]
+    cx = sum(p -> p[1], hull) / length(hull); cy = sum(p -> p[2], hull) / length(hull)
     R = 1 - 1.0e-6
+    n = length(hull); per = max(2, cld(400, n))         # ~400 boundary points total
     ring = Point2d[]
-    for θ in range(0, 2π; length = 361)        # moderate density: clip cost is O(land × segs)
-        lo, hi = 0.0, rmax
-        for _ in 1:44
-            m = (lo + hi) / 2
-            ll = invp(cx + m * cos(θ), cy + m * sin(θ))
-            (isfinite(ll[1]) && isfinite(ll[2])) ? (lo = m) : (hi = m)
+    for i in 1:n
+        a = hull[i]; b = hull[mod(i, n)+1]
+        for k in 0:(per-1)
+            s = k / per
+            px = a[1] + s * (b[1] - a[1]); py = a[2] + s * (b[2] - a[2])
+            ll = invp(cx + R * (px - cx), cy + R * (py - cy))
+            (isfinite(ll[1]) && isfinite(ll[2])) && push!(ring, Point2d(ll[1], ll[2]))
         end
-        ll = invp(cx + R * lo * cos(θ), cy + R * lo * sin(θ))
-        (isfinite(ll[1]) && isfinite(ll[2])) && push!(ring, Point2d(ll[1], ll[2]))
     end
-    # The radial scan assumes a star-shaped domain. A derived outline with big jumps between
-    # consecutive samples is malformed (non-star-shaped / multivalued inverse, e.g. adams_ws2);
-    # bail so the caller falls back to the projected-jump path instead of clipping against garbage.
     length(ring) < 16 && return Vector{Point2d}[]
-    jumps = count(i -> _gcdist_deg(ring[i-1], ring[i]) > 20.0, 2:length(ring))
-    jumps > 3 && return Vector{Point2d}[]
+    jumps = count(i -> _gcdist_deg(ring[i-1], ring[i]) > 25.0, 2:length(ring))
+    jumps > 4 && return Vector{Point2d}[]
     return Vector{Point2d}[ring]
 end
 
@@ -753,6 +825,45 @@ function _rotation(c::CircleClip)
     end
     return fwd, inv
 end
+_rotation(c::ObliqueAntimeridianClip) = (c.fwd, c.inv)
+
+# Conformal latitude (and inverse) on the WGS84 ellipsoid — spilhaus maps via the conformal sphere.
+const _E2_WGS84 = 0.0066943799901413165
+function _conformal_lat(φ)
+    e = sqrt(_E2_WGS84); s = sin(φ)
+    return 2 * atan(tan(π / 4 + φ / 2) * ((1 - e * s) / (1 + e * s))^(e / 2)) - π / 2
+end
+function _conformal_lat_inv(χ)
+    e = sqrt(_E2_WGS84); φ = χ
+    for _ in 1:12
+        s = sin(φ); φ = 2 * atan(tan(π / 4 + χ / 2) * ((1 + e * s) / (1 - e * s))^(e / 2)) - π / 2
+    end
+    return φ
+end
+
+# Snyder oblique aspect (A working manual, 5-7/5-8b) used by PROJ's spilhaus: maps geographic ↔
+# the adams_ws2 frame whose antimeridian is spilhaus's seam. Returns (fwd, inv) in radians.
+function _spilhaus_rotation(lon0_deg, lat0_deg, azi_deg)
+    lam0 = lon0_deg * _D2R; phi0 = lat0_deg * _D2R; azi = azi_deg * _D2R
+    χc = _conformal_lat(phi0)
+    sinα = -cos(χc) * cos(azi); cosα = sqrt(max(0.0, 1 - sinα^2))
+    λ0 = atan(tan(azi), -sin(χc)); β = π + atan(-sin(azi), -tan(χc))
+    off = lam0 + λ0
+    function fwd(λ, φ)
+        φc = _conformal_lat(φ); Δλ = λ - off
+        cφ = cos(φc); sφ = sin(φc); cΔ = cos(Δλ); sΔ = sin(Δλ)
+        pa = asin(clamp(sinα * sφ - cosα * cφ * cΔ, -1.0, 1.0))
+        la = β + atan(cφ * sΔ, sinα * cφ * cΔ + cosα * sφ)
+        return (_wrapλ(la), pa)
+    end
+    function inv(la, pa)
+        cl = cos(la - β); sl = sin(la - β); sp = sin(pa); cp = cos(pa)
+        χ = asin(clamp(sinα * sp + cosα * cp * cl, -1.0, 1.0))
+        λ = atan(cp * sl, sinα * cp * cl - cosα * sp) + off
+        return (λ, _conformal_lat_inv(χ))
+    end
+    return fwd, inv
+end
 
 # --- antimeridian crossing latitude (d3 clipAntimeridianIntersect), radians ---------------
 @inline function _antimeridian_lat(λ0, φ0, λ1, φ1)
@@ -918,19 +1029,22 @@ end
 
 # ---- per-strategy hooks dispatched by the generic driver --------------------------------
 _clip_ring(c::AntimeridianClip, ring) = (lines = _antimeridian_stream(vcat(ring, [ring[1]])); (lines[1], 2 - lines[2]))
+_clip_ring(c::ObliqueAntimeridianClip, ring) = (lines = _antimeridian_stream(vcat(ring, [ring[1]])); (lines[1], 2 - lines[2]))
 _clip_ring(c::CircleClip, ring)       = _circle_stream(c, vcat(ring, [ring[1]]))
 
 _clip_open(c::AntimeridianClip, line) = [l for l in _antimeridian_stream(line)[1] if length(l) > 1]
+_clip_open(c::ObliqueAntimeridianClip, line) = [l for l in _antimeridian_stream(line)[1] if length(l) > 1]
 _clip_open(c::CircleClip, line)       = [l for l in _circle_stream(c, line)[1] if length(l) > 1]
 
 _start(::AntimeridianClip) = (-π, -π / 2)
+_start(::ObliqueAntimeridianClip) = (-π, -π / 2)
 function _start(c::CircleClip)
     radius = c.radius * _D2R
     cos(radius) > 0 ? (0.0, -radius) : (-π, radius - π)
 end
 
 # boundary interpolate from `from` to `to` (radian `_Pt` or `nothing`), appending to `out`
-function _interpolate!(::AntimeridianClip, from, to, dir, out)
+function _interpolate!(::Union{AntimeridianClip,ObliqueAntimeridianClip}, from, to, dir, out)
     if from === nothing                            # whole sphere boundary
         φ = dir * π / 2
         for p in ((-π, φ), (0.0, φ), (π, φ), (π, 0.0), (π, -φ), (0.0, -φ), (-π, -φ), (-π, 0.0), (-π, φ))
@@ -1255,7 +1369,7 @@ function _split_polygon(clip::SphereClip, rings_deg, project, scale; rotated::Bo
         return _rings_to_polygons([resample_sphere(r, project; scale = scale) for r in clipped], project)
     end
     fwd, inv = _rotation(clip)
-    seam = clip isa AntimeridianClip
+    seam = clip isa AntimeridianClip || clip isa ObliqueAntimeridianClip
     # Reconcile winding conventions. Makie's isobands follow RFC 7946 (exterior CCW / +planar
     # area, holes CW / −); d3-geo's spherical clip uses the OPPOSITE convention, so a ring left
     # as-is is read as bounding its complement and clips to fill ~the whole map (the band_0p1
@@ -1378,7 +1492,7 @@ function split_resample_line(pts, t::Proj.Transformation; scale::Float64 = NaN,
         return out
     end
     fwd, inv = _rotation(clip)
-    seam = clip isa AntimeridianClip
+    seam = clip isa AntimeridianClip || clip isa ObliqueAntimeridianClip
     out = Point2d[]
     for seg in _nan_segments(pts)
         line_rad = [(q = fwd(p[1] * _D2R, p[2] * _D2R); (q[1], q[2], 0.0)) for p in seg]
@@ -1427,7 +1541,20 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
     clip isa ProjectedClip && return Point2d[]      # no analytic outline (interrupted/guyou)
     if clip isa PolygonClip                         # spine = the derived boundary, projected
         project = _projector(ftf)
-        return _proj_ring(_densify_geo(clip.boundary[1], 6), project)   # densify for a smooth spine
+        # the boundary is already dense and its vertices sit on the (straight, in projected space)
+        # domain edges, so project directly — great-circle densify/resample would bow the edges
+        # and round the corners.
+        return Point2d[Point2d(project(p[1], p[2])...) for p in clip.boundary[1]]
+    end
+    if clip isa ObliqueAntimeridianClip
+        # spine = the rotated-frame antimeridian (the two seam meridians λ=±π, φ from −90 to 90),
+        # which the projection maps to the four square edges. Nudge JUST inside each side so the
+        # exact-seam wrap doesn't flip points between the left/right map edges (the spine smear).
+        _, inv = _rotation(clip); project = _projector(ftf)
+        N = 160; ring = Point2d[]
+        for i in 0:N; push!(ring, Point2d(_unrotate(inv, π, -π / 2 + π * i / N, true)...)); end   # right
+        for i in 0:N; push!(ring, Point2d(_unrotate(inv, -π, π / 2 - π * i / N, true)...)); end   # left
+        return Point2d[Point2d(project(p[1], p[2])...) for p in ring]
     end
     if clip isa NoClip
         project = _projector(ftf)
@@ -1446,7 +1573,8 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
         ring = _densify_geo(Point2d[Point2d(q[1] * _R2D, q[2] * _R2D) for q in raw], 24)  # smooth ellipse/rect
     else
         project = _projector(ftf)
-        ring = Point2d[Point2d(_unrotate(inv, q[1], q[2], false)...) for q in raw]
+        sm = clip isa ObliqueAntimeridianClip          # nudge off the exact rotated ±π seam
+        ring = Point2d[Point2d(_unrotate(inv, q[1], q[2], sm)...) for q in raw]
     end
     return _proj_ring(ring, project)
 end
@@ -1497,11 +1625,17 @@ function clip_strategy(t::Proj.Transformation)
         h = _proj_param(def, "h"; default = 35786000.0)
         ρ = h > 0 ? acosd(R / (R + h)) : 89.5
         return CircleClip(lon0, lat0, max(ρ - 0.5, 1.0))
-    elseif name in ("spilhaus", "guyou", "gringorten", "peirce_q", "adams_ws1", "adams_ws2",
-                    "ob_tran", "ocea", "oea")
-        # oblique squares: derive the spherical boundary (inverse-projected outline), cache it,
-        # and clip against it (d3 clipPolygon). Falls back to the projected-jump split when the
-        # outline derivation yields nothing (e.g. guyou, whose PROJ inverse is unavailable).
+    elseif name in ("spilhaus", "guyou", "gringorten", "peirce_q", "ob_tran", "ocea", "oea")
+        # Oblique squares: derive the spherical boundary (convex hull of the projected grid,
+        # inverse-projected — our stand-in for d3 `reclip`, which traces the in-order outline) and
+        # clip against it (d3 clipPolygon). Falls back to the projected-jump split when the outline
+        # derivation yields nothing (e.g. guyou, whose PROJ inverse is unavailable).
+        #
+        # WORKAROUND vs d3: the hull rounds the sharp square corners (grid sampling). The faithful
+        # route is `ObliqueAntimeridianClip` (clip at the oblique-frame antimeridian — exact
+        # corners), but without a "centred" projector for that frame it can't apply Option B, so
+        # pole-wrapping polygons smear. d3 avoids both because it owns its projections; matching it
+        # needs a native (centred-frame) port. So we keep the no-smear hull and accept round corners.
         bnd = get!(() -> _oblique_boundary(t), _BOUNDARY_CACHE, def)
         return (isempty(bnd) || length(bnd[1]) < 4) ? ProjectedClip() : PolygonClip(bnd)
     elseif name in ("igh", "imoll", "goode")
