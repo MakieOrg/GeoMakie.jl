@@ -399,6 +399,19 @@ function Makie.apply_transform(c::_NativeCentred, r::Makie.Rect2{T}) where {T}
     (umin, umax), (vmin, vmax) = iterated_bounds(c, (mn[1], mx[1]), (mn[2], mx[2]))
     return Makie.Rect2{T}(Makie.Vec2{T}(umin, vmin), Makie.Vec2{T}(umax - umin, vmax - vmin))
 end
+# Geometry overloads (defensive): Makie has no generic apply_transform(f, ::Polygon/LineString) and
+# special-cases Proj.Transformation, so a native transform should handle these too for any code path
+# that transforms a geometry directly. (Makie's poly!/lines! recipes actually transform the decomposed
+# point arrays, so the array method already covers the common case — these are belt-and-suspenders.)
+Makie.apply_transform(c::_NativeCentred, p::GeometryBasics.Polygon) =
+    GeometryBasics.Polygon(Makie.apply_transform(c, GeometryBasics.coordinates(p.exterior)),
+                           [Makie.apply_transform(c, GeometryBasics.coordinates(i)) for i in p.interiors])
+Makie.apply_transform(c::_NativeCentred, ls::GeometryBasics.LineString) =
+    GeometryBasics.LineString(Makie.apply_transform(c, GeometryBasics.coordinates(ls)))
+Makie.apply_transform(c::_NativeCentred, mp::GeometryBasics.MultiPolygon) =
+    GeometryBasics.MultiPolygon([Makie.apply_transform(c, p) for p in mp.polygons])
+Makie.apply_transform(c::_NativeCentred, ml::GeometryBasics.MultiLineString) =
+    GeometryBasics.MultiLineString([Makie.apply_transform(c, l) for l in ml.linestrings])
 
 struct ObliqueAntimeridianClip <: SphereClip
     fwd::Function
