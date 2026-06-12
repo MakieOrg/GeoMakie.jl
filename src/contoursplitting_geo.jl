@@ -268,6 +268,10 @@ end
 function _geo_grid_plot!(axis, plot, vals_node)
     source = pop!(plot.kw, :source, axis.source)
     reset_limits = to_value(pop!(plot.kw, :reset_limits, true))
+    # Realize the original surface/heatmap but hide it: the seam-clipped mesh below does the
+    # drawing, while the original keeps a computed colormapping so `Colorbar(fig, sf)` still works
+    # (it extracts the colormap from the returned plot). Same connect-and-hide as poly!/lines!.
+    Makie.plot!(axis.scene, plot); plot.visible = false
     mc = lift(plot[1], plot[2], vals_node, axis.dest, source) do xs, ys, vals, dest, src
         _geo_grid_mesh(dest, src, xs, ys, vals)
     end

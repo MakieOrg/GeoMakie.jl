@@ -92,7 +92,9 @@ doc = Documenter.makedocs(;
     authors="Anshul Singhvi and the Makie.jl contributors",
     doctest=false,
     warnonly = true,
-    draft = false,
+    # DRAFT=true skips @example/@repl/@setup/@eval evaluation → fast markdown-only build (no code
+    # cells run), for iterating on page structure/prose. Default (DRAFT unset) runs everything.
+    draft = get(ENV, "DRAFT", "false") == "true",
     plugins = [OhMyCards.ExampleConfig(; dot_slash = true),],
     pagesonly = !(get(ENV, "CI", "false") == "true"),
     debug = true,
