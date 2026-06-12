@@ -208,8 +208,9 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Lines{<:Tuple{<:AbstractVector{<
     Makie.plot!(axis.scene, plot); plot.visible = false
     splitpts = lift(plot[1], axis.dest, source) do pts, dest, src
         ftf = create_transform(dest, src); clip = clip_strategy(ftf)
-        rotated = clip isa AntimeridianClip
-        project = _projector(rotated ? create_transform(_centred_dest(dest), src) : ftf)
+        rotated = clip isa AntimeridianClip || clip isa ObliqueAntimeridianClip
+        project = _projector(clip isa ObliqueAntimeridianClip ? clip.centred :
+                             clip isa AntimeridianClip ? create_transform(_centred_dest(dest), src) : ftf)
         split_resample_line(pts, ftf; project = project, rotated = rotated)
     end
     Makie.lines!(
