@@ -17,6 +17,7 @@ _t(d) = G.create_transform(d, _LL)
     @test ct("+proj=igh") isa G.PolygonClip
     @test ct("+proj=igh_o") isa G.PolygonClip
     @test ct("+proj=imoll_o") isa G.PolygonClip      # oceanic interrupted Mollweide
+    @test ct("+proj=bertin1953") isa G.ObliqueAntimeridianClip   # rotated Hammer, native Option B
     @test ct("+proj=longlat +over") isa G.NoClip
 end
 
@@ -75,4 +76,22 @@ end
         @test_nowarn meshimage!(ga, -180 .. 180, -90 .. 90, GeoMakie.earth() |> rotr90)
         @test_nowarn Makie.update_state_before_display!(fig)
     end
+end
+
+@testset "bertin1953 native centred Hammer (Option B)" begin
+    clip = G.clip_strategy(_t("+proj=bertin1953")); proj = G._projector(_t("+proj=bertin1953"))
+    fwd, _ = G._bertin_rotation()
+    # native centred ∘ rotation == PROJ bertin forward (the Option-B exactness guarantee)
+    for (lo, la) in [(0.0, 0.0), (30.0, 40.0), (-100.0, -30.0), (150.0, 60.0)]
+        r = fwd(deg2rad(lo), deg2rad(la)); b = G._bertin_centred(rad2deg(r[1]), rad2deg(r[2])); f = proj(lo, la)
+        @test isapprox(b[1], f[1]; atol = 1.0) && isapprox(b[2], f[2]; atol = 1.0)
+    end
+    # no chord-streak (Antarctica straddles the rotated seam) through the actual split path
+    polys, _ = G._split_geom(GeoMakie.land(), "+proj=bertin1953", _LL); c = clip.centred.f
+    worst = 0.0
+    for p in polys, k in 2:length(GeometryBasics.coordinates(p.exterior))
+        pr = GeometryBasics.coordinates(p.exterior)
+        worst = max(worst, hypot(c(pr[k]...)[1] - c(pr[k-1]...)[1], c(pr[k]...)[2] - c(pr[k-1]...)[2]))
+    end
+    @test worst < 5.0e6        # a seam-collapse streak would be ~20e6 (≈ map width)
 end

@@ -60,6 +60,11 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Contourf)
             ctf = create_transform(_centred_dest(to_value(axis.dest)), to_value(source))
             project = _projector(ctf); scale = resample_scale(project)
             return _split_polys_colors(polys, colors, clip, project, scale; rotated = true)
+        elseif clip isa ObliqueAntimeridianClip
+            # Option B with a NATIVE centred projector (bertin): clip at the rotated antimeridian,
+            # draw the rotated split with the native Hammer so the ±π seam keeps its two edges.
+            project = _projector(clip.centred); scale = resample_scale(project)
+            return _split_polys_colors(polys, colors, clip, project, scale; rotated = true)
         else
             project = _projector(tfunc); scale = resample_scale(project)
             return _split_polys_colors(polys, colors, clip, project, scale; rotated = false)
@@ -70,8 +75,9 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Contourf)
     # transform for the antimeridian (rotated frame), full transform otherwise. Decide inside
     # one lift so the geometry frame and the transform switch atomically when `dest` changes.
     childfunc = lift(axis.dest, source) do dest, src
-        ftf = create_transform(dest, src)
-        clip_strategy(ftf) isa AntimeridianClip ? create_transform(_centred_dest(dest), src) : ftf
+        ftf = create_transform(dest, src); clip = clip_strategy(ftf)
+        clip isa AntimeridianClip ? create_transform(_centred_dest(dest), src) :
+        clip isa ObliqueAntimeridianClip ? clip.centred : ftf
     end
 
     child = _find_child(plot, Makie.Poly)
@@ -105,8 +111,9 @@ end
 # (Option B — geometry is emitted in the rotated frame), the full transform otherwise.
 function _child_transformfunc(axis, source)
     lift(axis.dest, source) do dest, src
-        ftf = create_transform(dest, src)
-        clip_strategy(ftf) isa AntimeridianClip ? create_transform(_centred_dest(dest), src) : ftf
+        ftf = create_transform(dest, src); clip = clip_strategy(ftf)
+        clip isa AntimeridianClip ? create_transform(_centred_dest(dest), src) :
+        clip isa ObliqueAntimeridianClip ? clip.centred : ftf
     end
 end
 
@@ -117,8 +124,9 @@ function _split_geom(geom, dest, source)
     ftf = create_transform(dest, source); clip = clip_strategy(ftf)
     polys = GeometryBasics.Polygon{2,Float32}[]; group = Int[]
     clip isa NoClip && (for (k, p) in enumerate(_collect_polys(geom)); push!(polys, p); push!(group, k); end; return (polys, group))
-    rotated = clip isa AntimeridianClip
-    project = _projector(rotated ? create_transform(_centred_dest(dest), source) : ftf)
+    rotated = clip isa AntimeridianClip || clip isa ObliqueAntimeridianClip
+    project = _projector(clip isa ObliqueAntimeridianClip ? clip.centred :
+                         clip isa AntimeridianClip ? create_transform(_centred_dest(dest), source) : ftf)
     scale = resample_scale(project)
     for (k, p) in enumerate(_collect_polys(geom))
         pieces = _split_polygon(clip, _poly_rings(p), project, scale; rotated = rotated)
@@ -170,8 +178,9 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Contour)
     if child !== nothing
         splitpts = lift(child[1], axis.dest, source) do pts, dest, src
             ftf = create_transform(dest, src); clip = clip_strategy(ftf)
-            rotated = clip isa AntimeridianClip
-            project = _projector(rotated ? create_transform(_centred_dest(dest), src) : ftf)
+            rotated = clip isa AntimeridianClip || clip isa ObliqueAntimeridianClip
+            project = _projector(clip isa ObliqueAntimeridianClip ? clip.centred :
+                                 clip isa AntimeridianClip ? create_transform(_centred_dest(dest), src) : ftf)
             split_resample_line(pts, ftf; project = project, rotated = rotated)
         end
         col = lift(c -> c isa AbstractVector ? :black : c, child.color)   # per-vertex colour can't survive resampling

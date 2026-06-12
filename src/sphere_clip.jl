@@ -368,23 +368,42 @@ struct CircleClip <: SphereClip
 end
 
 """
-    ObliqueAntimeridianClip(fwd, inv)
+    ObliqueAntimeridianClip(fwd, inv, centred)
 
-Antimeridian seam in a *rotated* (oblique) frame — e.g. spilhaus is `adams_ws2` in a Snyder
-oblique aspect, so its seam is the antimeridian of that frame. `fwd`/`inv` rotate geographic ↔
-the oblique frame (radians); the clip cuts at the rotated antimeridian (so the square corners —
-the oblique poles and anti-equator — land exactly), then rotates back to geographic and draws
-with the full projection (unlike the pure-longitude `AntimeridianClip`, which uses Option B).
+Antimeridian seam in a *rotated* (oblique) frame, drawn with Option B via a NATIVE centred
+projector. `fwd`/`inv` rotate geographic ↔ the oblique frame (radians); the clip cuts at the
+rotated antimeridian, and `centred::_NativeCentred` projects the rotated-frame split directly to
+metres — exactly d3's `rotate(...) → clipAntimeridian → centredProjection`. Drawing in the rotated
+frame (rather than unrotating back through PROJ) is essential: PROJ's `atan2` collapses the ±π
+seam onto one edge, smearing geometry that straddles it (Antarctica on bertin).
 
-NOTE: currently unused — `clip_strategy` routes spilhaus through the no-smear hull
-([`PolygonClip`]) instead. This clip gives exact corners but, lacking a "centred" projector for
-the oblique frame, can't apply Option B, so polygons wrapping the oblique pole smear. It's kept
-as the d3-faithful seam definition; activating it needs a native centred-frame projector
-(`adams_ws2` + spilhaus's 2-D rotation/scale).
+Used for **bertin1953** (a rotated, fudged Hammer that PROJ ships with no inverse): see
+[`_bertin_rotation`](@ref)/[`_bertin_centred`](@ref). NOT used for spilhaus — that's a *square*
+(adams) whose oblique pole is a sharp corner the antimeridian pole-walk can't match, so it stays
+on the no-smear [`PolygonClip`] hull (rounded corners, documented workaround).
 """
+# A native (non-PROJ) centred projector: rotated lon/lat (deg) → projected metres, callable both
+# as `c((lon,lat))` (for `_projector`) and via `Makie.apply_transform` (as a child transform_func),
+# so Option B works for an oblique projection whose "centred" frame PROJ doesn't expose (bertin).
+struct _NativeCentred
+    f::Function
+end
+(c::_NativeCentred)(p) = c.f(p[1], p[2])
+function Makie.apply_transform(c::_NativeCentred, p::Makie.VecTypes)
+    xy = c.f(p[1], p[2])
+    return length(p) == 3 ? Makie.Point3{Float64}(xy[1], xy[2], p[3]) : Makie.Point2{Float64}(xy[1], xy[2])
+end
+Makie.apply_transform(c::_NativeCentred, ps::AbstractArray) = map(p -> Makie.apply_transform(c, p), ps)
+function Makie.apply_transform(c::_NativeCentred, r::Makie.Rect2{T}) where {T}
+    mn = minimum(r); mx = maximum(r)
+    (umin, umax), (vmin, vmax) = iterated_bounds(c, (mn[1], mx[1]), (mn[2], mx[2]))
+    return Makie.Rect2{T}(Makie.Vec2{T}(umin, vmin), Makie.Vec2{T}(umax - umin, vmax - vmin))
+end
+
 struct ObliqueAntimeridianClip <: SphereClip
     fwd::Function
     inv::Function
+    centred::_NativeCentred   # rotated lon/lat (deg) → metres; draw the rotated split with this
 end
 
 """
@@ -869,6 +888,46 @@ function _spilhaus_rotation(lon0_deg, lat0_deg, azi_deg)
         return (λ, _conformal_lat_inv(χ))
     end
     return fwd, inv
+end
+
+# --- bertin1953: a rotated, fudged Hammer (PROJ `bertin1953.cpp`, no inverse) -----------------
+# PROJ bakes the oblique aspect into the forward (lam += −16.5°, then a −42° rotation about the
+# y-axis, dgamma=0). d3 does the same as `rotate([-16.5,-42])` then `clipAntimeridian`. A pure
+# rotation IS analytically invertible (unlike the full bertin forward), so we clip at the rotated
+# antimeridian and — crucially — draw with the native CENTRED Hammer (`_bertin_centred`), Option B,
+# rather than unrotating through PROJ (whose atan2 collapses the ±π seam, smearing Antarctica).
+const _BERTIN_DL = deg2rad(-16.5)
+const _BERTIN_CD = cosd(-42.0)
+const _BERTIN_SD = sind(-42.0)
+function _bertin_rotation()
+    fwd = function (λ, φ)                 # geographic (rad) → rotated frame (rad)
+        λ2 = λ + _BERTIN_DL; c = cos(φ); x = cos(λ2) * c; y = sin(λ2) * c; z = sin(φ)
+        z0 = z * _BERTIN_CD + x * _BERTIN_SD
+        return (atan(y, x * _BERTIN_CD - z * _BERTIN_SD), asin(clamp(z0, -1.0, 1.0)))
+    end
+    inv = function (λr, φr)               # rotated frame (rad) → geographic (rad)
+        c = cos(φr); xn = cos(λr) * c; yn = sin(λr) * c; zn = sin(φr)
+        x = xn * _BERTIN_CD + zn * _BERTIN_SD; z = -xn * _BERTIN_SD + zn * _BERTIN_CD
+        return (atan(yn, x) - _BERTIN_DL, asin(clamp(z, -1.0, 1.0)))
+    end
+    return fwd, inv
+end
+# Native centred bertin: the post-rotation forward (pre-fudge + Hammer(1.68) + post-fudge), taking
+# rotated lon/lat in DEGREES → projected metres. No `adjlon`, so the seam ±180° stays distinct (the
+# two ellipse edges). Verified `_bertin_centred(rotate(geo)) == PROJ bertin(geo)` to 0 m.
+function _bertin_centred(λ, φ)
+    λ = deg2rad(λ); φ = deg2rad(φ)
+    fu = 1.4; k = 12.0; w = 1.68; a = 6.378137e6
+    if λ + φ < -fu
+        d = (λ - φ + 1.6) * (λ + φ + fu) / 8
+        λ += d; φ -= 0.8 * d * sin(φ + π / 2)
+    end
+    cφ = cos(φ); d = sqrt(2 / (1 + cφ * cos(λ / 2)))
+    x = w * d * cφ * sin(λ / 2); y = d * sin(φ)
+    d = (1 - cos(λ * φ)) / k
+    y < 0 && (x *= 1 + d)
+    y > 0 && (y *= 1 + d / 1.5 * x * x)
+    return (a * x, a * y)
 end
 
 # --- antimeridian crossing latitude (d3 clipAntimeridianIntersect), radians ---------------
@@ -1568,14 +1627,14 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
         return Point2d[Point2d(project(p[1], p[2])...) for p in clip.boundary[1]]
     end
     if clip isa ObliqueAntimeridianClip
-        # spine = the rotated-frame antimeridian (the two seam meridians λ=±π, φ from −90 to 90),
-        # which the projection maps to the four square edges. Nudge JUST inside each side so the
-        # exact-seam wrap doesn't flip points between the left/right map edges (the spine smear).
-        _, inv = _rotation(clip); project = _projector(ftf)
-        N = 160; ring = Point2d[]
-        for i in 0:N; push!(ring, Point2d(_unrotate(inv, π, -π / 2 + π * i / N, true)...)); end   # right
-        for i in 0:N; push!(ring, Point2d(_unrotate(inv, -π, π / 2 - π * i / N, true)...)); end   # left
-        return Point2d[Point2d(project(p[1], p[2])...) for p in ring]
+        # spine = the rotated-frame antimeridian (λ=±180°, φ from −90 to 90), drawn DIRECTLY with
+        # the native centred projector: λ=+180 → the right ellipse edge, λ=−180 → the left, with no
+        # unrotate (which would collapse the ±π seam through PROJ's atan2). Closes into the ellipse.
+        c = clip.centred.f
+        N = 200; ring = Point2d[]
+        for i in 0:N; push!(ring, Point2d(c(180.0, -90 + 180 * i / N)...)); end    # right edge ↑
+        for i in 0:N; push!(ring, Point2d(c(-180.0, 90 - 180 * i / N)...)); end    # left edge ↓
+        return ring
     end
     if clip isa NoClip
         project = _projector(ftf)
@@ -1653,6 +1712,12 @@ function clip_strategy(t::Proj.Transformation)
         # the whole boundary circle, so geometry crossing it smears along the rim (NOT an
         # antimeridian seam). Clip a thin cap at the antipode; the rim becomes the spine.
         return CircleClip(lon0, lat0, 179.5)
+    elseif name == "bertin1953"
+        # rotated, fudged Hammer (no PROJ inverse). d3: rotate([-16.5,-42]) + clipAntimeridian.
+        # We clip at the rotated antimeridian and draw with the native centred Hammer (Option B),
+        # so the ±π seam doesn't collapse (which smeared Antarctica when unrotating through PROJ).
+        fwd, inv = _bertin_rotation()
+        return ObliqueAntimeridianClip(fwd, inv, _NativeCentred(_bertin_centred))
     elseif name in ("spilhaus", "guyou", "gringorten", "peirce_q", "ob_tran", "ocea", "oea")
         # Oblique squares: derive the spherical boundary (convex hull of the projected grid,
         # inverse-projected — our stand-in for d3 `reclip`, which traces the in-order outline) and
