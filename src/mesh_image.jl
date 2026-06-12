@@ -91,14 +91,29 @@ function _clip_faces(points, latlon, faces, proj; factor = 0.3, depth = 4)
         push!(ll, Point2d(m[1], m[2])); push!(pts, Point3d(pm[1], pm[2], 0.0)); push!(parents, (a, b))
         idx = length(pts); midcache[key] = idx; return idx
     end
+    # Projected extent, so most edges can be decided from the ALREADY-projected vertices and skip
+    # an extra midpoint projection per edge — the cost that made npoints=1000 take 5 min + 56 GiB
+    # (geos→natearth curvature subdividing every face). Mirrors cartopy: detect wraps from projected
+    # coords; don't forward-project every face.
+    xmin = ymin = Inf; xmax = ymax = -Inf
+    @inbounds for p in points
+        _fin(p) || continue
+        xmin = min(xmin, p[1]); xmax = max(xmax, p[1]); ymin = min(ymin, p[2]); ymax = max(ymax, p[2])
+    end
+    ext = (isfinite(xmin) && xmax > xmin) ? hypot(xmax - xmin, ymax - ymin) : 0.0
+    seam2 = (0.5 * ext)^2        # edge spanning ≳½ the map ⇒ wraps the seam (squared ⇒ no sqrt)
+    skip2 = (0.005 * ext)^2      # edge ≲0.5% of the map ⇒ sub-pixel curvature, not worth subdividing
     function crosses(a, b)
         p1 = pts[a]; p2 = pts[b]
         (_fin(p1) && _fin(p2)) || return true
+        dx = p1[1] - p2[1]; dy = p1[2] - p2[2]; e2 = dx * dx + dy * dy
+        e2 > seam2 && return true            # wraps the seam — from projected vertices only, no proj
+        e2 < skip2 && return false           # too short to show curvature — skip the projection
         la = ll[a]; lb = ll[b]
         m = _gc_midpoint(la[1], la[2], lb[1], lb[2]); pm = proj(m[1], m[2])
         _fin(pm) || return true
         ex = (p1[1] + p2[1]) / 2; ey = (p1[2] + p2[2]) / 2
-        return hypot(pm[1] - ex, pm[2] - ey) > factor * hypot(p1[1] - p2[1], p1[2] - p2[2]) + 1.0e-9
+        return hypot(pm[1] - ex, pm[2] - ey) > factor * sqrt(e2) + 1.0e-9
     end
     out = eltype(faces)[]
     function emit(a, b, c, d)
