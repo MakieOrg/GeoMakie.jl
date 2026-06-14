@@ -12,6 +12,8 @@ _t(d) = G.create_transform(d, _LL)
     @test ct("+proj=ortho") isa G.CircleClip
     @test ct("+proj=aeqd") isa G.CircleClip          # full-disk azimuthal: antipode cap, not seam
     @test ct("+proj=laea") isa G.CircleClip
+    @test ct("+proj=stere +lat_0=90") isa G.CircleClip   # polar stereographic: antipode cap, NOT antimeridian
+    @test ct("+proj=stere +lat_0=-90") isa G.CircleClip
     @test ct("+proj=merc").lat_max < 90              # Mercator pole clamp
     @test ct("+proj=spilhaus") isa G.PolygonClip
     @test ct("+proj=igh") isa G.PolygonClip

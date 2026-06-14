@@ -1720,10 +1720,13 @@ function clip_strategy(t::Proj.Transformation)
         h = _proj_param(def, "h"; default = 35786000.0)
         ρ = h > 0 ? acosd(R / (R + h)) : 89.5
         return CircleClip(lon0, lat0, max(ρ - 0.5, 1.0))
-    elseif name in ("aeqd", "laea")
-        # full-disk azimuthal: the ANTIPODE (180° from the centre) is the singularity — it maps to
-        # the whole boundary circle, so geometry crossing it smears along the rim (NOT an
-        # antimeridian seam). Clip a thin cap at the antipode; the rim becomes the spine.
+    elseif name in ("aeqd", "laea", "stere", "sterea", "ups")
+        # full-disk azimuthal/conformal: the ANTIPODE (180° from the centre) is the singularity — it
+        # maps to the whole boundary circle (stereographic sends it to infinity), so geometry crossing
+        # it smears along the rim (NOT an antimeridian seam). Clip a thin cap at the antipode; the rim
+        # becomes the spine. Routing `stere` through the default AntimeridianClip instead reprojected
+        # everything via the centred-frame (Option B), which collapses a polar `lat_0=±90` into an
+        # equatorial aspect (the "Africa-centred" bug).
         return CircleClip(lon0, lat0, 179.5)
     elseif name == "bertin1953"
         # rotated, fudged Hammer (no PROJ inverse). d3: rotate([-16.5,-42]) + clipAntimeridian.

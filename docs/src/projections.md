@@ -100,3 +100,35 @@ galleryfig(batches[4]) # hide
 ```@example projections
 galleryfig(batches[5]) # hide
 ```
+
+## Polar (stereographic)
+
+Stereographic centred on each pole and zoomed to the cap — the way you'd view sea-ice
+or tripolar-grid fields. Stereographic is azimuthal: its only discontinuity is the
+*antipode* (the opposite pole), so the on-sphere clip is an antipodal cap, and the
+graticule stays concentric right up to the centre. GeoAxis `limits` are in lon/lat, so
+the cap is "all longitudes, lat in `[55, 90]`" (or the southern mirror), which the
+projection maps to the disk.
+
+```@example projections
+## a pole-encircling field defined over each cap, closed in longitude (cyclic) so the
+## bands meet cleanly across the ±180° seam
+capfield(l, y) = sind(y) + 0.25 * cosd(3l) * cosd(y)
+function capgrid(lat)
+    lon = collect(-180.0:2:178)
+    z = [capfield(l, y) for l in lon, y in lat]
+    return (vcat(lon, lon[begin] + 360), lat, vcat(z, z[begin:begin, :]))
+end
+
+polar = Figure(size = (840, 440))
+for (i, (d, lat, lims, ttl)) in enumerate([
+        ("+proj=stere +lat_0=90 +lon_0=0",  collect(20.0:2:90),  ((-180, 180), (55, 90)),   "North polar stereographic"),
+        ("+proj=stere +lat_0=-90 +lon_0=0", collect(-90.0:2:-20), ((-180, 180), (-90, -55)), "South polar stereographic")])
+    ga = GeoAxis(polar[1, i]; dest = d, limits = lims, title = ttl, titlesize = 11)
+    hidedecorations!(ga; grid = false)
+    lon, la, z = capgrid(lat)
+    contourf!(ga, lon, la, z; levels = range(-1, 1; length = 11), extendlow = :auto, extendhigh = :auto)
+    poly!(ga, LAND; color = (:gray70, 0.55), strokecolor = :black, strokewidth = 0.3)
+end
+polar # hide
+```
