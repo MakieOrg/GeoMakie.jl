@@ -117,6 +117,12 @@ function _clip_faces(points, latlon, faces, proj; factor = 0.3, depth = 4)
     end
     out = eltype(faces)[]
     function emit(a, b, c, d)
+        # Fully off-map face (all three vertices non-finite — e.g. the entire back hemisphere of an
+        # azimuthal/perspective projection like ortho/geos): drop in O(1). Without this, every such
+        # cell subdivides to `depth` (up to 4^depth sub-triangles) only to be discarded, which made a
+        # dense raster `heatmap`/`surface` on a GeoAxis take minutes (≈half the grid × 256). Genuine
+        # limb-straddle faces have at least one finite vertex, so they still subdivide below.
+        (_fin(pts[a]) || _fin(pts[b]) || _fin(pts[c])) || return
         (crosses(a, b) || crosses(b, c) || crosses(c, a)) || (push!(out, eltype(faces)(a, b, c)); return)
         d <= 0 && return                      # sub-pixel remnant at the seam: drop
         ab = mid(a, b); bc = mid(b, c); ca = mid(c, a)
