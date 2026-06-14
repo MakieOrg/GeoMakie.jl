@@ -659,37 +659,50 @@ function Makie.initialize_block!(axis::GeoAxis)
     lat_text = Obs(String[])
     lat_points_px = Obs(Point2d[])
 
+    # The spine/tick-label positions feed the axis protrusions, which feed the layout, which
+    # changes `cam.projectionview` — re-triggering this very callback *synchronously* on the same
+    # stack. For most projections that settles in 1–2 passes, but some full-disk azimuthal aspects
+    # (e.g. equatorial `+proj=laea`) never converge and recurse until the stack overflows. Cap the
+    # synchronous re-entry depth: converging projections never approach the cap, while a runaway is
+    # bounded to a finite (near-settled) result instead of crashing.
+    spine_reentry = Ref(0)
     onany(scene, spines_obs, cam.projectionview, vp_unchanged) do spines, pv, area
-        poffset = minimum(area)
-        project_px(p) = to_ndim(Point2d, Makie.project(cam, :data, :pixel, p), 0.0f0) .+ poffset
-        project_p(p) = (input=p.input, projected=project_px(p.projected), dir=p.dir, intersect_dir=p.intersect_dir)
+        spine_reentry[] >= 8 && return
+        spine_reentry[] += 1
+        try
+            poffset = minimum(area)
+            project_px(p) = to_ndim(Point2d, Makie.project(cam, :data, :pixel, p), 0.0f0) .+ poffset
+            project_p(p) = (input=p.input, projected=project_px(p.projected), dir=p.dir, intersect_dir=p.intersect_dir)
 
-        left = project_p.(spines.left)
-        right = project_p.(spines.right)
-        bottom = project_p.(spines.bottom)
-        top = project_p.(spines.top)
+            left = project_p.(spines.left)
+            right = project_p.(spines.right)
+            bottom = project_p.(spines.bottom)
+            top = project_p.(spines.top)
 
-        lonspine = choose_side(left, right)
-        latspine = choose_side(bottom, top)
+            lonspine = choose_side(left, right)
+            latspine = choose_side(bottom, top)
 
-        # Filter out ticks that go almost parallel to boundingbox
-        function too_narrow(p)
-            if isfinite(p.intersect_dir)
-                line_dir = p.intersect_dir
-                a = abs(angle_between(p.dir, line_dir))
-                (a < 0.2 || abs(pi - a) < 0.2) && return false
+            # Filter out ticks that go almost parallel to boundingbox
+            function too_narrow(p)
+                if isfinite(p.intersect_dir)
+                    line_dir = p.intersect_dir
+                    a = abs(angle_between(p.dir, line_dir))
+                    (a < 0.2 || abs(pi - a) < 0.2) && return false
+                end
+                return true
             end
-            return true
+
+            filter!(too_narrow, lonspine)
+            filter!(too_narrow, latspine)
+
+            filter!(p -> filter_too_close(p, latspine), lonspine)
+            filter!(p -> filter_too_close(p, lonspine), latspine)
+            lon_spine[] = lonspine
+            lat_spine[] = latspine
+            return
+        finally
+            spine_reentry[] -= 1
         end
-
-        filter!(too_narrow, lonspine)
-        filter!(too_narrow, latspine)
-
-        filter!(p -> filter_too_close(p, latspine), lonspine)
-        filter!(p -> filter_too_close(p, lonspine), latspine)
-        lon_spine[] = lonspine
-        lat_spine[] = latspine
-        return
     end
 
     onany(lat_spine, axis.xlabelpadding, axis.xticklabelsize) do spine, offset, size
