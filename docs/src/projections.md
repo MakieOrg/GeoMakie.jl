@@ -5,10 +5,11 @@ contours, polygons, lines, and the projection boundary stay correct across each
 projection's discontinuity — the antimeridian, interrupted lobes (`igh`/`imoll`),
 azimuthal/perspective horizons (`ortho`/`geos`), and oblique seams (`spilhaus`/`bertin`).
 
-The gallery below draws the same global field as a `contourf!` on a `GeoAxis`, with the
-coastline land polygons overlaid, for (almost) every projection PROJ provides. A clean
-panel — no horizontal smears across the map — means the seam split fired correctly for
-that projection.
+Each section below draws the same global field as a `contourf!` on a `GeoAxis`, with the
+coastline land polygons overlaid, for (almost) every projection PROJ provides — one panel
+per projection, with related variants (e.g. `eck1`…`eck6`) grouped into tabs. A clean panel
+— no horizontal smears across the map — means the seam split fired correctly for that
+projection.
 
 ```@setup projections
 using GeoMakie, CairoMakie
@@ -21,84 +22,788 @@ field = [sind(2p) * cosd(3l) + 0.3 * sind(p) for l in lons, p in lats]
 const LEVELS = range(-1.3, 1.3; length = 12)
 const LAND = GeoMakie.land()
 
-## one contourf + land panel per projection, into a shared grid figure; a per-panel
-## try-catch keeps one bad projection from sinking the whole figure
-function gallery!(fig, projs; ncols = 4)
-    for (i, proj) in enumerate(projs)
-        r, c = fldmod1(i, ncols)
-        try
-            ga = GeoAxis(fig[r, c]; dest = proj,
-                         title = replace(proj, "+proj=" => ""), titlesize = 9)
-            hidedecorations!(ga; grid = false)
-            contourf!(ga, lons, lats, field; levels = LEVELS,
-                      extendlow = :auto, extendhigh = :auto)
-            poly!(ga, LAND; color = (:gray70, 0.55), strokecolor = :black, strokewidth = 0.2)
-        catch
-            Label(fig[r, c], replace(proj, "+proj=" => "") * "\n(skipped)"; fontsize = 8)
-        end
+## one contourf + land panel for a single projection; a try-catch keeps a bad projection
+## from sinking the whole page (it renders a "(skipped)" label instead)
+function panel(proj)
+    fig = Figure(size = (420, 280))
+    try
+        ga = GeoAxis(fig[1, 1]; dest = proj)
+        hidedecorations!(ga; grid = false)
+        contourf!(ga, lons, lats, field; levels = LEVELS, extendlow = :auto, extendhigh = :auto)
+        poly!(ga, LAND; color = (:gray70, 0.55), strokecolor = :black, strokewidth = 0.3)
+    catch
+        Label(fig[1, 1], replace(proj, "+proj=" => "") * "\n(skipped)"; fontsize = 10)
     end
     return fig
 end
-
-galleryfig(projs; ncols = 4) =
-    gallery!(Figure(size = (ncols * 220, cld(length(projs), ncols) * 175)), projs; ncols)
-
-## the projection list (from examples/most_projections.jl), minus the two that crash
-## PROJ fatally (`misrsom` overflows PROJ's stack; `cass` self-overlaps)
-projections = [
-    "+proj=adams_hemi", "+proj=adams_ws1", "+proj=adams_ws2",
-    "+proj=aea +lat_1=29.5 +lat_2=42.5", "+proj=aeqd", "+proj=airy", "+proj=aitoff",
-    "+proj=apian", "+proj=august", "+proj=bacon", "+proj=bertin1953", "+proj=bipc +ns",
-    "+proj=boggs", "+proj=bonne +lat_1=10", "+proj=cea",
-    "+proj=chamb +lat_1=10 +lon_1=30 +lon_2=40", "+proj=collg", "+proj=comill",
-    "+proj=crast", "+proj=denoy", "+proj=eck1", "+proj=eck2", "+proj=eck3",
-    "+proj=eck4", "+proj=eck5", "+proj=eck6", "+proj=eqc", "+proj=eqdc +lat_1=55 +lat_2=60",
-    "+proj=eqearth", "+proj=euler +lat_1=67 +lat_2=75", "+proj=fahey", "+proj=fouc", "+proj=fouc_s",
-    "+proj=gall", "+proj=geos +h=35785831.0 +lon_0=-60 +sweep=y", "+proj=gins8", "+proj=gn_sinu +m=2 +n=3",
-    "+proj=goode", "+proj=guyou", "+proj=hammer", "+proj=hatano",
-    "+proj=igh", "+proj=igh_o +lon_0=-160", "+proj=imoll", "+proj=imoll_o +lon_0=-160",
-    "+proj=imw_p +lat_1=30 +lat_2=-40", "+proj=isea",
-    "+proj=kav5", "+proj=kav7", "+proj=laea", "+proj=lagrng", "+proj=larr", "+proj=lask",
-    "+proj=lcca +lat_0=35", "+proj=leac", "+proj=loxim",
-    "+proj=lsat +ellps=GRS80 +lat_1=-60 +lat_2=60 +lsat=2 +path=2", "+proj=mbt_s", "+proj=mbt_fps",
-    "+proj=mbtfpp", "+proj=mbtfpq", "+proj=mbtfps", "+proj=merc", "+proj=mill",
-    "+proj=moll", "+proj=murd1 +lat_1=30 +lat_2=50",
-    "+proj=murd3 +lat_1=30 +lat_2=50", "+proj=natearth", "+proj=natearth2",
-    "+proj=nell", "+proj=nell_h", "+proj=nicol",
-    "+proj=ob_tran +o_proj=mill +o_lon_p=40 +o_lat_p=50 +lon_0=60", "+proj=ocea", "+proj=oea +m=1 +n=2",
-    "+proj=omerc +lat_1=45 +lat_2=55", "+proj=ortel", "+proj=ortho", "+proj=patterson", "+proj=poly",
-    "+proj=putp1", "+proj=putp2", "+proj=putp3", "+proj=putp3p", "+proj=putp4p", "+proj=putp5",
-    "+proj=putp5p", "+proj=putp6", "+proj=putp6p", "+proj=qua_aut", "+proj=robin", "+proj=rouss",
-    "+proj=rpoly", "+proj=sinu", "+proj=spilhaus", "+proj=times", "+proj=tissot +lat_1=60 +lat_2=65", "+proj=tmerc",
-    "+proj=tobmerc", "+proj=tpeqd +lat_1=60 +lat_2=65", "+proj=urm5 +n=0.9 +alpha=2 +q=4",
-    "+proj=urmfps +n=0.5", "+proj=vandg", "+proj=vandg2", "+proj=vandg3", "+proj=vandg4",
-    "+proj=vitk1 +lat_1=45 +lat_2=55", "+proj=wag1", "+proj=wag2", "+proj=wag3", "+proj=wag4",
-    "+proj=wag5", "+proj=wag6", "+proj=wag7", "+proj=webmerc +datum=WGS84", "+proj=weren",
-    "+proj=wink1", "+proj=wink2", "+proj=wintri",
-]
-
-## split into batches so each figure is a readable grid rather than one giant image
-batches = [projections[i:min(i + 23, end)] for i in 1:24:length(projections)]
 ```
 
-```@example projections
-galleryfig(batches[1]) # hide
-```
+## `+proj=adams_hemi`
 
 ```@example projections
-galleryfig(batches[2]) # hide
+panel("+proj=adams_hemi") # hide
 ```
 
-```@example projections
-galleryfig(batches[3]) # hide
-```
+## `adams_ws` family
+
+::: tabs
+
+== adams_ws1
+
+````@example projections
+panel("+proj=adams_ws1") # hide
+````
+
+== adams_ws2
+
+````@example projections
+panel("+proj=adams_ws2") # hide
+````
+
+:::
+
+## `+proj=aea +lat_1=29.5 +lat_2=42.5`
 
 ```@example projections
-galleryfig(batches[4]) # hide
+panel("+proj=aea +lat_1=29.5 +lat_2=42.5") # hide
 ```
 
+## `+proj=aeqd`
+
 ```@example projections
-galleryfig(batches[5]) # hide
+panel("+proj=aeqd") # hide
+```
+
+## `+proj=airy`
+
+```@example projections
+panel("+proj=airy") # hide
+```
+
+## `+proj=aitoff`
+
+```@example projections
+panel("+proj=aitoff") # hide
+```
+
+## `+proj=apian`
+
+```@example projections
+panel("+proj=apian") # hide
+```
+
+## `+proj=august`
+
+```@example projections
+panel("+proj=august") # hide
+```
+
+## `+proj=bacon`
+
+```@example projections
+panel("+proj=bacon") # hide
+```
+
+## `+proj=bertin1953`
+
+```@example projections
+panel("+proj=bertin1953") # hide
+```
+
+## `+proj=bipc +ns`
+
+```@example projections
+panel("+proj=bipc +ns") # hide
+```
+
+## `+proj=boggs`
+
+```@example projections
+panel("+proj=boggs") # hide
+```
+
+## `+proj=bonne +lat_1=10`
+
+```@example projections
+panel("+proj=bonne +lat_1=10") # hide
+```
+
+## `+proj=cea`
+
+```@example projections
+panel("+proj=cea") # hide
+```
+
+## `+proj=chamb +lat_1=10 +lon_1=30 +lon_2=40`
+
+```@example projections
+panel("+proj=chamb +lat_1=10 +lon_1=30 +lon_2=40") # hide
+```
+
+## `+proj=collg`
+
+```@example projections
+panel("+proj=collg") # hide
+```
+
+## `+proj=comill`
+
+```@example projections
+panel("+proj=comill") # hide
+```
+
+## `+proj=crast`
+
+```@example projections
+panel("+proj=crast") # hide
+```
+
+## `+proj=denoy`
+
+```@example projections
+panel("+proj=denoy") # hide
+```
+
+## `eck` family
+
+::: tabs
+
+== eck1
+
+````@example projections
+panel("+proj=eck1") # hide
+````
+
+== eck2
+
+````@example projections
+panel("+proj=eck2") # hide
+````
+
+== eck3
+
+````@example projections
+panel("+proj=eck3") # hide
+````
+
+== eck4
+
+````@example projections
+panel("+proj=eck4") # hide
+````
+
+== eck5
+
+````@example projections
+panel("+proj=eck5") # hide
+````
+
+== eck6
+
+````@example projections
+panel("+proj=eck6") # hide
+````
+
+:::
+
+## `+proj=eqc`
+
+```@example projections
+panel("+proj=eqc") # hide
+```
+
+## `+proj=eqdc +lat_1=55 +lat_2=60`
+
+```@example projections
+panel("+proj=eqdc +lat_1=55 +lat_2=60") # hide
+```
+
+## `+proj=eqearth`
+
+```@example projections
+panel("+proj=eqearth") # hide
+```
+
+## `+proj=euler +lat_1=67 +lat_2=75`
+
+```@example projections
+panel("+proj=euler +lat_1=67 +lat_2=75") # hide
+```
+
+## `+proj=fahey`
+
+```@example projections
+panel("+proj=fahey") # hide
+```
+
+## `+proj=fouc`
+
+```@example projections
+panel("+proj=fouc") # hide
+```
+
+## `+proj=fouc_s`
+
+```@example projections
+panel("+proj=fouc_s") # hide
+```
+
+## `+proj=gall`
+
+```@example projections
+panel("+proj=gall") # hide
+```
+
+## `+proj=geos +h=35785831.0 +lon_0=-60 +sweep=y`
+
+```@example projections
+panel("+proj=geos +h=35785831.0 +lon_0=-60 +sweep=y") # hide
+```
+
+## `+proj=gins8`
+
+```@example projections
+panel("+proj=gins8") # hide
+```
+
+## `+proj=gn_sinu +m=2 +n=3`
+
+```@example projections
+panel("+proj=gn_sinu +m=2 +n=3") # hide
+```
+
+## `+proj=goode`
+
+```@example projections
+panel("+proj=goode") # hide
+```
+
+## `+proj=guyou`
+
+```@example projections
+panel("+proj=guyou") # hide
+```
+
+## `+proj=hammer`
+
+```@example projections
+panel("+proj=hammer") # hide
+```
+
+## `+proj=hatano`
+
+```@example projections
+panel("+proj=hatano") # hide
+```
+
+## `+proj=igh`
+
+```@example projections
+panel("+proj=igh") # hide
+```
+
+## `+proj=igh_o +lon_0=-160`
+
+```@example projections
+panel("+proj=igh_o +lon_0=-160") # hide
+```
+
+## `+proj=imoll`
+
+```@example projections
+panel("+proj=imoll") # hide
+```
+
+## `+proj=imoll_o +lon_0=-160`
+
+```@example projections
+panel("+proj=imoll_o +lon_0=-160") # hide
+```
+
+## `+proj=imw_p +lat_1=30 +lat_2=-40`
+
+```@example projections
+panel("+proj=imw_p +lat_1=30 +lat_2=-40") # hide
+```
+
+## `+proj=isea`
+
+```@example projections
+panel("+proj=isea") # hide
+```
+
+## `kav` family
+
+::: tabs
+
+== kav5
+
+````@example projections
+panel("+proj=kav5") # hide
+````
+
+== kav7
+
+````@example projections
+panel("+proj=kav7") # hide
+````
+
+:::
+
+## `+proj=laea`
+
+```@example projections
+panel("+proj=laea") # hide
+```
+
+## `+proj=lagrng`
+
+```@example projections
+panel("+proj=lagrng") # hide
+```
+
+## `+proj=larr`
+
+```@example projections
+panel("+proj=larr") # hide
+```
+
+## `+proj=lask`
+
+```@example projections
+panel("+proj=lask") # hide
+```
+
+## `+proj=lcca +lat_0=35`
+
+```@example projections
+panel("+proj=lcca +lat_0=35") # hide
+```
+
+## `+proj=leac`
+
+```@example projections
+panel("+proj=leac") # hide
+```
+
+## `+proj=loxim`
+
+```@example projections
+panel("+proj=loxim") # hide
+```
+
+## `+proj=lsat +ellps=GRS80 +lat_1=-60 +lat_2=60 +lsat=2 +path=2`
+
+```@example projections
+panel("+proj=lsat +ellps=GRS80 +lat_1=-60 +lat_2=60 +lsat=2 +path=2") # hide
+```
+
+## `+proj=mbt_s`
+
+```@example projections
+panel("+proj=mbt_s") # hide
+```
+
+## `+proj=mbt_fps`
+
+```@example projections
+panel("+proj=mbt_fps") # hide
+```
+
+## `+proj=mbtfpp`
+
+```@example projections
+panel("+proj=mbtfpp") # hide
+```
+
+## `+proj=mbtfpq`
+
+```@example projections
+panel("+proj=mbtfpq") # hide
+```
+
+## `+proj=mbtfps`
+
+```@example projections
+panel("+proj=mbtfps") # hide
+```
+
+## `+proj=merc`
+
+```@example projections
+panel("+proj=merc") # hide
+```
+
+## `+proj=mill`
+
+```@example projections
+panel("+proj=mill") # hide
+```
+
+## `+proj=moll`
+
+```@example projections
+panel("+proj=moll") # hide
+```
+
+## `murd` family
+
+::: tabs
+
+== murd1
+
+````@example projections
+panel("+proj=murd1 +lat_1=30 +lat_2=50") # hide
+````
+
+== murd3
+
+````@example projections
+panel("+proj=murd3 +lat_1=30 +lat_2=50") # hide
+````
+
+:::
+
+## `natearth` family
+
+::: tabs
+
+== natearth
+
+````@example projections
+panel("+proj=natearth") # hide
+````
+
+== natearth2
+
+````@example projections
+panel("+proj=natearth2") # hide
+````
+
+:::
+
+## `+proj=nell`
+
+```@example projections
+panel("+proj=nell") # hide
+```
+
+## `+proj=nell_h`
+
+```@example projections
+panel("+proj=nell_h") # hide
+```
+
+## `+proj=nicol`
+
+```@example projections
+panel("+proj=nicol") # hide
+```
+
+## `+proj=ob_tran +o_proj=mill +o_lon_p=40 +o_lat_p=50 +lon_0=60`
+
+```@example projections
+panel("+proj=ob_tran +o_proj=mill +o_lon_p=40 +o_lat_p=50 +lon_0=60") # hide
+```
+
+## `+proj=ocea`
+
+```@example projections
+panel("+proj=ocea") # hide
+```
+
+## `+proj=oea +m=1 +n=2`
+
+```@example projections
+panel("+proj=oea +m=1 +n=2") # hide
+```
+
+## `+proj=omerc +lat_1=45 +lat_2=55`
+
+```@example projections
+panel("+proj=omerc +lat_1=45 +lat_2=55") # hide
+```
+
+## `+proj=ortel`
+
+```@example projections
+panel("+proj=ortel") # hide
+```
+
+## `+proj=ortho`
+
+```@example projections
+panel("+proj=ortho") # hide
+```
+
+## `+proj=patterson`
+
+```@example projections
+panel("+proj=patterson") # hide
+```
+
+## `+proj=poly`
+
+```@example projections
+panel("+proj=poly") # hide
+```
+
+## `putp` family
+
+::: tabs
+
+== putp1
+
+````@example projections
+panel("+proj=putp1") # hide
+````
+
+== putp2
+
+````@example projections
+panel("+proj=putp2") # hide
+````
+
+== putp3
+
+````@example projections
+panel("+proj=putp3") # hide
+````
+
+== putp3p
+
+````@example projections
+panel("+proj=putp3p") # hide
+````
+
+== putp4p
+
+````@example projections
+panel("+proj=putp4p") # hide
+````
+
+== putp5
+
+````@example projections
+panel("+proj=putp5") # hide
+````
+
+== putp5p
+
+````@example projections
+panel("+proj=putp5p") # hide
+````
+
+== putp6
+
+````@example projections
+panel("+proj=putp6") # hide
+````
+
+== putp6p
+
+````@example projections
+panel("+proj=putp6p") # hide
+````
+
+:::
+
+## `+proj=qua_aut`
+
+```@example projections
+panel("+proj=qua_aut") # hide
+```
+
+## `+proj=robin`
+
+```@example projections
+panel("+proj=robin") # hide
+```
+
+## `+proj=rouss`
+
+```@example projections
+panel("+proj=rouss") # hide
+```
+
+## `+proj=rpoly`
+
+```@example projections
+panel("+proj=rpoly") # hide
+```
+
+## `+proj=sinu`
+
+```@example projections
+panel("+proj=sinu") # hide
+```
+
+## `+proj=spilhaus`
+
+```@example projections
+panel("+proj=spilhaus") # hide
+```
+
+## `+proj=times`
+
+```@example projections
+panel("+proj=times") # hide
+```
+
+## `+proj=tissot +lat_1=60 +lat_2=65`
+
+```@example projections
+panel("+proj=tissot +lat_1=60 +lat_2=65") # hide
+```
+
+## `+proj=tmerc`
+
+```@example projections
+panel("+proj=tmerc") # hide
+```
+
+## `+proj=tobmerc`
+
+```@example projections
+panel("+proj=tobmerc") # hide
+```
+
+## `+proj=tpeqd +lat_1=60 +lat_2=65`
+
+```@example projections
+panel("+proj=tpeqd +lat_1=60 +lat_2=65") # hide
+```
+
+## `+proj=urm5 +n=0.9 +alpha=2 +q=4`
+
+```@example projections
+panel("+proj=urm5 +n=0.9 +alpha=2 +q=4") # hide
+```
+
+## `+proj=urmfps +n=0.5`
+
+```@example projections
+panel("+proj=urmfps +n=0.5") # hide
+```
+
+## `vandg` family
+
+::: tabs
+
+== vandg
+
+````@example projections
+panel("+proj=vandg") # hide
+````
+
+== vandg2
+
+````@example projections
+panel("+proj=vandg2") # hide
+````
+
+== vandg3
+
+````@example projections
+panel("+proj=vandg3") # hide
+````
+
+== vandg4
+
+````@example projections
+panel("+proj=vandg4") # hide
+````
+
+:::
+
+## `+proj=vitk1 +lat_1=45 +lat_2=55`
+
+```@example projections
+panel("+proj=vitk1 +lat_1=45 +lat_2=55") # hide
+```
+
+## `wag` family
+
+::: tabs
+
+== wag1
+
+````@example projections
+panel("+proj=wag1") # hide
+````
+
+== wag2
+
+````@example projections
+panel("+proj=wag2") # hide
+````
+
+== wag3
+
+````@example projections
+panel("+proj=wag3") # hide
+````
+
+== wag4
+
+````@example projections
+panel("+proj=wag4") # hide
+````
+
+== wag5
+
+````@example projections
+panel("+proj=wag5") # hide
+````
+
+== wag6
+
+````@example projections
+panel("+proj=wag6") # hide
+````
+
+== wag7
+
+````@example projections
+panel("+proj=wag7") # hide
+````
+
+:::
+
+## `+proj=webmerc +datum=WGS84`
+
+```@example projections
+panel("+proj=webmerc +datum=WGS84") # hide
+```
+
+## `+proj=weren`
+
+```@example projections
+panel("+proj=weren") # hide
+```
+
+## `wink` family
+
+::: tabs
+
+== wink1
+
+````@example projections
+panel("+proj=wink1") # hide
+````
+
+== wink2
+
+````@example projections
+panel("+proj=wink2") # hide
+````
+
+:::
+
+## `+proj=wintri`
+
+```@example projections
+panel("+proj=wintri") # hide
 ```
 
 ## Polar (stereographic)
