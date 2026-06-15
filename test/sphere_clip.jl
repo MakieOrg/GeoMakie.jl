@@ -77,10 +77,22 @@ end
         # explicit per-vertex *colour* matrix (e.g. draping an image) must not force Float64(::RGBA)
         imgcol = [RGBA{Float32}(abs(sind(l)), abs(cosd(p)), 0.5f0, 1.0f0) for l in lons, p in lats]
         @test_nowarn surface!(ga, lons, lats, zeros(length(lons), length(lats)); color = imgcol, shading = NoShading)
+        # a colour image finer than the z grid must be resampled onto it, not dropped to a flat colour
+        bigimg = [RGBA{Float32}(abs(sind(2l)), abs(cosd(3p)), 0.2f0, 1.0f0)
+                  for l in range(-180, 180; length = 200), p in range(-90, 90; length = 100)]
+        @test_nowarn surface!(ga, lons, lats, zeros(length(lons), length(lats)); color = bigimg, shading = NoShading)
         @test_nowarn heatmap!(ga, lons, lats, data)
         @test_nowarn meshimage!(ga, -180 .. 180, -90 .. 90, GeoMakie.earth() |> rotr90)
         @test_nowarn Makie.update_state_before_display!(fig)
     end
+end
+
+@testset "_resample_to_grid samples a finer image onto the z grid" begin
+    A = Float64[10i + j for i in 1:4, j in 1:4]   # all distinct
+    B = G._resample_to_grid(A, 2, 2)
+    @test size(B) == (2, 2)
+    @test length(unique(B)) == 4                  # sampled, not collapsed to one flat value
+    @test G._resample_to_grid(A, 4, 4) === A      # same size -> identity, no copy
 end
 
 @testset "bertin1953 native centred Hammer (Option B)" begin

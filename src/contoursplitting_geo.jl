@@ -293,9 +293,24 @@ function _geo_grid_plot!(axis, plot, vals_node)
     return plot
 end
 
+# A colour image passed as `surface!(...; color = img)` may be finer than the z grid (which
+# sets the mesh/geometry resolution). CairoMakie meshes can't texture-map, so sample `img`
+# onto the grid as per-vertex colours instead of dropping it (which rendered a flat colour).
+function _resample_to_grid(img, nx, ny)
+    sx, sy = size(img)
+    (sx == nx && sy == ny) && return img
+    out = Matrix{eltype(img)}(undef, nx, ny)
+    @inbounds for j in 1:ny, i in 1:nx
+        ai = clamp(round(Int, (i - 0.5) * sx / nx + 0.5), 1, sx)
+        aj = clamp(round(Int, (j - 0.5) * sy / ny + 0.5), 1, sy)
+        out[i, j] = img[ai, aj]
+    end
+    return out
+end
+
 function Makie.plot!(axis::GeoAxis, plot::Makie.Surface)
     vals = lift(plot[3], plot.color) do zs, col
-        (col isa AbstractMatrix && size(col) == size(zs)) ? col : zs
+        col isa AbstractMatrix ? _resample_to_grid(col, size(zs, 1), size(zs, 2)) : zs
     end
     return _geo_grid_plot!(axis, plot, vals)
 end
