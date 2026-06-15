@@ -186,9 +186,15 @@ function resample_sphere(sub, project; scale::Float64 = 1.0)
     return out
 end
 
-# A scale that makes `_DELTA2` correspond to a small fraction of the projected map size, so
-# the same threshold behaves across projections with wildly different units (degrees vs
-# metres). `project` is sampled on a coarse lon/lat grid to estimate the projected span.
+"""
+    resample_scale(project) -> Float64
+
+Estimate a scale factor that makes the resampling threshold `_DELTA2` correspond to a small
+fraction of the projected map size, so the same threshold behaves consistently across
+projections with wildly different units (degrees vs metres). `project(lon, lat) -> (x, y)` is
+sampled on a coarse lon/lat grid to estimate the projected span. Used as the `scale` argument
+to [`resample_sphere`](@ref).
+"""
 function resample_scale(project)
     umin = vmin = Inf; umax = vmax = -Inf
     for lon in -180.0:30.0:180.0, lat in -90.0:30.0:90.0
