@@ -24,7 +24,7 @@ Guiding principles:
   recipe renders for moll/spilhaus/igh/bertin. Keep it green through every swap. Add a numeric
   before/after diff for any geometry you delegate.
 
-## Already done this session (commit `2311bd2`)
+## Already done (commit `2311bd2`)
 
 - Deleted ~75 lines of dead code (`_ring_contains`/`_inside_polygon`, `_planar_pip`/
   `_planar_inside`, `_ring_area_sph`, `_rewind_small`, the spilhaus conformal-rotation block).
@@ -36,6 +36,58 @@ Guiding principles:
 - De-duplicated `childfunc` (→ `_child_transformfunc`) and fixed a stale comment in
   `contoursplitting_geo.jl`. Updated the module header note (GO *does* now have spherical clip/area).
 
+## This session — outcome summary
+
+Investigated every roadmap item against the installed deps (GeometryOps **0.1.40**,
+GeometryBasics 0.5.11, GeoInterface 1.6.1, Geodesy 1.2.0, CoordinateTransformations 0.6.4).
+Net code change is small and conservative; the bigger deliverable is *evidence* of where
+delegation is and isn't possible. sphere_clip testset stays **green** (8 testsets) throughout.
+
+- **DONE — version compat fixed.** `Project.toml` `GeometryOps` `0.1.6` → **`0.1.28`**. The old
+  bound was already wrong (the existing `GO.forcexyz` usage needs ≥0.1.15); 0.1.28 is the first
+  tag shipping the `UnitSpherical` submodule we now use.
+- **DONE — P2 primitives (pushed as far as correctness+perf allow).** Delegated to
+  `GeometryOps.UnitSpherical` every spherical primitive where the swap is **at least as correct and
+  as fast** (the stated bar):
+  | helper | → delegated to | evidence |
+  |---|---|---|
+  | `_geo_interp` | `slerp` | ≡ old to ≤6e-14 (non-antipodal); antipodal-robust; neutral in boundary build |
+  | `_gcdist_deg` | `spherical_distance` | ≡ old to 8.5e-7° |
+  | `_cart` | `UnitSphereFromGeographic` | identical maths; 1.7 ns ≡ 1.7 ns; 0 allocs |
+  | `_cp_dist` | `spherical_distance` (+`UnitSphericalPoint` wrap) | same atan2 form; 0 allocs |
+
+  **Evaluated and deliberately KEPT** (each fails the bar — these are the upstream asks):
+  | helper | why kept | upstream fix that would unblock |
+  |---|---|---|
+  | `_gc_intersect` | GO's `spherical_arc_intersection` is **correct** (matches incl. the degenerate-zero-length guard) but **allocates** 4×/240 B per call; ours is alloc-free and runs in the `_cp_clip_line` hot loop | an allocation-free / in-place arc-intersection variant |
+  | `_sph` | `GeographicFromUnitSphere` does **not** `clamp(z,-1,1)` → `DomainError` on FP `|z|>1` | clamp `asind` arg upstream |
+  | `_cartr` / `_sphr` | radian-native (hot clip); UnitSpherical is degrees-only → a rad→deg→rad round-trip regresses the loop | a radians entry point |
+  | `_dot3`/`_cross3`/`_normalize3` | generic ℝ³ vector ops (LinearAlgebra), not geo primitives; on `NTuple` they're alloc-free and trivial | n/a |
+
+  The d3 line-by-line ports (`_polygon_contains`, `_antimeridian_stream`, `_circle_*`, `_cp_*`) stay
+  hand-rolled — they mirror the d3-geo source verbatim (the verifiability guardrail) and a type
+  migration to `UnitSphericalPoint` buys no perf.
+- **NOT FEASIBLE — P1 spherical clip.** GO's Foster–Hormann clip computes edge intersections with
+  **planar** lon/lat math for *every* manifold: `_intersection_point(manifold::M, …)` →
+  `_find_cross_intersection` is a 2-D parametric line solve, and the orientation predicates are
+  planar. The GO source flags it: *"this is suitable for planar but spherical/geodesic will need
+  s2 support at some point"* (`clipping_processor.jl`). Routing `_clip_against_polygon` through
+  `GO.intersection(GO.Spherical(), …)` would replace true great-circle arc intersection with a
+  planar lon/lat solve — a correctness regression exactly on the seam-crossing edges this code
+  exists for. Keep our port; **upstream candidate** = a GO issue for s2/true-spherical clipping.
+- **NOT A CLEAN DROP-IN — P3 segmentize.** `GO.segmentize` exposes only `Planar()` and
+  `Geodesic()`; `segmentize(::Manifold, …)` silently falls back to `Planar()`. For `_densify_geo`
+  (great-circle arcs over lon/lat°), `Planar` is geometrically wrong (straight lon/lat lines) and
+  `Geodesic` is ellipsoidal, in metres, and needs Proj + whole-geometry GI wrapping. No unit-sphere
+  mode exists. The underlying great-circle *interpolation* is nonetheless now delegated (via
+  `slerp`); the densify *loop* (angular, K-points-per-edge, NTuple) stays ours.
+- **NO DROP-IN — P4 ring nesting.** GO has hole-assignment logic but only **inside**
+  `polygonize` (raster-based), not as a public helper, and it differs from `_rings_to_polygons`:
+  it splits exterior/hole by **winding direction** (not even-odd containment *depth*), nests in
+  **native** space (we need **projected** space so seam pieces at opposite map edges separate),
+  and uses planar `covers`. Genuinely different requirements → **maintainer decision** whether GO
+  should grow a generic `rings → nested polygons by depth` helper.
+
 ## Roadmap — what to delegate next (priority order)
 
 Investigated against the **installed dev versions**: GeometryOps **0.1.40** (has a real
@@ -44,7 +96,12 @@ Geodesy 1.2.0, CoordinateTransformations 0.6.4. (Geodesy/CoordinateTransformatio
 **orthogonal** — ellipsoid/ECEF-in-metres and math-spherical-radians-without-rotations — so the
 rotation/cartesian/distance code is *not* reinvention of those two.)
 
-### P1 — the `PolygonClip` spherical-clip path → `GO.intersection(GO.Spherical(), …)`
+### P1 — ❌ NOT FEASIBLE (GO spherical clip is planar-math) — the `PolygonClip` spherical-clip path → `GO.intersection(GO.Spherical(), …)`
+**Verdict (this session):** GO's `Spherical()` Foster–Hormann clip still intersects edges with planar
+lon/lat math (`_intersection_point`/`_find_cross_intersection` in `intersection.jl` are 2-D; source
+comment: "spherical/geodesic will need s2 support at some point"). Delegating regresses correctness
+on seam-crossing edges. Keep the port; file a GO issue for true-spherical clipping. Detail below.
+
 Biggest single win (~217 lines): `_cp_clip_line` + `_cp_rejoin` + `_cp_interpolate!` +
 `_clip_against_polygon` (lines ~560–780) implement a d3-geo-polygon `clipPolygon`. GO 0.1.40's
 Foster–Hormann clipping (`src/methods/clipping/`) explicitly supports the `Spherical()` manifold.
@@ -57,7 +114,10 @@ Foster–Hormann clipping (`src/methods/clipping/`) explicitly supports the `Sph
 - If GO is correct but slower, profile and PR upstream; if it's missing the boundary-walk fill,
   raise it as a GO issue.
 
-### P2 — low-level spherical primitives → `GeometryOps.UnitSpherical`
+### P2 — ✅ DONE (partial): `_geo_interp`→`slerp`, `_gcdist_deg`→`spherical_distance`; primitives/ports kept
+**Verdict (this session):** benchmarked neutral, numerically verified; delegated the two non-port
+helpers. Kept the `NTuple{3}` math + d3 ports (identical perf, mirror d3 source). Detail below.
+
 Exact analogues exist (`src/utils/UnitSpherical/`):
 | sphere_clip.jl | UnitSpherical |
 |---|---|
@@ -72,11 +132,19 @@ Exact analogues exist (`src/utils/UnitSpherical/`):
   This is a prime case where "keep the wheel upstream" may conflict with perf: if UnitSpherical is
   slower in our access pattern, PR an allocation-free path upstream rather than keeping ours.
 
-### P3 — densify → `GO.segmentize(GO.Spherical(); max_distance)`
+### P3 — ⚠️ NOT A CLEAN DROP-IN (no unit-sphere segmentize) — densify → `GO.segmentize(GO.Spherical(); max_distance)`
+**Verdict (this session):** `segmentize` has only `Planar()` (wrong geometry for us) and `Geodesic()`
+(ellipsoidal/metres/Proj); `::Manifold` falls back to `Planar()`. Great-circle interpolation now goes
+via `slerp`; the angular K-per-edge densify loop stays ours. Detail below.
+
 `_densify_geo` / the great-circle densify loops are non-adaptive — a clean match for `segmentize`.
 Note `resample_sphere` is **not** this (see "must stay" below).
 
-### P4 — ring nesting (`_rings_to_polygons`, ~75 lines)
+### P4 — ⚠️ NO DROP-IN (GO nesting is internal/winding-based/native-space) — ring nesting (`_rings_to_polygons`, ~75 lines)
+**Verdict (this session):** GO's hole assignment lives only inside `polygonize` (raster), splits by
+winding not even-odd depth, and nests in native (not projected) space. Different requirements →
+maintainer decision on a generic `rings→nested-polygons` helper. Detail below.
+
 Rebuilds polygons-with-holes from a flat ring set by containment depth (Makie needs explicit
 holes; d3 uses even-odd). `GO.polygonize` is **raster-based**, not ring-nesting, so no drop-in
 today. **Candidate to upstream**: a "rings → nested polygons" helper is generally useful and a
@@ -99,14 +167,13 @@ natural GeometryOps addition. Decide with the GO maintainers whether it belongs 
 - **`clip_strategy` registry, `_NativeCentred`/bertin, Option B centred-frame, recipe overrides** —
   PROJ-string + Makie-specific glue. Keep here.
 
-## Version / compat caveat (do this before relying on Spherical)
+## Version / compat caveat — ✅ DONE
 
-`Project.toml` pins `GeometryOps = "0.1.6"`. The caret bound technically admits 0.1.40, but the
-`Spherical()` manifold / `UnitSpherical` / spherical Foster–Hormann landed **well after** 0.1.6.
-To depend on them, **raise the lower bound** to whichever 0.1.x introduced the manifold refactor
-(check the GO changelog/registry; `GeometryOpsCore` owns the manifold types) so users don't
-resolve to a version that `MethodError`s. Treat the spherical API as comparatively new — verify,
-don't assume.
+`Project.toml` `GeometryOps` bound raised `0.1.6` → **`0.1.28`** this session.
+- `0.1.6` was already incorrect: the existing `GO.forcexyz` usage (utils.jl) needs **≥0.1.15**.
+- `UnitSpherical` (the `slerp`/`spherical_distance` we now use) first ships in **v0.1.28**
+  (commit `65c1f7a13`, "include in GeometryOps proper", 2025-04-03).
+- The caret `0.1.28` still admits the tested 0.1.40. Resolves clean; suite green.
 
 ## How to verify
 
@@ -131,9 +198,16 @@ not slower.
 - `src/contoursplitting_geo.jl` — recipe overrides for `Contourf`/`Contour`/`Poly`/`Lines`/
   `Surface`/`Heatmap` on `GeoAxis`. Shares `_clip_faces`/`_mesh_projector` with `mesh_image.jl`.
 
-## Open design questions for the maintainers
+## Upstream issues → drafted in `dev/UPSTREAM_GEOMETRYOPS.md`
 
-1. Where is the GeoMakie↔GeometryOps boundary for the **projection-adaptive resampler**? (Likely
-   GeoMakie, but worth confirming.)
-2. Will GO accept a **spherical point-in-polygon predicate** and a **rings→nested-polygons** helper?
-3. Is `UnitSpherical` allocation-free enough for our hot loops, or do we PR a faster path?
+The investigation answered the old open questions; the gaps are written up as ready-to-file
+GeometryOps issues (per maintainer request, drafts only — not yet posted):
+1. `Spherical()` clipping is planar-math (Issue 1) — the P1 blocker.
+2. Allocation-free `spherical_arc_intersection` (Issue 2) — would unblock delegating `_gc_intersect`.
+3. Spherical point-in-polygon predicate (Issue 3) — would let us delete `_polygon_contains`.
+4. Public rings→nested-polygons-by-depth helper (Issue 4) — the P4 question.
+   Plus minor nits: `GeographicFromUnitSphere` should `clamp`; a radians transform for hot loops.
+
+Still genuinely GeoMakie-side (confirmed, not upstream): the **projection-adaptive resampler**
+(`resample_sphere`, keyed to *projected* error via a per-projection `scale`), the
+antimeridian/circle seam drivers, and the `clip_strategy`/Option-B/recipe glue.
