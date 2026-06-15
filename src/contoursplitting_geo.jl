@@ -72,20 +72,14 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Contourf)
     end
 
     # the split child must draw in the SAME frame the split polys were emitted in: centred
-    # transform for the antimeridian (rotated frame), full transform otherwise. Decide inside
-    # one lift so the geometry frame and the transform switch atomically when `dest` changes.
-    childfunc = lift(axis.dest, source) do dest, src
-        ftf = create_transform(dest, src); clip = clip_strategy(ftf)
-        clip isa AntimeridianClip ? create_transform(_centred_dest(dest), src) :
-        clip isa ObliqueAntimeridianClip ? clip.centred : ftf
-    end
-
+    # transform for the antimeridian (rotated frame), full transform otherwise — decided inside one
+    # lift (`_child_transformfunc`) so the geometry frame and transform switch atomically with `dest`.
     child = _find_child(plot, Makie.Poly)
     if child !== nothing
         _drop_child!(axis.scene, plot, child)
         Makie.poly!(
             plot, plot.split_polys;
-            transformation = Makie.Transformation(childfunc),
+            transformation = Makie.Transformation(_child_transformfunc(axis, source)),
             colormap = plot.computed_colormap,
             colorrange = plot.computed_colorrange,
             highclip = plot.computed_highcolor,
@@ -230,7 +224,7 @@ end
 # Build a projected, discontinuity-clipped triangle mesh from a rectilinear lon/lat grid
 # (`xs`, `ys` vectors) with per-vertex values `vals`. The grid is projected (Option B — rotated
 # frame + centred projector — for the antimeridian, so lon_0=180 doesn't collapse), triangulated,
-# and faces straddling the tear are dropped (`_visible_faces`). Returns (mesh, flat colour vector).
+# and faces straddling the tear are subdivided/dropped (`_clip_faces`). Returns (mesh, flat colour vector).
 function _geo_grid_mesh(dest, source, xs, ys, vals)
     ftf = create_transform(dest, source); clip = clip_strategy(ftf)
     rotated = clip isa AntimeridianClip

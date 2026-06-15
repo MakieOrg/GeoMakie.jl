@@ -33,8 +33,14 @@ Ports of:
 The discontinuity each destination transform tears along is chosen by [`clip_strategy`](@ref),
 the analog of d3's per-projection `preclip`.
 
-Geometry I/O goes through GeoInterface (`GI`) so the input type is irrelevant; the spherical
-math (containment, great-circle intersections, rejoin) has no GO/GI equivalent and is ported.
+Geometry I/O goes through GeoInterface (`GI`) so the input type is irrelevant. The clip driver,
+the d3 antimeridian/circle seam logic, the projection-adaptive `resample_sphere`, and the
+winding point-in-polygon (`_polygon_contains`) are ported because they have no GeometryOps
+equivalent (GO's `Spherical()` clip is polygon∩polygon; its predicates and resampler are planar /
+distance-based, not seam-aware or projection-adaptive). Planar helpers used on already-projected
+points — the oblique-square boundary's convex hull and Douglas–Peucker simplify — DO defer to
+`GO.convex_hull`/`GO.simplify`. A faithful port of the `PolygonClip` path onto
+`GO.intersection(GO.Spherical(), …)` is a candidate future simplification (see `_clip_against_polygon`).
 =#
 
 const _D2R = π / 180
@@ -251,58 +257,6 @@ function _polygon_contains(polygon, point)
     return xor(angle < -1.0e-6 || (angle < 1.0e-6 && total < -1.0e-12), (winding & 1) == 1)
 end
 
-# Winding-independent containment: `_polygon_contains` follows d3-geo's convention (which is
-# winding-sensitive), so we normalise each ring to positive spherical area first. `_ring_contains`
-# is true iff `pt` (lon/lat deg) is inside the region bounded by one `ring`; `_inside_polygon`
-# combines an exterior (`rings[1]`) with holes (`rings[2:end]`).
-_ring_contains(ring, pt) = _polygon_contains([_ring_area_sph(ring) < 0 ? reverse(ring) : ring], pt)
-function _inside_polygon(rings, pt)
-    isempty(rings) && return false
-    _ring_contains(rings[1], pt) || return false
-    for i in 2:length(rings)
-        _ring_contains(rings[i], pt) && return false
-    end
-    return true
-end
-
-# PLANAR (lon/lat even-odd) point-in-polygon, with longitudes unwrapped to within 180° of the
-# test point so an antimeridian-crossing ring doesn't get a spurious wrap edge. Used to seed
-# the circle-clip rejoin parity for planar contourf bands (see `_clip_polygon`).
-function _planar_pip(ring, x, y)
-    inside = false; n = length(ring); j = n
-    @inbounds for i in 1:n
-        xi = ring[i][1] - round((ring[i][1] - x) / 360) * 360; yi = ring[i][2]
-        xj = ring[j][1] - round((ring[j][1] - x) / 360) * 360; yj = ring[j][2]
-        if (yi > y) != (yj > y)
-            x < xi + (y - yi) / (yj - yi) * (xj - xi) && (inside = !inside)
-        end
-        j = i
-    end
-    return inside
-end
-function _planar_inside(rings, pt)
-    inside = false
-    for r in rings
-        _planar_pip(r, pt[1], pt[2]) && (inside = !inside)
-    end
-    return inside
-end
-
-# Signed spherical area of a lon/lat ring (steradians). Rotation-invariant; its sign encodes
-# winding. Used for ring-nesting in [`_rings_to_polygons`](@ref) and the containment above.
-function _ring_area_sph(r)
-    n = length(r)
-    n < 3 && return 0.0
-    a = 0.0
-    @inbounds for i in 1:n
-        p0 = r[i]; p1 = r[i == n ? 1 : i + 1]
-        dλ = (p1[1] - p0[1]) * _D2R
-        dλ = mod(dλ + π, 2π) - π
-        a += dλ * (2.0 + sin(p0[2] * _D2R) + sin(p1[2] * _D2R))
-    end
-    return a / 2
-end
-
 # Spherical area (steradians, range [0, 4π]) of the region a lon/lat ring BOUNDS under d3's
 # winding convention (port of d3-geo area.js). A ring traversed so its interior is the small
 # region returns < 2π; one traversed the other way (interior = complement) returns > 2π. We use
@@ -326,8 +280,6 @@ function _geo_area(ring)
     end
     return 2 * (s < 0 ? 2π + s : s)
 end
-# canonicalise a ring so its bounded interior is the SMALLER region (d3 convention exterior)
-_rewind_small(r) = _geo_area(r) > 2π ? reverse(r) : r
 
 ############################################################
 #                   Clip strategies                        #
@@ -472,46 +424,13 @@ const _BOUNDARY_CACHE = Dict{String,Vector{Vector{Point2d}}}()
 # great-circle distance (degrees) between two lon/lat points
 _gcdist_deg(a, b) = acosd(clamp(_dot3(_cart(a[1], a[2]), _cart(b[1], b[2])), -1.0, 1.0))
 
-# Douglas–Peucker simplification of a closed ring (projected 2-D points), tolerance `tol`.
-# Collapses near-collinear runs so a (grid-sampled) square hull becomes 4 sharp corners while a
-# smoothly-curved hull (ellipse) keeps enough points to stay within `tol` of the curve.
-function _dp_simplify(ring, tol)
-    n = length(ring); n < 4 && return ring
-    keep = falses(n); keep[1] = true
-    # farthest-from-[1] anchor so the closed ring is split into two well-defined chains
-    far = argmax(i -> hypot(ring[i][1] - ring[1][1], ring[i][2] - ring[1][2]), 1:n)
-    keep[far] = true
-    stack = Tuple{Int,Int}[(1, far), (far, n + 1)]
-    idxof(i) = i > n ? 1 : i
-    while !isempty(stack)
-        i, j = pop!(stack)
-        j <= i + 1 && continue
-        ax, ay = ring[idxof(i)]; bx, by = ring[idxof(j)]
-        dx = bx - ax; dy = by - ay; L = hypot(dx, dy)
-        dmax = 0.0; m = i
-        for k in (i+1):(j-1)
-            px, py = ring[idxof(k)]
-            d = L < 1.0e-12 ? hypot(px - ax, py - ay) : abs(dy * (px - ax) - dx * (py - ay)) / L
-            d > dmax && (dmax = d; m = k)
-        end
-        if dmax > tol
-            keep[idxof(m)] = true; push!(stack, (i, m)); push!(stack, (m, j))
-        end
-    end
-    return ring[keep]
-end
-
-# Andrew's monotone-chain convex hull (CCW, collinear points dropped) of 2-D points.
-function _convex_hull(pts)
-    p = sort(unique(pts); by = q -> (q[1], q[2]))
-    length(p) < 3 && return p
-    cr(o, a, b) = (a[1] - o[1]) * (b[2] - o[2]) - (a[2] - o[2]) * (b[1] - o[1])
-    half(seq) = (h = eltype(p)[]; for q in seq
-            while length(h) >= 2 && cr(h[end-1], h[end], q) <= 0; pop!(h); end
-            push!(h, q)
-        end; h)
-    lower = half(p); upper = half(Iterators.reverse(p))
-    return vcat(lower[1:end-1], upper[1:end-1])
+# Exterior ring of a GI polygon as an OPEN Point2d vector (drop the closing duplicate vertex, if
+# any). Used to read back GeometryOps' convex-hull / simplify output for the boundary trace below.
+function _exterior_open(poly)
+    r = GI.getexterior(poly)
+    pts = Point2d[Point2d(GI.x(p), GI.y(p)) for p in GI.getpoint(r)]
+    length(pts) > 1 && isapprox(pts[end], pts[1]; atol = 1.0e-9) && pop!(pts)
+    return pts
 end
 
 # Derive the spherical clip boundary of an oblique projection (d3 `reclip`, in-order variant).
@@ -531,12 +450,16 @@ function _oblique_boundary(t)
         (isfinite(x) && isfinite(y)) && push!(proj_pts, Point2d(x, y))
     end
     length(proj_pts) < 16 && return Vector{Point2d}[]
-    hull = _convex_hull(proj_pts)
+    # Convex hull of the projected grid = the in-order domain outline (these projections map the
+    # whole sphere into a CONVEX projected domain). GeometryOps' planar monotone-chain hull.
+    hullpoly = GO.convex_hull(proj_pts)
+    hull = _exterior_open(hullpoly)
     length(hull) < 3 && return Vector{Point2d}[]
-    # collapse grid-sampling noise at the corners: straight edges → sharp corners, curves kept
+    # collapse grid-sampling noise at the corners (Douglas–Peucker): straight edges → sharp
+    # corners, curves kept. tol = perpendicular distance as a fraction of the hull's diagonal.
     diag = hypot(maximum(p -> p[1], hull) - minimum(p -> p[1], hull),
                  maximum(p -> p[2], hull) - minimum(p -> p[2], hull))
-    hull = _dp_simplify(hull, 0.004 * diag)
+    hull = _exterior_open(GO.simplify(GO.DouglasPeucker(; tol = 0.004 * diag), hullpoly))
     length(hull) < 3 && return Vector{Point2d}[]
     cx = sum(p -> p[1], hull) / length(hull); cy = sum(p -> p[2], hull) / length(hull)
     R = 1 - 1.0e-6
@@ -870,44 +793,6 @@ function _rotation(c::CircleClip)
     return fwd, inv
 end
 _rotation(c::ObliqueAntimeridianClip) = (c.fwd, c.inv)
-
-# Conformal latitude (and inverse) on the WGS84 ellipsoid — spilhaus maps via the conformal sphere.
-const _E2_WGS84 = 0.0066943799901413165
-function _conformal_lat(φ)
-    e = sqrt(_E2_WGS84); s = sin(φ)
-    return 2 * atan(tan(π / 4 + φ / 2) * ((1 - e * s) / (1 + e * s))^(e / 2)) - π / 2
-end
-function _conformal_lat_inv(χ)
-    e = sqrt(_E2_WGS84); φ = χ
-    for _ in 1:12
-        s = sin(φ); φ = 2 * atan(tan(π / 4 + χ / 2) * ((1 + e * s) / (1 - e * s))^(e / 2)) - π / 2
-    end
-    return φ
-end
-
-# Snyder oblique aspect (A working manual, 5-7/5-8b) used by PROJ's spilhaus: maps geographic ↔
-# the adams_ws2 frame whose antimeridian is spilhaus's seam. Returns (fwd, inv) in radians.
-function _spilhaus_rotation(lon0_deg, lat0_deg, azi_deg)
-    lam0 = lon0_deg * _D2R; phi0 = lat0_deg * _D2R; azi = azi_deg * _D2R
-    χc = _conformal_lat(phi0)
-    sinα = -cos(χc) * cos(azi); cosα = sqrt(max(0.0, 1 - sinα^2))
-    λ0 = atan(tan(azi), -sin(χc)); β = π + atan(-sin(azi), -tan(χc))
-    off = lam0 + λ0
-    function fwd(λ, φ)
-        φc = _conformal_lat(φ); Δλ = λ - off
-        cφ = cos(φc); sφ = sin(φc); cΔ = cos(Δλ); sΔ = sin(Δλ)
-        pa = asin(clamp(sinα * sφ - cosα * cφ * cΔ, -1.0, 1.0))
-        la = β + atan(cφ * sΔ, sinα * cφ * cΔ + cosα * sφ)
-        return (_wrapλ(la), pa)
-    end
-    function inv(la, pa)
-        cl = cos(la - β); sl = sin(la - β); sp = sin(pa); cp = cos(pa)
-        χ = asin(clamp(sinα * sp + cosα * cp * cl, -1.0, 1.0))
-        λ = atan(cp * sl, sinα * cp * cl - cosα * sp) + off
-        return (λ, _conformal_lat_inv(χ))
-    end
-    return fwd, inv
-end
 
 # --- bertin1953: a rotated, fudged Hammer (PROJ `bertin1953.cpp`, no inverse) -----------------
 # PROJ bakes the oblique aspect into the forward (lam += −16.5°, then a −42° rotation about the
