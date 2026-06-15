@@ -74,6 +74,9 @@ end
         @test_nowarn poly!(ga, LAND)
         @test_nowarn lines!(ga, C)
         @test_nowarn surface!(ga, lons, lats, zeros(length(lons), length(lats)); color = data, shading = NoShading)
+        # explicit per-vertex *colour* matrix (e.g. draping an image) must not force Float64(::RGBA)
+        imgcol = [RGBA{Float32}(abs(sind(l)), abs(cosd(p)), 0.5f0, 1.0f0) for l in lons, p in lats]
+        @test_nowarn surface!(ga, lons, lats, zeros(length(lons), length(lats)); color = imgcol, shading = NoShading)
         @test_nowarn heatmap!(ga, lons, lats, data)
         @test_nowarn meshimage!(ga, -180 .. 180, -90 .. 90, GeoMakie.earth() |> rotr90)
         @test_nowarn Makie.update_state_before_display!(fig)

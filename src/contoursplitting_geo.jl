@@ -238,18 +238,20 @@ function _geo_grid_mesh(dest, source, xs, ys, vals)
     lon0 = rotated ? clip.lon0 : 0.0
     # heatmap passes cell EDGES (n+1) with per-cell data (n); use centres so the vertex grid
     # matches `vals`. surface passes coordinate vectors matching `vals` already.
-    nx = size(vals, 1); ny = size(vals, 2)
+    nx, ny = size(vals)
     xs = length(xs) == nx + 1 ? [(xs[i] + xs[i+1]) / 2 for i in 1:nx] : xs
     ys = length(ys) == ny + 1 ? [(ys[j] + ys[j+1]) / 2 for j in 1:ny] : ys
     points = Vector{Point3d}(undef, nx * ny)
     latlon = Vector{Point2d}(undef, nx * ny)
-    cols = Vector{Float64}(undef, nx * ny)
+    # Per-vertex values are either scalars (colormapped downstream) or explicit colours
+    # (`surface!(...; color = <image>)`); `similar` inherits either eltype, so no Float64(::RGBA).
+    cols = similar(vals, nx * ny)
     for (k, ci) in enumerate(CartesianIndices((nx, ny)))
         lo = Float64(xs[ci[1]]); la = Float64(ys[ci[2]])
         rotated && (lo = mod(lo - lon0 + 180.0, 360.0) - 180.0)   # canonical rotated frame
         latlon[k] = Point2d(lo, la)
         points[k] = Makie.to_ndim(Point3d, Makie.apply_transform(tf, Point3d(lo, la, 0.0)), 0.0)
-        cols[k] = Float64(vals[ci[1], ci[2]])
+        cols[k] = vals[ci[1], ci[2]]
     end
     rect = GeometryBasics.Tesselation(Rect2f(0, 0, 1, 1), (nx, ny))
     faces = GeometryBasics.decompose(Makie.GLTriangleFace, rect)

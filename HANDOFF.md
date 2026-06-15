@@ -3,7 +3,7 @@
 Branch: `bp-claued/sphere_clip_resampling` (base: `master`)
 Last updated: 2026-06-15
 
-## Commits this session (all pushed-ready, not yet pushed)
+## Commits this session (pushed to origin; pulled on the other machine)
 
 - `a122ebc` Fix polar stereographic: route `stere`/`sterea`/`ups` through antipode `CircleClip`
   (was mis-routed via the antimeridian centred frame → polar `lat_0=±90` collapsed to an
@@ -24,8 +24,18 @@ Tests green: `julia --project=dev/scratch-env test/sphere_clip.jl` (68 pass).
 Symptom: `julia --project=docs docs/make.jl` hangs in the Cardmeta phase, last line
 `[ Info: Running Cardmeta for geoid`. CI (Jun 4, master) does geoid→vesta3d in ~15 s.
 
+**Timed both pages standalone on this machine (Jun 15, `/tmp/geoid_test.jl`,
+`/tmp/vesta3d_test.jl`, `--project=docs`) — neither is slow; the stall did NOT reproduce:**
+- `geoid` (GLMakie, as the example activates): cover `colorbuffer(px_per_unit=2)` = 7.2 s cold /
+  2.9 s warm. The EGM96 raster is actually **1440×721 (~1.04M cells)**, not 1441×2881 — the
+  1441×2881 figure below was the *Vesta image*, not the geoid raster.
+- `vesta3d` cover under CairoMakie (the real docs path): `colorbuffer` = 1.6 s cold / 0.37 s warm
+  (build incl. first-call compile 5 s). GLMakie equivalent ~4 s. So CairoMakie software-3D is fine
+  here, not "minutes". → the docs stall is something else (DataDeps download prompt, an unrelated
+  page, or env-specific), not geoid/vesta render cost.
+
 Likely **NOT our regression** — evidence:
-- `geoid.jl` uses `GlobeAxis` + `surface!` on a 1441×2881 (~4.15M-cell) raster (`Cover = fig`).
+- `geoid.jl` uses `GlobeAxis` + `surface!` on a 1440×721 (~1.04M-cell) raster (`Cover = fig`).
 - The next page (CI order) is `vesta3d.jl` = `meshimage(...; type = GlobeAxis)`.
 - `src/sphere/globeaxis.jl` is **not** in our changed files (`git diff --name-only master..HEAD -- src`
   = GeoMakie.jl, contoursplitting_geo.jl, geoaxis.jl, mesh_image.jl, sphere_clip.jl, utils.jl).
