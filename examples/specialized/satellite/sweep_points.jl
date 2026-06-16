@@ -103,8 +103,13 @@ ras = try
     replace_missing(Raster(worldclim_file), NaN)
 catch e
     @warn "WorldClim is unreachable (server offline) — using a synthetic raster so the docs still build. The published docs use the real data whenever the server is up." exception = (e, catch_backtrace())
-    ## synthetic global raster so the sampling/surface below still works
-    Raster(rand(Float64, X(-180.0:1.0:179.0), Y(-90.0:1.0:89.0)))
+    ## Synthetic global raster so the sampling/surface below still works. It must use
+    ## `Intervals` sampling (like the real WorldClim raster) so `Contains(<arbitrary lon/lat>)`
+    ## below resolves — `Points` sampling only matches exact grid coordinates.
+    ## Span the full globe (to ±180/±90) so any sampled lon/lat is in bounds.
+    _Lk = Rasters.DimensionalData.Lookups
+    _r = Raster(rand(Float64, X(-180.0:1.0:180.0), Y(-90.0:1.0:90.0)))
+    set(_r, X => _Lk.Intervals(_Lk.Center()), Y => _Lk.Intervals(_Lk.Center()))
 end
 # Re-sample the raster to the sampling timeseries.  This is currently a manual process,
 # but we should just make everything a raster here.
