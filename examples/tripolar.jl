@@ -9,7 +9,7 @@ per cell) rather than 1-D vectors — and still clips correctly at a projection'
 
 Here we take a real [`Oceananigans.TripolarGrid`](https://github.com/CliMA/Oceananigans.jl),
 paint a tilted wave field on it, close the grid's longitudinal seam with
-[`add_cyclic_point`](@ref), and draw it with `contourf!` on the interrupted oblique
+`GeoMakie.add_cyclic_point`, and draw it with `contourf!` on the interrupted oblique
 Mollweide projection (`imoll_o`) — a hard case that tears the map into lobes.
 =#
 using GeoMakie, CairoMakie
