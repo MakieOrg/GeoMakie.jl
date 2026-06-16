@@ -159,7 +159,7 @@ not slower.
 
 ## Upstream issues — FILED in JuliaGeo/GeometryOps.jl (2026-06-15)
 
-Each names this branch's PR (**MakieOrg/GeoMakie.jl#379**) as the place the bespoke workaround
+Each names this branch's PR (**MakieOrg/GeoMakie.jl#381**) as the place the bespoke workaround
 lives, and states released GeoMakie neither has nor needs it. Local long-form drafts:
 `dev/UPSTREAM_GEOMETRYOPS.md` (gitignored).
 
