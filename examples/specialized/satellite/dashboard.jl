@@ -92,8 +92,14 @@ globe_attrib = get_attribution("blue_marble_topo_november")
 # For now, let's take the state of California and the county of Santa Clara.
 # We'll use the GADM.jl package to get these.
 using GADM
-cali = GADM.get("USA", "California")
-sc_county = GADM.get("USA", "California", "Santa Clara")
+cali, sc_county = try
+    (GADM.get("USA", "California"), GADM.get("USA", "California", "Santa Clara"))
+catch e
+    @warn "GADM is unreachable (server offline) — using placeholder geometries so the docs still build. The published docs use the real data whenever GADM is up." exception = (e, catch_backtrace())
+    ## rough lon/lat stand-ins so the centroid/bands/camera below still work
+    _box(xmin, xmax, ymin, ymax) = GeoMakie.GeometryBasics.Polygon(Point2f[(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax), (xmin, ymin)])
+    (_box(-124.5, -114.0, 32.5, 42.0), _box(-122.2, -121.2, 37.0, 37.5))
+end
 
 # ### Satellite trajectory
 # Let's take the Hubble Space Telescope as an example here.
@@ -180,7 +186,12 @@ f
 # `meshimage!` or `surface!` recipes.
 # To begin, let's plot a real satellite image 
 using Downloads, FileIO
-geostationary_img = FileIO.load(Downloads.download("https://gist.github.com/pelson/5871263/raw/EIDA50_201211061300_clip2.png"))
+geostationary_img = try
+    FileIO.load(Downloads.download("https://gist.github.com/pelson/5871263/raw/EIDA50_201211061300_clip2.png"))
+catch e
+    @warn "geostationary image download failed — using a blank placeholder so the docs still build." exception = (e, catch_backtrace())
+    fill(RGBAf(0, 0, 0, 0), 256, 256)
+end
 mi = meshimage!(a,
     -5500000 .. 5500000, -5500000 .. 5500000, geostationary_img;
     source="+proj=geos +h=35786000",
