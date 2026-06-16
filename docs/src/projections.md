@@ -5,31 +5,28 @@ contours, polygons, lines, and the projection boundary stay correct across each
 projection's discontinuity — the antimeridian, interrupted lobes (`igh`/`imoll`),
 azimuthal/perspective horizons (`ortho`/`geos`), and oblique seams (`spilhaus`/`bertin`).
 
-Each section below draws the same global field as a `contourf!` on a `GeoAxis`, with the
-coastline land polygons overlaid, for (almost) every projection PROJ provides — one panel
-per projection, with related variants (e.g. `eck1`…`eck6`) grouped into tabs. A clean panel
-— no horizontal smears across the map — means the seam split fired correctly for that
-projection.
+Each section below draws the **bare** projection on a `GeoAxis` — the coastline land
+polygons and the graticule — for (almost) every projection PROJ provides, one panel per
+projection, with related variants (e.g. `eck1`…`eck6`) grouped into tabs. The land outline
+and graticule stay correct right up to each projection's discontinuity (the antimeridian,
+interrupted lobes, azimuthal horizons, oblique seams), with no smears across the tear.
+
+(For a *filled-field* test on a curvilinear grid — `contourf!` of an Oceananigans tripolar
+field, with `add_cyclic_point` and the interrupted `imoll_o` projection — see the
+[Tripolar grid](@ref) example.)
 
 ```@setup projections
 using GeoMakie, CairoMakie
 
-## a global field with positive/negative bands, asymmetric through the poles so the
-## seam-splitter has no symmetry to lean on
-lons = -180:2.0:180
-lats = -90:2.0:90
-field = [sind(2p) * cosd(3l) + 0.3 * sind(p) for l in lons, p in lats]
-const LEVELS = range(-1.3, 1.3; length = 12)
 const LAND = GeoMakie.land()
 
-## one contourf + land panel for a single projection; a try-catch keeps a bad projection
-## from sinking the whole page (it renders a "(skipped)" label instead)
+## one bare land + graticule panel for a single projection; a try-catch keeps a bad
+## projection from sinking the whole page (it renders a "(skipped)" label instead)
 function panel(proj)
     fig = Figure(size = (420, 280))
     try
         ga = GeoAxis(fig[1, 1]; dest = proj)
         hidedecorations!(ga; grid = false)
-        contourf!(ga, lons, lats, field; levels = LEVELS, extendlow = :auto, extendhigh = :auto)
         poly!(ga, LAND; color = (:gray70, 0.55), strokecolor = :black, strokewidth = 0.3)
     catch
         Label(fig[1, 1], replace(proj, "+proj=" => "") * "\n(skipped)"; fontsize = 10)
@@ -816,23 +813,12 @@ the cap is "all longitudes, lat in `[55, 90]`" (or the southern mirror), which t
 projection maps to the disk.
 
 ```@example projections
-## a pole-encircling field defined over each cap, closed in longitude (cyclic) so the
-## bands meet cleanly across the ±180° seam
-capfield(l, y) = sind(y) + 0.25 * cosd(3l) * cosd(y)
-function capgrid(lat)
-    lon = collect(-180.0:2:178)
-    z = [capfield(l, y) for l in lon, y in lat]
-    return (vcat(lon, lon[begin] + 360), lat, vcat(z, z[begin:begin, :]))
-end
-
 polar = Figure(size = (840, 440))
-for (i, (d, lat, lims, ttl)) in enumerate([
-        ("+proj=stere +lat_0=90 +lon_0=0",  collect(20.0:2:90),  ((-180, 180), (55, 90)),   "North polar stereographic"),
-        ("+proj=stere +lat_0=-90 +lon_0=0", collect(-90.0:2:-20), ((-180, 180), (-90, -55)), "South polar stereographic")])
+for (i, (d, lims, ttl)) in enumerate([
+        ("+proj=stere +lat_0=90 +lon_0=0",  ((-180, 180), (55, 90)),   "North polar stereographic"),
+        ("+proj=stere +lat_0=-90 +lon_0=0", ((-180, 180), (-90, -55)), "South polar stereographic")])
     ga = GeoAxis(polar[1, i]; dest = d, limits = lims, title = ttl, titlesize = 11)
     hidedecorations!(ga; grid = false)
-    lon, la, z = capgrid(lat)
-    contourf!(ga, lon, la, z; levels = range(-1, 1; length = 11), extendlow = :auto, extendhigh = :auto)
     poly!(ga, LAND; color = (:gray70, 0.55), strokecolor = :black, strokewidth = 0.3)
 end
 polar # hide

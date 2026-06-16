@@ -49,6 +49,7 @@ examples = String[
     joinpath("gmt", "antioquia.jl"),
     "german_lakes.jl",
     "field_and_countries.jl",
+    "tripolar.jl",
     "meshimage.jl",
     # "projections.jl",
     "tissot.jl",
