@@ -78,7 +78,7 @@ const _GEO_FROM_US = GO.UnitSpherical.GeographicFromUnitSphere()  # UnitSpherica
 # DomainError where this must stay total. (Filed upstream — see HANDOFF.)
 @inline function _sph(v)
     x, y, z = v
-    (atan(y, x) * _R2D, asin(clamp(z, -1.0, 1.0)) * _R2D)
+    return (atan(y, x) * _R2D, asin(clamp(z, -1.0, 1.0)) * _R2D)
 end
 # radian versions (canonical-frame clip works in radians, like d3). Kept hand-rolled: UnitSpherical
 # only exposes a degrees transform, so routing the hot radian-native clip through it would add a
@@ -91,7 +91,7 @@ end
 @inline _cross3(a, b) = (a[2] * b[3] - a[3] * b[2], a[3] * b[1] - a[1] * b[3], a[1] * b[2] - a[2] * b[1])
 @inline function _normalize3(v)
     n = _norm3(v)
-    n < 1.0e-300 ? v : (v[1] / n, v[2] / n, v[3] / n)
+    return n < 1.0e-300 ? v : (v[1] / n, v[2] / n, v[3] / n)
 end
 
 @inline _cart_eq(a, b) = abs(a[1] - b[1]) < _EPS2 && abs(a[2] - b[2]) < _EPS2 && abs(a[3] - b[3]) < _EPS2
@@ -100,23 +100,25 @@ end
 # the edge normals; `_gc_intersect` returns the intersection unit vector of two segments (or
 # `nothing`), `_gc_point_on_line` tests whether a point lies on a segment.
 struct _IxSeg
-    from::NTuple{3,Float64}
-    to::NTuple{3,Float64}
-    normal::NTuple{3,Float64}
-    fromNormal::NTuple{3,Float64}
-    toNormal::NTuple{3,Float64}
+    from::NTuple{3, Float64}
+    to::NTuple{3, Float64}
+    normal::NTuple{3, Float64}
+    fromNormal::NTuple{3, Float64}
+    toNormal::NTuple{3, Float64}
     l::Float64
 end
 function _ixseg(from, to)
     n = _cross3(from, to)
-    _IxSeg(from, to, n, _cross3(n, from), _cross3(n, to), acos(clamp(_dot3(from, to), -1.0, 1.0)))
+    return _IxSeg(from, to, n, _cross3(n, from), _cross3(n, to), acos(clamp(_dot3(from, to), -1.0, 1.0)))
 end
 function _gc_intersect(a::_IxSeg, b::_IxSeg)
     (_cart_eq(a.from, b.from) || _cart_eq(a.from, b.to)) && return a.from
     (_cart_eq(a.to, b.from) || _cart_eq(a.to, b.to)) && return a.to
     lc = (a.l + b.l < π) ? cos(a.l + b.l) - _EPS : -1.0
-    (_dot3(a.from, b.from) < lc || _dot3(a.from, b.to) < lc ||
-     _dot3(a.to, b.from) < lc || _dot3(a.to, b.to) < lc) && return nothing
+    (
+        _dot3(a.from, b.from) < lc || _dot3(a.from, b.to) < lc ||
+            _dot3(a.to, b.from) < lc || _dot3(a.to, b.to) < lc
+    ) && return nothing
     cx = _cross3(a.normal, b.normal)
     # degenerate (zero-length segment → zero normal, or parallel great circles): d3's
     # cartesianNormalize yields NaN here, which fails the on-arc comparisons → no intersection.
@@ -146,8 +148,8 @@ end
 ############################################################
 
 const _MAXDEPTH = 16          # d3 maxDepth
-const _DELTA2   = 0.5         # d3 default precision² (projected units after scaling)
-const _COSMIN   = cos(30 * _D2R)   # d3 cosMinDistance
+const _DELTA2 = 0.5         # d3 default precision² (projected units after scaling)
+const _COSMIN = cos(30 * _D2R)   # d3 cosMinDistance
 
 # Port of d3 resample.js `resampleLineTo`, emitting **lon/lat** midpoints (the child
 # projects them). The straightness test is measured in *projected* space via `project`.
@@ -178,8 +180,8 @@ function _resample_to!(out, project, scale, v0, ll0, xy0, v1, ll1, xy1, depth)
     dy2 = (xy2[2] - xy0[2]) * scale
     dz = dy * dx2 - dx * dy2
     if dz * dz / d2 > _DELTA2 ||                                   # projected perpendicular distance
-       abs((dx * dx2 + dy * dy2) / d2 - 0.5) > 0.3 ||             # midpoint near an end
-       _dot3(v0, v1) < _COSMIN                                    # angular distance > 30°
+            abs((dx * dx2 + dy * dy2) / d2 - 0.5) > 0.3 ||             # midpoint near an end
+            _dot3(v0, v1) < _COSMIN                                    # angular distance > 30°
         _resample_to!(out, project, scale, v0, ll0, xy0, vm, ll2, xy2, depth - 1)
         push!(out, Point2d(lon2, lat2))
         _resample_to!(out, project, scale, vm, ll2, xy2, v1, ll1, xy1, depth - 1)
@@ -296,7 +298,7 @@ function _geo_area(ring)
     h = (ring[1][2] * _D2R) / 2 + π / 4
     cosφ0 = cos(h); sinφ0 = sin(h)
     s = 0.0
-    @inbounds for i in 2:(n+1)
+    @inbounds for i in 2:(n + 1)
         p = ring[i <= n ? i : 1]
         λ = p[1] * _D2R; φ = (p[2] * _D2R) / 2 + π / 4
         dλ = λ - λ0; sd = dλ >= 0 ? 1.0 : -1.0; ad = sd * dλ
@@ -389,8 +391,10 @@ end
 # that transforms a geometry directly. (Makie's poly!/lines! recipes actually transform the decomposed
 # point arrays, so the array method already covers the common case — these are belt-and-suspenders.)
 Makie.apply_transform(c::_NativeCentred, p::GeometryBasics.Polygon) =
-    GeometryBasics.Polygon(Makie.apply_transform(c, GeometryBasics.coordinates(p.exterior)),
-                           [Makie.apply_transform(c, GeometryBasics.coordinates(i)) for i in p.interiors])
+    GeometryBasics.Polygon(
+    Makie.apply_transform(c, GeometryBasics.coordinates(p.exterior)),
+    [Makie.apply_transform(c, GeometryBasics.coordinates(i)) for i in p.interiors]
+)
 Makie.apply_transform(c::_NativeCentred, ls::GeometryBasics.LineString) =
     GeometryBasics.LineString(Makie.apply_transform(c, GeometryBasics.coordinates(ls)))
 Makie.apply_transform(c::_NativeCentred, mp::GeometryBasics.MultiPolygon) =
@@ -437,13 +441,13 @@ function PolygonClip(boundary::Vector{<:AbstractVector})
     _geo_area(rings[1]) < 2π && (rings[1] = reverse(rings[1]))
     segs = _IxSeg[]
     for r in rings, i in 2:length(r)
-        push!(segs, _ixseg(_cartr(r[i-1][1] * _D2R, r[i-1][2] * _D2R), _cartr(r[i][1] * _D2R, r[i][2] * _D2R)))
+        push!(segs, _ixseg(_cartr(r[i - 1][1] * _D2R, r[i - 1][2] * _D2R), _cartr(r[i][1] * _D2R, r[i][2] * _D2R)))
     end
     return PolygonClip(rings, segs, rings[1])
 end
 
 # --- boundary derivation (d3 reclip): inverse-project the projected outline -----------------
-const _BOUNDARY_CACHE = Dict{String,Vector{Vector{Point2d}}}()
+const _BOUNDARY_CACHE = Dict{String, Vector{Vector{Point2d}}}()
 
 # Oblique squares (spilhaus/guyou/…): trace the projected outline by binary-searching, in many
 # directions from the projected centre, the radius where the inverse stops being finite, then
@@ -452,7 +456,8 @@ const _BOUNDARY_CACHE = Dict{String,Vector{Vector{Point2d}}}()
 # `spherical_distance`, the numerically-stable atan2(‖a×b‖, a·b) form; matches the old
 # acos-of-dot to ~1e-6° and is stable for near-coincident points).
 _gcdist_deg(a, b) = _R2D * GO.UnitSpherical.spherical_distance(
-    _US_FROM_GEO((Float64(a[1]), Float64(a[2]))), _US_FROM_GEO((Float64(b[1]), Float64(b[2]))))
+    _US_FROM_GEO((Float64(a[1]), Float64(a[2]))), _US_FROM_GEO((Float64(b[1]), Float64(b[2])))
+)
 
 # Exterior ring of a GI polygon as an OPEN Point2d vector (drop the closing duplicate vertex, if
 # any). Used to read back GeometryOps' convex-hull / simplify output for the boundary trace below.
@@ -472,8 +477,20 @@ end
 # (e.g. guyou) or the result is malformed.
 function _oblique_boundary(t)
     tinv = Base.inv(t; always_xy = true)
-    proj(lo, la) = (try; xy = t((Float64(lo), Float64(la))); (Float64(xy[1]), Float64(xy[2])); catch; (NaN, NaN); end)
-    invp(x, y) = (try; ll = tinv((Float64(x), Float64(y))); (Float64(ll[1]), Float64(ll[2])); catch; (NaN, NaN); end)
+    proj(lo, la) = (
+        try
+            xy = t((Float64(lo), Float64(la))); (Float64(xy[1]), Float64(xy[2]))
+        catch
+            (NaN, NaN)
+        end
+    )
+    invp(x, y) = (
+        try
+            ll = tinv((Float64(x), Float64(y))); (Float64(ll[1]), Float64(ll[2]))
+        catch
+            (NaN, NaN)
+        end
+    )
     proj_pts = Point2d[]
     for lo in -180.0:0.5:180.0, la in -89.5:0.5:89.5
         x, y = proj(lo, la)
@@ -487,8 +504,10 @@ function _oblique_boundary(t)
     length(hull) < 3 && return Vector{Point2d}[]
     # collapse grid-sampling noise at the corners (Douglas–Peucker): straight edges → sharp
     # corners, curves kept. tol = perpendicular distance as a fraction of the hull's diagonal.
-    diag = hypot(maximum(p -> p[1], hull) - minimum(p -> p[1], hull),
-                 maximum(p -> p[2], hull) - minimum(p -> p[2], hull))
+    diag = hypot(
+        maximum(p -> p[1], hull) - minimum(p -> p[1], hull),
+        maximum(p -> p[2], hull) - minimum(p -> p[2], hull)
+    )
     hull = _exterior_open(GO.simplify(GO.DouglasPeucker(; tol = 0.004 * diag), hullpoly))
     length(hull) < 3 && return Vector{Point2d}[]
     cx = sum(p -> p[1], hull) / length(hull); cy = sum(p -> p[2], hull) / length(hull)
@@ -496,8 +515,8 @@ function _oblique_boundary(t)
     n = length(hull); per = max(2, cld(400, n))         # ~400 boundary points total
     ring = Point2d[]
     for i in 1:n
-        a = hull[i]; b = hull[mod(i, n)+1]
-        for k in 0:(per-1)
+        a = hull[i]; b = hull[mod(i, n) + 1]
+        for k in 0:(per - 1)
             s = k / per
             px = a[1] + s * (b[1] - a[1]); py = a[2] + s * (b[2] - a[2])
             ll = invp(cx + R * (px - cx), cy + R * (py - cy))
@@ -505,7 +524,7 @@ function _oblique_boundary(t)
         end
     end
     length(ring) < 16 && return Vector{Point2d}[]
-    jumps = count(i -> _gcdist_deg(ring[i-1], ring[i]) > 25.0, 2:length(ring))
+    jumps = count(i -> _gcdist_deg(ring[i - 1], ring[i]) > 25.0, 2:length(ring))
     jumps > 4 && return Vector{Point2d}[]
     return Vector{Point2d}[ring]
 end
@@ -516,16 +535,22 @@ end
 # Goode/interrupted-Mollweide lobes (match PROJ igh/imoll, transcribed from d3 homolosine.js):
 const _IGH_LOBES = (
     (((-180.0, 0.0), (-100.0, 90.0), (-40.0, 0.0)), ((-40.0, 0.0), (30.0, 90.0), (180.0, 0.0))),
-    (((-180.0, 0.0), (-160.0, -90.0), (-100.0, 0.0)), ((-100.0, 0.0), (-60.0, -90.0), (-20.0, 0.0)),
-     ((-20.0, 0.0), (20.0, -90.0), (80.0, 0.0)), ((80.0, 0.0), (140.0, -90.0), (180.0, 0.0))),
+    (
+        ((-180.0, 0.0), (-160.0, -90.0), (-100.0, 0.0)), ((-100.0, 0.0), (-60.0, -90.0), (-20.0, 0.0)),
+        ((-20.0, 0.0), (20.0, -90.0), (80.0, 0.0)), ((80.0, 0.0), (140.0, -90.0), (180.0, 0.0)),
+    ),
 )
 # Oceanic Goode (PROJ igh_o): N split at lon −90/60, S split at −60/90; central meridians from
 # igh_o.cpp's zone setup (N: −140/−10/130, S: −110/20/150).
 const _IGH_O_LOBES = (
-    (((-180.0, 0.0), (-140.0, 90.0), (-90.0, 0.0)), ((-90.0, 0.0), (-10.0, 90.0), (60.0, 0.0)),
-     ((60.0, 0.0), (130.0, 90.0), (180.0, 0.0))),
-    (((-180.0, 0.0), (-110.0, -90.0), (-60.0, 0.0)), ((-60.0, 0.0), (20.0, -90.0), (90.0, 0.0)),
-     ((90.0, 0.0), (150.0, -90.0), (180.0, 0.0))),
+    (
+        ((-180.0, 0.0), (-140.0, 90.0), (-90.0, 0.0)), ((-90.0, 0.0), (-10.0, 90.0), (60.0, 0.0)),
+        ((60.0, 0.0), (130.0, 90.0), (180.0, 0.0)),
+    ),
+    (
+        ((-180.0, 0.0), (-110.0, -90.0), (-60.0, 0.0)), ((-60.0, 0.0), (20.0, -90.0), (90.0, 0.0)),
+        ((90.0, 0.0), (150.0, -90.0), (180.0, 0.0)),
+    ),
 )
 # Great-circle interpolation at fraction `s` between two lon/lat° points, returning (lon,lat)°.
 # Delegated to UnitSpherical's `slerp` (S2 tangent-vector form): machine-precision-identical to
@@ -533,8 +558,10 @@ const _IGH_O_LOBES = (
 # `1/sin(Ω)` divisor blew up. Boundary edges here are never near-antipodal, so this is a pure
 # robustness upgrade at neutral cost.
 function _geo_interp(a, b, s)
-    p = GO.UnitSpherical.slerp(_US_FROM_GEO((Float64(a[1]), Float64(a[2]))),
-                               _US_FROM_GEO((Float64(b[1]), Float64(b[2]))), s)
+    p = GO.UnitSpherical.slerp(
+        _US_FROM_GEO((Float64(a[1]), Float64(a[2]))),
+        _US_FROM_GEO((Float64(b[1]), Float64(b[2]))), s
+    )
     return _GEO_FROM_US(p)
 end
 function _interrupted_boundary(lobes, lon0)
@@ -557,9 +584,9 @@ function _interrupted_boundary(lobes, lon0)
     K = 24
     dense = Point2d[]
     for i in 2:length(poly)
-        a = poly[i-1]; b = poly[i]; push!(dense, a)
+        a = poly[i - 1]; b = poly[i]; push!(dense, a)
         if abs(a[1] - b[1]) > 1.0e-3 || abs(a[2] - b[2]) > 1.0e-3      # skip ~zero junction edges
-            for t in 1:(K-1)
+            for t in 1:(K - 1)
                 q = _geo_interp((a[1], a[2]), (b[1], b[2]), t / K)
                 push!(dense, Point2d(q[1], q[2]))
             end
@@ -585,7 +612,8 @@ _randsign(i, j) = sign(sin(100 * i + j))
 # geodesic distance between two cartesian unit vectors — UnitSpherical's `spherical_distance` is the
 # identical atan2(‖a×b‖, a·b) form; the NTuple→UnitSphericalPoint wrap is allocation-free.
 _cp_dist(a, b) = GO.UnitSpherical.spherical_distance(
-    GO.UnitSpherical.UnitSphericalPoint(a), GO.UnitSpherical.UnitSphericalPoint(b))
+    GO.UnitSpherical.UnitSphericalPoint(a), GO.UnitSpherical.UnitSphericalPoint(b)
+)
 _cp_sort(a, b) = a.index != b.index ? float(a.index - b.index) : (a.t - b.t)
 
 # Port of d3-geo-polygon clipPolygon's clipLine, on one polyline (radians). Returns the visible
@@ -605,7 +633,7 @@ function _cp_clip_line(pts, pc::PolygonClip; closed::Bool)
         point = _cartr(λ * 0.9999999999, φ + 1.0e-14)
         v = v0
         if point0 !== nothing
-            ints = NamedTuple{(:λ, :φ, :index, :t, :d),NTuple{5,Float64}}[]
+            ints = NamedTuple{(:λ, :φ, :index, :t, :d), NTuple{5, Float64}}[]
             segA = _ixseg(point0, point)
             i = 1; jc = 100
             while i <= length(segs) && jc > 0
@@ -667,18 +695,18 @@ function _cp_interpolate!(pc::PolygonClip, from, to, dir, out)
         end
     elseif from.index < 0 || to.index < 0
         return                              # defensive: an ordinary (non-boundary) point reached
-                                            # interpolate (a clipPolygon multi-hole edge case);
-                                            # skip the boundary walk rather than index segs[0]
+        # interpolate (a clipPolygon multi-hole edge case);
+        # skip the boundary walk rather than index segs[0]
     elseif from.index != to.index
         i = from.index
         while i != to.index
-            s = segs[i+1]; p = dir > 0 ? s.to : s.from; sλ, sφ = _sphr(p)
+            s = segs[i + 1]; p = dir > 0 ? s.to : s.from; sλ, sφ = _sphr(p)
             push!(out, _CPt(sλ, sφ, -1, 0.0))
             i = mod(i + dir + n, n)
         end
     elseif from.index == to.index && from.t > to.t
-        for k in 0:(n-1)
-            s = segs[mod(from.index + k * dir + n, n)+1]; p = dir > 0 ? s.to : s.from; sλ, sφ = _sphr(p)
+        for k in 0:(n - 1)
+            s = segs[mod(from.index + k * dir + n, n) + 1]; p = dir > 0 ? s.to : s.from; sλ, sφ = _sphr(p)
             push!(out, _CPt(sλ, sφ, -1, 0.0))
         end
     end
@@ -688,19 +716,22 @@ end
 # rejoin (port of clip/rejoin.js) for _CPt segments with the index/t sort
 mutable struct _IxC
     x::_CPt
-    z::Union{Nothing,Vector{_CPt}}
-    o::Union{Nothing,_IxC}
+    z::Union{Nothing, Vector{_CPt}}
+    o::Union{Nothing, _IxC}
     e::Bool
     v::Bool
-    n::Union{Nothing,_IxC}
-    p::Union{Nothing,_IxC}
+    n::Union{Nothing, _IxC}
+    p::Union{Nothing, _IxC}
 end
 _IxC(x, z, o, e) = _IxC(x, z, o, e, false, nothing, nothing)
 function _linkC!(arr)
     isempty(arr) && return
     a = arr[1]
-    @inbounds for i in 2:length(arr); b = arr[i]; a.n = b; b.p = a; a = b; end
-    a.n = arr[1]; arr[1].p = a
+    @inbounds for i in 2:length(arr)
+        b = arr[i]; a.n = b; b.p = a; a = b
+    end
+    a.n = arr[1]
+    return arr[1].p = a
 end
 @inline _cpteq(a, b) = abs(a.λ - b.λ) < _EPS && abs(a.φ - b.φ) < _EPS
 function _cp_rejoin(segments, start_inside, pc)
@@ -710,7 +741,7 @@ function _cp_rejoin(segments, start_inside, pc)
         (length(seg) - 1) <= 0 && continue
         p0 = seg[1]; p1 = seg[end]
         if _cpteq(p0, p1)
-            push!(rings, seg[1:end-1]); continue
+            push!(rings, seg[1:(end - 1)]); continue
         end
         a = _IxC(p0, seg, nothing, true);  ao = _IxC(p0, nothing, a, false); a.o = ao
         b = _IxC(p1, seg, nothing, false); bo = _IxC(p1, nothing, b, true);  b.o = bo
@@ -720,7 +751,9 @@ function _cp_rejoin(segments, start_inside, pc)
     sort!(clip; lt = (u, w) -> _cp_sort(u.x, w.x) < 0)
     _linkC!(subject); _linkC!(clip)
     si = start_inside
-    for c in clip; si = !si; c.e = si; end
+    for c in clip
+        si = !si; c.e = si
+    end
     start = subject[1]
     # Each intersection is visited once, so total work is bounded by the number of intersections.
     # Cap iterations defensively: a malformed boundary (e.g. a self-intersecting derived outline)
@@ -743,7 +776,9 @@ function _cp_rejoin(segments, start_inside, pc)
             else
                 if is_subject
                     pts = current.p.z
-                    for k in length(pts):-1:1; push!(ring, pts[k]); end
+                    for k in length(pts):-1:1
+                        push!(ring, pts[k])
+                    end
                 else
                     _cp_interpolate!(pc, current.x, current.p.x, -1, ring)
                 end
@@ -776,9 +811,11 @@ function _clip_against_polygon(pc::PolygonClip, rings_deg)
             continue
         end
         if length(lines) > 1 && (clean & 2) != 0
-            lines = vcat([vcat(lines[end], lines[1])], lines[2:end-1])
+            lines = vcat([vcat(lines[end], lines[1])], lines[2:(end - 1)])
         end
-        for s in lines; length(s) > 1 && push!(segments, s); end
+        for s in lines
+            length(s) > 1 && push!(segments, s)
+        end
     end
     out = whole
     # d3: startInside = is the boundary's start point inside the SUBJECT polygon (per-polygon).
@@ -792,7 +829,7 @@ end
 
 # Internal clip-core point: (λ, φ, marker) in radians. `marker` carries d3's degeneracy
 # flags (1 = coincident-intersection nudge, 2/3 = boundary-exit markers used by rejoin).
-const _Pt = NTuple{3,Float64}
+const _Pt = NTuple{3, Float64}
 @inline _seg_pteq(a, b) = abs(a[1] - b[1]) < _EPS && abs(a[2] - b[2]) < _EPS
 
 # --- rotation (d3 rotation.js): map projection centre → canonical [0,0] and back ----------
@@ -874,7 +911,7 @@ end
     s = sin(λ0 - λ1)
     abs(s) < _EPS && return (φ0 + φ1) / 2
     cφ0 = cos(φ0); cφ1 = cos(φ1)
-    atan((sin(φ0) * cφ1 * sin(λ1) - sin(φ1) * cφ0 * sin(λ0)) / (cφ0 * cφ1 * s))
+    return atan((sin(φ0) * cφ1 * sin(λ1) - sin(φ1) * cφ0 * sin(λ0)) / (cφ0 * cφ1 * s))
 end
 
 ############################################################
@@ -929,8 +966,16 @@ end
 @inline function _circle_code(λ, φ, radius, smallR)
     r = smallR ? radius : π - radius
     code = 0
-    if λ < -r; code |= 1; elseif λ > r; code |= 2; end
-    if φ < -r; code |= 4; elseif φ > r; code |= 8; end
+    if λ < -r
+        code |= 1
+    elseif λ > r
+        code |= 2
+    end
+    if φ < -r
+        code |= 4
+    elseif φ > r
+        code |= 8
+    end
     return code
 end
 
@@ -963,8 +1008,10 @@ function _circle_intersect(cr, a, b, two)
     meridian = polar || δ < _EPS
     (!polar && φ1 < φ0) && ((φ0, φ1) = (φ1, φ0))
     cond = meridian ?
-        (polar ? xor(φ0 + φ1 > 0, qφ < (abs(qλ - λ0) < _EPS ? φ0 : φ1)) :
-                 (φ0 <= qφ <= φ1)) :
+        (
+            polar ? xor(φ0 + φ1 > 0, qφ < (abs(qλ - λ0) < _EPS ? φ0 : φ1)) :
+            (φ0 <= qφ <= φ1)
+        ) :
         xor(δ > π, λ0 <= qλ <= λ1)
     cond || return nothing
     s1 = (-w + t) / uu
@@ -984,7 +1031,7 @@ function _circle_stream(c::CircleClip, feed)
         point1 = (λ, φ, 0.0)
         v = vis(λ, φ)
         cde = smallR ? (v ? 0 : _circle_code(λ, φ, radius, smallR)) :
-                       (v ? _circle_code(λ + (λ < 0 ? π : -π), φ, radius, smallR) : 0)
+            (v ? _circle_code(λ + (λ < 0 ? π : -π), φ, radius, smallR) : 0)
         if point0 === nothing
             v00 = v0 = v
             v && _lineStart!(sink)
@@ -1034,22 +1081,22 @@ end
 # ---- per-strategy hooks dispatched by the generic driver --------------------------------
 _clip_ring(c::AntimeridianClip, ring) = (lines = _antimeridian_stream(vcat(ring, [ring[1]])); (lines[1], 2 - lines[2]))
 _clip_ring(c::ObliqueAntimeridianClip, ring) = (lines = _antimeridian_stream(vcat(ring, [ring[1]])); (lines[1], 2 - lines[2]))
-_clip_ring(c::CircleClip, ring)       = _circle_stream(c, vcat(ring, [ring[1]]))
+_clip_ring(c::CircleClip, ring) = _circle_stream(c, vcat(ring, [ring[1]]))
 
 _clip_open(c::AntimeridianClip, line) = [l for l in _antimeridian_stream(line)[1] if length(l) > 1]
 _clip_open(c::ObliqueAntimeridianClip, line) = [l for l in _antimeridian_stream(line)[1] if length(l) > 1]
-_clip_open(c::CircleClip, line)       = [l for l in _circle_stream(c, line)[1] if length(l) > 1]
+_clip_open(c::CircleClip, line) = [l for l in _circle_stream(c, line)[1] if length(l) > 1]
 
 _start(::AntimeridianClip) = (-π, -π / 2)
 _start(::ObliqueAntimeridianClip) = (-π, -π / 2)
 function _start(c::CircleClip)
     radius = c.radius * _D2R
-    cos(radius) > 0 ? (0.0, -radius) : (-π, radius - π)
+    return cos(radius) > 0 ? (0.0, -radius) : (-π, radius - π)
 end
 
 # boundary interpolate from `from` to `to` (radian `_Pt` or `nothing`), appending to `out`
-function _interpolate!(::Union{AntimeridianClip,ObliqueAntimeridianClip}, from, to, dir, out)
-    if from === nothing                            # whole sphere boundary
+function _interpolate!(::Union{AntimeridianClip, ObliqueAntimeridianClip}, from, to, dir, out)
+    return if from === nothing                            # whole sphere boundary
         φ = dir * π / 2
         for p in ((-π, φ), (0.0, φ), (π, φ), (π, 0.0), (π, -φ), (0.0, -φ), (-π, -φ), (-π, 0.0), (-π, φ))
             push!(out, (p[1], p[2], 0.0))
@@ -1064,7 +1111,7 @@ function _interpolate!(::Union{AntimeridianClip,ObliqueAntimeridianClip}, from, 
 end
 function _interpolate!(c::CircleClip, from, to, dir, out)
     radius = c.radius * _D2R
-    _circle_stream_arc!(out, radius, 2 * _D2R, dir, from, to)
+    return _circle_stream_arc!(out, radius, 2 * _D2R, dir, from, to)
 end
 
 # d3 circle.js circleStream: walk the canonical circle (centred at origin) from `t0` to `t1`
@@ -1086,6 +1133,7 @@ function _circle_stream_arc!(out, radius, delta, dir, t0p, t1p)
         push!(out, (λ, φ, 0.0))
         t -= step
     end
+    return
 end
 function _circle_radius(cosR, p)
     v = _cartr(p[1], p[2])
@@ -1097,12 +1145,12 @@ end
 # ---- rejoin (port of clip/rejoin.js) ----------------------------------------------------
 mutable struct _Ix
     x::_Pt
-    z::Union{Nothing,Vector{_Pt}}
-    o::Union{Nothing,_Ix}
+    z::Union{Nothing, Vector{_Pt}}
+    o::Union{Nothing, _Ix}
     e::Bool
     v::Bool
-    n::Union{Nothing,_Ix}
-    p::Union{Nothing,_Ix}
+    n::Union{Nothing, _Ix}
+    p::Union{Nothing, _Ix}
 end
 _Ix(x, z, o, e) = _Ix(x, z, o, e, false, nothing, nothing)
 
@@ -1124,11 +1172,11 @@ function _rejoin(segments, compare, start_inside, interpolate!)
         p0 = seg[1]; p1 = seg[end]
         if _seg_pteq(p0, p1)
             if p0[3] == 0.0 && p1[3] == 0.0       # closed ring, no intersections
-                push!(rings, seg[1:end-1])
+                push!(rings, seg[1:(end - 1)])
                 continue
             end
             p1 = (p1[1] + 2 * _EPS, p1[2], p1[3])  # nudge degenerate
-            seg = vcat(seg[1:end-1], [p1])
+            seg = vcat(seg[1:(end - 1)], [p1])
         end
         a = _Ix(p0, seg, nothing, true);  ao = _Ix(p0, nothing, a, false); a.o = ao
         b = _Ix(p1, seg, nothing, false); bo = _Ix(p1, nothing, b, true);  b.o = bo
@@ -1154,7 +1202,9 @@ function _rejoin(segments, compare, start_inside, interpolate!)
             current.v = true; current.o.v = true
             if current.e
                 if is_subject
-                    for q in current.z; push!(ring, q); end
+                    for q in current.z
+                        push!(ring, q)
+                    end
                 else
                     interpolate!(current.x, current.n.x, 1, ring)
                 end
@@ -1162,7 +1212,9 @@ function _rejoin(segments, compare, start_inside, interpolate!)
             else
                 if is_subject
                     pts = current.p.z
-                    for k in length(pts):-1:1; push!(ring, pts[k]); end
+                    for k in length(pts):-1:1
+                        push!(ring, pts[k])
+                    end
                 else
                     interpolate!(current.x, current.p.x, -1, ring)
                 end
@@ -1192,7 +1244,7 @@ function _clip_polygon(c::SphereClip, rings_rad)
             continue
         end
         if length(segs) > 1 && (clean & 2) != 0    # rejoin first & last segment
-            segs = vcat([vcat(segs[end], segs[1])], segs[2:end-1])
+            segs = vcat([vcat(segs[end], segs[1])], segs[2:(end - 1)])
         end
         for s in segs
             length(s) > 1 && push!(segments, s)
@@ -1248,11 +1300,11 @@ end
 # Output geometry stays lon/lat (the GeoAxis transform re-projects it).
 function _rings_to_polygons(rings, project)
     valid = [r for r in rings if length(r) >= 4]
-    isempty(valid) && return GeometryBasics.Polygon{2,Float32}[]
+    isempty(valid) && return GeometryBasics.Polygon{2, Float32}[]
     n = length(valid)
     proj = [[project(p[1], p[2]) for p in r] for r in valid]
     # a finite representative vertex per ring (rings are visible ⇒ finite, but guard anyway)
-    rep = Vector{NTuple{2,Float64}}(undef, n)
+    rep = Vector{NTuple{2, Float64}}(undef, n)
     keep = trues(n)
     for i in 1:n
         k = findfirst(_isfinitexy, proj[i])
@@ -1277,7 +1329,7 @@ function _rings_to_polygons(rings, project)
         end
         best > 0 && push!(assigned[best], valid[h])
     end
-    polys = GeometryBasics.Polygon{2,Float32}[]
+    polys = GeometryBasics.Polygon{2, Float32}[]
     for e in ext_idx
         ext = Point2f[Point2f(p[1], p[2]) for p in valid[e]]
         hs = assigned[e]
@@ -1330,10 +1382,12 @@ end
 # pure-longitude rotation, the result lands in the same projected space as the axis, but the
 # seam now sits at rotated ±180° which the centred projection maps to distinct edges (no
 # longitude-wrap collapse). Non-string dests (GFT/EPSG) pass through unchanged.
-_centred_dest(d::AbstractString) = replace(d,
+_centred_dest(d::AbstractString) = replace(
+    d,
     r"\blon_0=[-+0-9.eE]+" => "lon_0=0",
     r"\blat_0=[-+0-9.eE]+" => "lat_0=0",
-    r"\bpm=[-+0-9.eE]+" => "pm=0")
+    r"\bpm=[-+0-9.eE]+" => "pm=0"
+)
 _centred_dest(x) = x
 
 # Seam boundary vertices land at exactly rotated ±π. PROJ's longitude range is half-open, so
@@ -1384,9 +1438,11 @@ function _split_polygon(clip::SphereClip, rings_deg, project, scale; rotated::Bo
     # case). Re-orient by RING ROLE using the planar (lon/lat) winding — robust regardless of band
     # size. BOTH the clipPolygon (PolygonClip) and rotation-clip paths need this; without it on the
     # PolygonClip path, contourf negative bands (igh/imoll) clip to the complement and vanish.
-    rings_deg = [i == 1 ? (_planar_area(r) > 0 ? reverse(r) : r) :   # exterior → d3 (CW)
-                          (_planar_area(r) < 0 ? reverse(r) : r)     # holes    → d3 (CCW)
-                 for (i, r) in enumerate(rings_deg)]
+    rings_deg = [
+        i == 1 ? (_planar_area(r) > 0 ? reverse(r) : r) :   # exterior → d3 (CW)
+            (_planar_area(r) < 0 ? reverse(r) : r)     # holes    → d3 (CCW)
+            for (i, r) in enumerate(rings_deg)
+    ]
     if clip isa PolygonClip      # d3 clipPolygon against the derived spherical boundary
         clipped = _clip_against_polygon(clip, rings_deg)
         return _rings_to_polygons([resample_sphere(r, project; scale = scale) for r in clipped], project)
@@ -1395,7 +1451,7 @@ function _split_polygon(clip::SphereClip, rings_deg, project, scale; rotated::Bo
     seam = clip isa AntimeridianClip || clip isa ObliqueAntimeridianClip
     rings_rad = [[(q = fwd(p[1] * _D2R, p[2] * _D2R); (q[1], q[2], 0.0)) for p in r] for r in rings_deg]
     clipped = _clip_polygon(clip, rings_rad)
-    isempty(clipped) && return GeometryBasics.Polygon{2,Float32}[]
+    isempty(clipped) && return GeometryBasics.Polygon{2, Float32}[]
     out_deg = Vector{Point2d}[]
     for r in clipped
         rd = Point2d[]
@@ -1426,7 +1482,7 @@ function split_geometry(geom, t::Proj.Transformation)
     clip = clip_strategy(t)
     project = _projector(t)
     scale = resample_scale(project)
-    out = GeometryBasics.Polygon{2,Float32}[]
+    out = GeometryBasics.Polygon{2, Float32}[]
     for p in _collect_polys(geom)
         append!(out, _split_polygon(clip, _poly_rings(p), project, scale))
     end
@@ -1459,7 +1515,7 @@ function _jump_split_line(pts, project, scale; factor = 8.0)
     projd = [[project(p[1], p[2]) for p in res] for res in segs]
     lens = Float64[]
     for pr in projd, i in 2:length(pr)
-        (_isfinitexy(pr[i]) && _isfinitexy(pr[i-1])) && push!(lens, hypot(pr[i][1] - pr[i-1][1], pr[i][2] - pr[i-1][2]))
+        (_isfinitexy(pr[i]) && _isfinitexy(pr[i - 1])) && push!(lens, hypot(pr[i][1] - pr[i - 1][1], pr[i][2] - pr[i - 1][2]))
     end
     isempty(lens) && return reduce(vcat, segs; init = Point2d[])
     med = sort(lens)[cld(length(lens), 2)]
@@ -1467,8 +1523,8 @@ function _jump_split_line(pts, project, scale; factor = 8.0)
     out = Point2d[]
     for (res, pr) in zip(segs, projd)
         for i in eachindex(res)
-            if i > 1 && _isfinitexy(pr[i]) && _isfinitexy(pr[i-1]) &&
-               hypot(pr[i][1] - pr[i-1][1], pr[i][2] - pr[i-1][2]) > thr
+            if i > 1 && _isfinitexy(pr[i]) && _isfinitexy(pr[i - 1]) &&
+                    hypot(pr[i][1] - pr[i - 1][1], pr[i][2] - pr[i - 1][2]) > thr
                 push!(out, Point2d(NaN, NaN))      # break across the tear
             end
             push!(out, res[i])
@@ -1486,8 +1542,10 @@ adaptively resample each visible sub-line, and join with `NaN` breaks. With `rot
 output stays in the canonical rotated frame (Option B — the caller draws with the centred
 transform) and `project` must be the centred projector; otherwise output is geographic lon/lat.
 """
-function split_resample_line(pts, t::Proj.Transformation; scale::Float64 = NaN,
-                             rotated::Bool = false, project = nothing)
+function split_resample_line(
+        pts, t::Proj.Transformation; scale::Float64 = NaN,
+        rotated::Bool = false, project = nothing
+    )
     clip = clip_strategy(t)
     project === nothing && (project = _projector(t))
     isnan(scale) && (scale = resample_scale(project))
@@ -1518,7 +1576,7 @@ function split_resample_line(pts, t::Proj.Transformation; scale::Float64 = NaN,
         for s in _clip_open(clip, line_rad)
             isempty(s) && continue
             sd = rotated ? [Point2d(q[1] * _R2D, q[2] * _R2D) for q in s] :
-                           [Point2d(_unrotate(inv, q[1], q[2], seam)...) for q in s]
+                [Point2d(_unrotate(inv, q[1], q[2], seam)...) for q in s]
             !isempty(out) && push!(out, Point2d(NaN, NaN))
             append!(out, _clamp_lat(resample_sphere(sd, prc; scale = scale), lm))
         end
@@ -1531,8 +1589,8 @@ end
 function _densify_geo(ring, k)
     out = Point2d[]
     for i in 2:length(ring)
-        a = ring[i-1]; b = ring[i]; push!(out, a)
-        for t in 1:(k-1)
+        a = ring[i - 1]; b = ring[i]; push!(out, a)
+        for t in 1:(k - 1)
             q = _geo_interp((a[1], a[2]), (b[1], b[2]), t / k)
             push!(out, Point2d(q[1], q[2]))
         end
@@ -1571,17 +1629,29 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
         # unrotate (which would collapse the ±π seam through PROJ's atan2). Closes into the ellipse.
         c = clip.centred.f
         N = 200; ring = Point2d[]
-        for i in 0:N; push!(ring, Point2d(c(180.0, -90 + 180 * i / N)...)); end    # right edge ↑
-        for i in 0:N; push!(ring, Point2d(c(-180.0, 90 - 180 * i / N)...)); end    # left edge ↓
+        for i in 0:N
+            push!(ring, Point2d(c(180.0, -90 + 180 * i / N)...))
+        end    # right edge ↑
+        for i in 0:N
+            push!(ring, Point2d(c(-180.0, 90 - 180 * i / N)...))
+        end    # left edge ↓
         return ring
     end
     if clip isa NoClip
         project = _projector(ftf)
         ring = Point2d[]
-        for lon in -180.0:5.0:180.0; push!(ring, Point2d(lon, -89.9)); end
-        for lat in -89.9:5.0:89.9;   push!(ring, Point2d(180.0, lat)); end
-        for lon in 180.0:-5.0:-180.0; push!(ring, Point2d(lon, 89.9)); end
-        for lat in 89.9:-5.0:-89.9;  push!(ring, Point2d(-180.0, lat)); end
+        for lon in -180.0:5.0:180.0
+            push!(ring, Point2d(lon, -89.9))
+        end
+        for lat in -89.9:5.0:89.9
+            push!(ring, Point2d(180.0, lat))
+        end
+        for lon in 180.0:-5.0:-180.0
+            push!(ring, Point2d(lon, 89.9))
+        end
+        for lat in 89.9:-5.0:-89.9
+            push!(ring, Point2d(-180.0, lat))
+        end
         return _proj_ring(ring, project)
     end
     fwd, inv = _rotation(clip)
