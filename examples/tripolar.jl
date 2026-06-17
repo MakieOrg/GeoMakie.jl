@@ -14,6 +14,7 @@ Mollweide projection (`imoll_o`) — a hard case that tears the map into lobes.
 =#
 using GeoMakie, CairoMakie
 using Oceananigans
+CairoMakie.activate!(type = :svg) # hide
 
 # ## The field
 # A wave that is zero and ``C^1`` at both poles (`sind(2φ)^2`), modulated in longitude. We
@@ -54,14 +55,16 @@ z = rotated_pole_wave_field(λ, φ)
 
 # ## Plot
 # `imoll_o` is the interrupted oblique Mollweide — the field is torn into lobes and each
-# lobe filled correctly, with no smear across the interruptions.
+# lobe filled correctly, with no smear across the interruptions. The land polygons are drawn
+# **opaque, on top of** the `contourf!` (and clipped at the same seam), so coastlines read
+# clearly against the field rather than blending into it.
 fig = Figure(size = (900, 480))
 ga = GeoAxis(fig[1, 1]; dest = "+proj=imoll_o +lon_0=-160",
     title = "Tilted wave on an Oceananigans tripolar grid (imoll_o)")
 hidedecorations!(ga; grid = false)
 cf = contourf!(ga, λc, φc, zc; levels = range(-1, 1; length = 11),
     extendlow = :auto, extendhigh = :auto)
-poly!(ga, GeoMakie.land(); color = (:gray80, 0.4), strokecolor = :black, strokewidth = 0.4)
+poly!(ga, GeoMakie.land(); color = :gray90, strokecolor = :black, strokewidth = 0.3)
 Colorbar(fig[1, 2], cf; label = "field")
 fig
 
@@ -69,5 +72,15 @@ fig
 ```@cardmeta
 Description = "contourf on a curvilinear Oceananigans tripolar grid"
 Cover = fig
+```
+=#
+
+#=
+The CairoMakie backend type is process-global, so restore the default PNG backend here —
+otherwise later (raster-heavy) example pages such as `meshimage` would be emitted as SVG too.
+
+```@setup tripolar_reset
+using CairoMakie
+CairoMakie.activate!(px_per_unit = 2, type = :png)
 ```
 =#
