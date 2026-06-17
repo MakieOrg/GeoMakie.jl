@@ -18,6 +18,12 @@ field, with `add_cyclic_point` and the interrupted `imoll_o` projection — see 
 ```@setup projections
 using GeoMakie, CairoMakie
 
+## This page is pure vector content (land polygons + graticule lines, no raster data
+## layer), so render it as SVG for crisp output at any zoom. backend type is process-
+## global in CairoMakie, so we reset to PNG in a hidden block at the end of the page
+## (otherwise raster-heavy later pages would balloon into huge SVGs).
+CairoMakie.activate!(type = :svg)
+
 const LAND = GeoMakie.land()
 
 ## one bare land + graticule panel for a single projection; a try-catch keeps a bad
@@ -822,4 +828,9 @@ for (i, (d, lims, ttl)) in enumerate([
     poly!(ga, LAND; color = (:gray70, 0.55), strokecolor = :black, strokewidth = 0.3)
 end
 polar # hide
+```
+
+```@setup projections
+## Restore the global PNG backend so later (raster-heavy) doc pages are not emitted as SVG.
+CairoMakie.activate!(px_per_unit = 2, type = :png)
 ```
