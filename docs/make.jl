@@ -6,6 +6,16 @@ import GLMakie, CairoMakie
 # some strategic imports to avoid world age issues
 using FHist
 
+# Pre-load Oceananigans (used by the `tripolar` example) up front, swallowing a benign
+# init-time warning: TaylorSeries (pulled in via CubedSphere) carries a stale `Requires`
+# hook whose IntervalArithmetic integration references `IntervalBox`, removed in recent
+# IntervalArithmetic. Loading it here under a `NullLogger` keeps that warning out of the
+# rendered `@example` output; the example's own `using Oceananigans` is then a no-op.
+using Logging
+Logging.with_logger(Logging.NullLogger()) do
+    @eval import Oceananigans
+end
+
 # Set some global settings
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)
