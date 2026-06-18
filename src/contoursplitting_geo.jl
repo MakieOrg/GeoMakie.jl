@@ -28,7 +28,7 @@ function _split_polys_colors(polys, colors, clip::SphereClip, project, scale; ro
     newpolys = GeometryBasics.Polygon{2,Float32}[]
     newcolors = eltype(colors)[]
     for (poly, col) in zip(polys, colors)
-        for np in _split_polygon(clip, _poly_rings(poly), project, scale; rotated = rotated)
+        for np in _split_polygon(clip, _poly_rings(poly), project, scale; rotated = rotated, winding = :planar)
             push!(newpolys, np); push!(newcolors, col)
         end
     end

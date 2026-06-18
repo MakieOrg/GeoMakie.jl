@@ -1,5 +1,6 @@
 using Test
 using GeoMakie, CairoMakie, GeometryBasics
+import Proj
 const G = GeoMakie
 const _LL = "+proj=longlat +datum=WGS84"
 _t(d) = G.create_transform(d, _LL)
@@ -111,4 +112,44 @@ end
         worst = max(worst, hypot(c(pr[k]...)[1] - c(pr[k-1]...)[1], c(pr[k]...)[2] - c(pr[k-1]...)[2]))
     end
     @test worst < 5.0e6        # a seam-collapse streak would be ~20e6 (≈ map width)
+end
+
+@testset "Tissot pole/seam circles don't fill the whole map" begin
+    # Regression (Tissot's indicatrix on bertin1953): a small geodesic circle centred on a pole is a
+    # constant-latitude ring that ENCIRCLES the pole (planar shoelace ≈ 0, sign is noise); one
+    # straddling the antimeridian has a SIGN-FLIPPED planar winding. The old planar rewind therefore
+    # reversed them into bounding their complement → `_polygon_contains` read the clip anchor as
+    # inside → the whole map filled. The `:spherical` rewind (poly!/`split_geometry`) orients by
+    # `_geo_area`, which honours the seam and the poles. Faithful triggers need real geodesic circles:
+    geod = Proj.geod_geodesic(6378137, 1 / 298.257223563)
+    function geocircle(lon, lat, radius = 500_000, n = 50)
+        pts = GeometryBasics.Point2d[GeometryBasics.Point2d(reverse(Proj.geod_direct(geod, lat, lon, θ, radius)[1:2])...)
+                                     for θ in range(0, 360; length = n)]
+        pts[end] == pts[1] || push!(pts, pts[1])
+        return GeometryBasics.Polygon(pts)
+    end
+    subjects = [geocircle(lo, la) for (lo, la) in
+                [(0.0, -90.0), (90.0, -90.0), (180.0, -81.0), (0.0, 90.0), (0.0, 0.0)]]
+    mapspan(p, c) = (xy = [c(q...) for q in GeometryBasics.coordinates(p.exterior) if all(isfinite, c(q...))];
+                     isempty(xy) ? 0.0 :
+                     (maximum(first.(xy)) - minimum(first.(xy))) * (maximum(last.(xy)) - minimum(last.(xy))))
+    planar_worst = 0.0   # track whether the OLD `:planar` rewind blew anything up (anywhere)
+    for dest in ["+proj=bertin1953", "+proj=moll +lon_0=180", "+proj=igh"]
+        t = _t(dest); clip = G.clip_strategy(t)
+        # bounded frame the split is drawn in (centred for the Option-B clips) — to measure extent
+        c = clip isa G.ObliqueAntimeridianClip ? clip.centred.f :
+            clip isa G.AntimeridianClip ? G._projector(_t(G._centred_dest(dest))) : G._projector(t)
+        polys, _ = G._split_geom(subjects, dest, _LL)   # poly! path → `:spherical`
+        @test !isempty(polys)
+        # a whole-map fill bbox ≈ the map area (~3e14 m²); a ~500 km circle stays well under 1e14.
+        @test maximum(mapspan(p, c) for p in polys) < 1.0e14
+        project = clip isa G.ObliqueAntimeridianClip ? G._projector(clip.centred) :
+                  clip isa G.AntimeridianClip ? G._projector(_t(G._centred_dest(dest))) : G._projector(t)
+        rotated = clip isa G.AntimeridianClip || clip isa G.ObliqueAntimeridianClip
+        planar = reduce(vcat, (G._split_polygon(clip, G._poly_rings(s), project, G.resample_scale(project);
+                                                 rotated = rotated, winding = :planar) for s in subjects))
+        planar_worst = max(planar_worst, maximum(mapspan(p, c) for p in planar))
+    end
+    # confirm the guard is real: the OLD `:planar` rewind DID fill the map for at least one case.
+    @test planar_worst > 1.0e14
 end

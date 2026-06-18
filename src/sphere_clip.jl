@@ -796,9 +796,9 @@ end
 # Clip the rings of one polygon against the spherical boundary; returns lon/lat-degree rings.
 function _clip_against_polygon(pc::PolygonClip, rings_deg)
     isempty(pc.segs) && return [Point2d[Point2d(p[1], p[2]) for p in r] for r in rings_deg]
-    # Rings arrive already canonically wound from `_split_polygon` (role-based PLANAR rewind,
-    # robust regardless of band size). Do NOT re-wind here — the old spherical-area heuristic
-    # (_geo_area > 2π) flips bands covering >½ the globe (igh/imoll negative contourf bands).
+    # Rings arrive already canonically wound from `_split_polygon` (role-based, by the caller's
+    # `:spherical`/`:planar` regime). Do NOT re-wind here — re-deciding would undo that and flip
+    # the parity (e.g. shrinking igh/imoll contourf bands that bound >½ the globe).
     start_pt = (pc.flat[1][1], pc.flat[1][2])           # the clip boundary's start vertex (deg)
     segments = Vector{_CPt}[]
     whole = Vector{_CPt}[]
@@ -1422,7 +1422,7 @@ _projected_fill(rings_deg, project, scale) = _rings_to_polygons(rings_deg, proje
 # clamp ring/line latitudes to ±lat_max (pole-blowup cylindricals, e.g. merc); identity at 90.
 _clamp_lat(r, lm) = lm >= 90.0 ? r : [Point2d(p[1], clamp(p[2], -lm, lm)) for p in r]
 
-function _split_polygon(clip::SphereClip, rings_deg, project, scale; rotated::Bool = false)
+function _split_polygon(clip::SphereClip, rings_deg, project, scale; rotated::Bool = false, winding::Symbol = :spherical)
     clip isa NoClip && return _rings_to_polygons(rings_deg, project)
     clip isa ProjectedClip && return _projected_fill(rings_deg, project, scale)
     # ±lat clamp for pole-blowup cylindricals (merc): clamp the subject, resample through a
@@ -1432,17 +1432,30 @@ function _split_polygon(clip::SphereClip, rings_deg, project, scale; rotated::Bo
     lm = clip isa AntimeridianClip ? clip.lat_max : 90.0
     lm < 90 && (rings_deg = [_clamp_lat(r, lm) for r in rings_deg])
     prc = lm < 90 ? ((lo, la) -> project(lo, clamp(la, -lm, lm))) : project
-    # Reconcile winding conventions. Makie's isobands follow RFC 7946 (exterior CCW / +planar
-    # area, holes CW / −); d3-geo's spherical clip uses the OPPOSITE convention, so a ring left
-    # as-is is read as bounding its complement and clips to fill ~the whole map (the band_0p1
-    # case). Re-orient by RING ROLE using the planar (lon/lat) winding — robust regardless of band
-    # size. BOTH the clipPolygon (PolygonClip) and rotation-clip paths need this; without it on the
-    # PolygonClip path, contourf negative bands (igh/imoll) clip to the complement and vanish.
-    rings_deg = [
-        i == 1 ? (_planar_area(r) > 0 ? reverse(r) : r) :   # exterior → d3 (CW)
-            (_planar_area(r) < 0 ? reverse(r) : r)     # holes    → d3 (CCW)
-            for (i, r) in enumerate(rings_deg)
-    ]
+    # Reconcile winding conventions to d3's spherical clip (exterior CW so its ≤½-sphere interior
+    # is the side `_polygon_contains` reads as "inside"; holes the opposite). Two regimes:
+    #
+    # `:spherical` (user geometry via poly!/`split_geometry`) — orient by RING ROLE using the
+    # SPHERICAL winding (`_geo_area`: the d3/S2 signed area, which honours the antimeridian and the
+    # poles). The planar (lon/lat) shoelace this replaced is WRONG for rings that cross the seam
+    # (their flat winding flips) and DEGENERATE for rings that encircle a pole (flat area ≈ 0, sign
+    # is noise) — so it spuriously reversed Tissot's seam/pole circles into bounding the complement
+    # and filled the whole map. `_geo_area` is correct there, and still flips RFC-7946 exterior-CCW
+    # inputs (e.g. shapefiles) to the CW the clip wants.
+    #
+    # `:planar` (Makie contourf isobands) — orient by the planar shoelace. Bands are grid-rectangle
+    # bounded (planar winding is reliable, never pole-degenerate) and a single band may legitimately
+    # bound MORE than half the sphere; the spherical-area rule would wrongly shrink such a band to
+    # its small complement (dropping bands), so the size-agnostic planar rule is the right one here.
+    rings_deg = if winding === :planar
+        [i == 1 ? (_planar_area(r) > 0 ? reverse(r) : r) :   # exterior → d3 (CW)
+             (_planar_area(r) < 0 ? reverse(r) : r)          # holes    → d3 (CCW)
+         for (i, r) in enumerate(rings_deg)]
+    else
+        [i == 1 ? (_geo_area(r) > 2π ? reverse(r) : r) :     # exterior → bounds the ≤½-sphere side
+             (_geo_area(r) < 2π ? reverse(r) : r)            # holes    → the complement
+         for (i, r) in enumerate(rings_deg)]
+    end
     if clip isa PolygonClip      # d3 clipPolygon against the derived spherical boundary
         clipped = _clip_against_polygon(clip, rings_deg)
         return _rings_to_polygons([resample_sphere(r, project; scale = scale) for r in clipped], project)
