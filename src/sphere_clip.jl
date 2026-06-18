@@ -1382,10 +1382,16 @@ end
 # pure-longitude rotation, the result lands in the same projected space as the axis, but the
 # seam now sits at rotated ±180° which the centred projection maps to distinct edges (no
 # longitude-wrap collapse). Non-string dests (GFT/EPSG) pass through unchanged.
+# Centred (lon_0=0) variant for Option-B drawing of the antimeridian split. The
+# `AntimeridianClip` rotation is LONGITUDE-ONLY (`_rotation`: (λ,φ)->(λ+dλ, φ)), so we zero only
+# the longitude origin (`lon_0`/`pm`) and MUST keep `lat_0`/`lat_1`/`lat_2`: for a conic such as
+# `lcc` (`lat_0=39 lat_1=33 lat_2=45`), zeroing `lat_0` shifts the false origin by megametres, so
+# the split geometry — emitted in the rotated frame and drawn with this centred projector — lands
+# far from where its own data limits expect it, zooming the GeoAxis out to a speck. (Harmless for
+# the pseudocylindricals that dominate this path, whose `lat_0` is already 0.)
 _centred_dest(d::AbstractString) = replace(
     d,
     r"\blon_0=[-+0-9.eE]+" => "lon_0=0",
-    r"\blat_0=[-+0-9.eE]+" => "lat_0=0",
     r"\bpm=[-+0-9.eE]+" => "pm=0"
 )
 _centred_dest(x) = x
