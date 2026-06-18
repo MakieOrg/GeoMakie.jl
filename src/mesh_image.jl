@@ -199,6 +199,16 @@ function Makie.plot!(plot::MeshImage)
             )
         end
 
+        # The seam clip assumes the x/y inputs are lon/lat (it tears at a PROJECTION
+        # discontinuity via great-circle midpoints). That only holds for a geographic
+        # projection (a `Proj.Transformation`, i.e. a `GeoAxis`). For any other transform —
+        # the affine/log-scaled `Axis` cases, or a 3D `GlobeAxis` (no seam) — `_gc_midpoint`
+        # on non-lon/lat coordinates produces garbage and mangles the mesh, so emit the plain
+        # rectangle mesh (the original behaviour) there.
+        if !(tfunc isa Proj.Transformation)
+            return (GeometryBasics.Mesh(copy(points), faces; uv = uvs),)
+        end
+
         # clip faces straddling the projection discontinuity (subdivides toward the seam)
         pts, _, faces2, parents = _clip_faces(points, latlon, faces, _mesh_projector(tfunc, z_level))
         uvs2 = collect(Vec2f, uvs)
