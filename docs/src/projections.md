@@ -7,9 +7,9 @@ azimuthal/perspective horizons (`ortho`/`geos`), and oblique seams (`spilhaus`/`
 
 Each section below draws the **bare** projection on a `GeoAxis` — the coastline land
 polygons and the graticule — for (almost) every projection PROJ provides, one panel per
-projection, with related variants (e.g. `eck1`…`eck6`) grouped into tabs. The land outline
-and graticule stay correct right up to each projection's discontinuity (the antimeridian,
-interrupted lobes, azimuthal horizons, oblique seams), with no smears across the tear.
+projection (the PROJ string is shown as each panel's title), with related variants grouped
+into tabs. The land outline and graticule stay correct right up to each projection's
+discontinuity, with no smears across the tear.
 
 (For a *filled-field* test on a curvilinear grid — `contourf!` of an Oceananigans tripolar
 field, with `add_cyclic_point` and the interrupted `imoll_o` projection — see the
@@ -26,12 +26,13 @@ CairoMakie.activate!(type = :svg)
 
 const LAND = GeoMakie.land()
 
-## one bare land + graticule panel for a single projection; a try-catch keeps a bad
-## projection from sinking the whole page (it renders a "(skipped)" label instead)
+## one bare land + graticule panel for a single projection; the PROJ string is the title.
+## a try-catch keeps a bad projection from sinking the whole page (it renders a
+## "(skipped)" label instead)
 function panel(proj)
-    fig = Figure(size = (420, 280))
+    fig = Figure(size = (420, 300))
     try
-        ga = GeoAxis(fig[1, 1]; dest = proj)
+        ga = GeoAxis(fig[1, 1]; dest = proj, title = proj, titlesize = 9, titlefont = :regular)
         hidedecorations!(ga; grid = false)
         poly!(ga, LAND; color = (:gray70, 0.55), strokecolor = :black, strokewidth = 0.3)
     catch
@@ -41,23 +42,23 @@ function panel(proj)
 end
 ```
 
-## `+proj=adams_hemi`
-
-```@example projections
-panel("+proj=adams_hemi") # hide
-```
-
-## `adams_ws` family
+## Adams projections
 
 ::: tabs
 
-== adams_ws1
+== Hemisphere in a square
+
+````@example projections
+panel("+proj=adams_hemi") # hide
+````
+
+== World in a square I
 
 ````@example projections
 panel("+proj=adams_ws1") # hide
 ````
 
-== adams_ws2
+== World in a square II
 
 ````@example projections
 panel("+proj=adams_ws2") # hide
@@ -65,143 +66,143 @@ panel("+proj=adams_ws2") # hide
 
 :::
 
-## `+proj=aea +lat_1=29.5 +lat_2=42.5`
+## Albers Equal-Area Conic
 
 ```@example projections
 panel("+proj=aea +lat_1=29.5 +lat_2=42.5") # hide
 ```
 
-## `+proj=aeqd`
+## Azimuthal Equidistant
 
 ```@example projections
 panel("+proj=aeqd") # hide
 ```
 
-## `+proj=airy`
+## Airy
 
 ```@example projections
 panel("+proj=airy") # hide
 ```
 
-## `+proj=aitoff`
+## Aitoff
 
 ```@example projections
 panel("+proj=aitoff") # hide
 ```
 
-## `+proj=apian`
+## Apian Globular I
 
 ```@example projections
 panel("+proj=apian") # hide
 ```
 
-## `+proj=august`
+## August Epicycloidal
 
 ```@example projections
 panel("+proj=august") # hide
 ```
 
-## `+proj=bacon`
+## Bacon Globular
 
 ```@example projections
 panel("+proj=bacon") # hide
 ```
 
-## `+proj=bertin1953`
+## Bertin 1953
 
 ```@example projections
 panel("+proj=bertin1953") # hide
 ```
 
-## `+proj=bipc +ns`
+## Bipolar Conic
 
 ```@example projections
 panel("+proj=bipc +ns") # hide
 ```
 
-## `+proj=boggs`
+## Boggs Eumorphic
 
 ```@example projections
 panel("+proj=boggs") # hide
 ```
 
-## `+proj=bonne +lat_1=10`
+## Bonne
 
 ```@example projections
 panel("+proj=bonne +lat_1=10") # hide
 ```
 
-## `+proj=cea`
+## Cylindrical Equal-Area
 
 ```@example projections
 panel("+proj=cea") # hide
 ```
 
-## `+proj=chamb +lat_1=10 +lon_1=30 +lon_2=40`
+## Chamberlin Trimetric
 
 ```@example projections
 panel("+proj=chamb +lat_1=10 +lon_1=30 +lon_2=40") # hide
 ```
 
-## `+proj=collg`
+## Collignon
 
 ```@example projections
 panel("+proj=collg") # hide
 ```
 
-## `+proj=comill`
+## Compact Miller
 
 ```@example projections
 panel("+proj=comill") # hide
 ```
 
-## `+proj=crast`
+## Craster Parabolic
 
 ```@example projections
 panel("+proj=crast") # hide
 ```
 
-## `+proj=denoy`
+## Denoyer Semi-Elliptical
 
 ```@example projections
 panel("+proj=denoy") # hide
 ```
 
-## `eck` family
+## Eckert
 
 ::: tabs
 
-== eck1
+== I
 
 ````@example projections
 panel("+proj=eck1") # hide
 ````
 
-== eck2
+== II
 
 ````@example projections
 panel("+proj=eck2") # hide
 ````
 
-== eck3
+== III
 
 ````@example projections
 panel("+proj=eck3") # hide
 ````
 
-== eck4
+== IV
 
 ````@example projections
 panel("+proj=eck4") # hide
 ````
 
-== eck5
+== V
 
 ````@example projections
 panel("+proj=eck5") # hide
 ````
 
-== eck6
+== VI
 
 ````@example projections
 panel("+proj=eck6") # hide
@@ -209,143 +210,155 @@ panel("+proj=eck6") # hide
 
 :::
 
-## `+proj=eqc`
+## Equidistant Cylindrical (Plate Carrée)
 
 ```@example projections
 panel("+proj=eqc") # hide
 ```
 
-## `+proj=eqdc +lat_1=55 +lat_2=60`
+## Equidistant Conic
 
 ```@example projections
 panel("+proj=eqdc +lat_1=55 +lat_2=60") # hide
 ```
 
-## `+proj=eqearth`
+## Equal Earth
 
 ```@example projections
 panel("+proj=eqearth") # hide
 ```
 
-## `+proj=euler +lat_1=67 +lat_2=75`
+## Euler
 
 ```@example projections
 panel("+proj=euler +lat_1=67 +lat_2=75") # hide
 ```
 
-## `+proj=fahey`
+## Fahey
 
 ```@example projections
 panel("+proj=fahey") # hide
 ```
 
-## `+proj=fouc`
+## Foucaut projections
 
-```@example projections
+::: tabs
+
+== Foucaut
+
+````@example projections
 panel("+proj=fouc") # hide
-```
+````
 
-## `+proj=fouc_s`
+== Foucaut Sinusoidal
 
-```@example projections
+````@example projections
 panel("+proj=fouc_s") # hide
-```
+````
 
-## `+proj=gall`
+:::
+
+## Gall Stereographic
 
 ```@example projections
 panel("+proj=gall") # hide
 ```
 
-## `+proj=geos +h=35785831.0 +lon_0=-60 +sweep=y`
+## Geostationary Satellite
 
 ```@example projections
 panel("+proj=geos +h=35785831.0 +lon_0=-60 +sweep=y") # hide
 ```
 
-## `+proj=gins8`
+## Ginsburg VIII
 
 ```@example projections
 panel("+proj=gins8") # hide
 ```
 
-## `+proj=gn_sinu +m=2 +n=3`
+## General Sinusoidal Series
 
 ```@example projections
 panel("+proj=gn_sinu +m=2 +n=3") # hide
 ```
 
-## `+proj=goode`
+## Goode Homolosine
 
 ```@example projections
 panel("+proj=goode") # hide
 ```
 
-## `+proj=guyou`
+## Guyou
 
 ```@example projections
 panel("+proj=guyou") # hide
 ```
 
-## `+proj=hammer`
+## Hammer
 
 ```@example projections
 panel("+proj=hammer") # hide
 ```
 
-## `+proj=hatano`
+## Hatano Asymmetrical Equal-Area
 
 ```@example projections
 panel("+proj=hatano") # hide
 ```
 
-## `+proj=igh`
+## Interrupted projections
 
-```@example projections
+::: tabs
+
+== Goode Homolosine
+
+````@example projections
 panel("+proj=igh") # hide
-```
+````
 
-## `+proj=igh_o +lon_0=-160`
+== Goode Homolosine (oceanic)
 
-```@example projections
+````@example projections
 panel("+proj=igh_o +lon_0=-160") # hide
-```
+````
 
-## `+proj=imoll`
+== Mollweide
 
-```@example projections
+````@example projections
 panel("+proj=imoll") # hide
-```
+````
 
-## `+proj=imoll_o +lon_0=-160`
+== Mollweide (oceanic)
 
-```@example projections
+````@example projections
 panel("+proj=imoll_o +lon_0=-160") # hide
-```
+````
 
-## `+proj=imw_p +lat_1=30 +lat_2=-40`
+:::
+
+## International Map of the World Polyconic
 
 ```@example projections
 panel("+proj=imw_p +lat_1=30 +lat_2=-40") # hide
 ```
 
-## `+proj=isea`
+## Icosahedral Snyder Equal-Area
 
 ```@example projections
 panel("+proj=isea") # hide
 ```
 
-## `kav` family
+## Kavrayskiy
 
 ::: tabs
 
-== kav5
+== V
 
 ````@example projections
 panel("+proj=kav5") # hide
 ````
 
-== kav7
+== VII
 
 ````@example projections
 panel("+proj=kav7") # hide
@@ -353,113 +366,119 @@ panel("+proj=kav7") # hide
 
 :::
 
-## `+proj=laea`
+## Lambert Azimuthal Equal-Area
 
 ```@example projections
 panel("+proj=laea") # hide
 ```
 
-## `+proj=lagrng`
+## Lagrange
 
 ```@example projections
 panel("+proj=lagrng") # hide
 ```
 
-## `+proj=larr`
+## Larrivée
 
 ```@example projections
 panel("+proj=larr") # hide
 ```
 
-## `+proj=lask`
+## Laskowski
 
 ```@example projections
 panel("+proj=lask") # hide
 ```
 
-## `+proj=lcca +lat_0=35`
+## Lambert Conformal Conic (Alternative)
 
 ```@example projections
 panel("+proj=lcca +lat_0=35") # hide
 ```
 
-## `+proj=leac`
+## Lambert Equal-Area Conic
 
 ```@example projections
 panel("+proj=leac") # hide
 ```
 
-## `+proj=loxim`
+## Loximuthal
 
 ```@example projections
 panel("+proj=loxim") # hide
 ```
 
-## `+proj=lsat +ellps=GRS80 +lat_1=-60 +lat_2=60 +lsat=2 +path=2`
+## Space Oblique (Landsat)
 
 ```@example projections
 panel("+proj=lsat +ellps=GRS80 +lat_1=-60 +lat_2=60 +lsat=2 +path=2") # hide
 ```
 
-## `+proj=mbt_s`
+## McBryde–Thomas projections
 
-```@example projections
+::: tabs
+
+== Flat-Polar Sine (No. 1)
+
+````@example projections
 panel("+proj=mbt_s") # hide
-```
+````
 
-## `+proj=mbt_fps`
+== Flat-Pole Sine (No. 2)
 
-```@example projections
+````@example projections
 panel("+proj=mbt_fps") # hide
-```
+````
 
-## `+proj=mbtfpp`
+== Flat-Polar Parabolic
 
-```@example projections
+````@example projections
 panel("+proj=mbtfpp") # hide
-```
+````
 
-## `+proj=mbtfpq`
+== Flat-Polar Quartic
 
-```@example projections
+````@example projections
 panel("+proj=mbtfpq") # hide
-```
+````
 
-## `+proj=mbtfps`
+== Flat-Polar Sinusoidal
 
-```@example projections
+````@example projections
 panel("+proj=mbtfps") # hide
-```
+````
 
-## `+proj=merc`
+:::
+
+## Mercator
 
 ```@example projections
 panel("+proj=merc") # hide
 ```
 
-## `+proj=mill`
+## Miller Cylindrical
 
 ```@example projections
 panel("+proj=mill") # hide
 ```
 
-## `+proj=moll`
+## Mollweide
 
 ```@example projections
 panel("+proj=moll") # hide
 ```
 
-## `murd` family
+## Murdoch
 
 ::: tabs
 
-== murd1
+== I
 
 ````@example projections
 panel("+proj=murd1 +lat_1=30 +lat_2=50") # hide
 ````
 
-== murd3
+== III
 
 ````@example projections
 panel("+proj=murd3 +lat_1=30 +lat_2=50") # hide
@@ -467,17 +486,17 @@ panel("+proj=murd3 +lat_1=30 +lat_2=50") # hide
 
 :::
 
-## `natearth` family
+## Natural Earth
 
 ::: tabs
 
-== natearth
+== I
 
 ````@example projections
 panel("+proj=natearth") # hide
 ````
 
-== natearth2
+== II
 
 ````@example projections
 panel("+proj=natearth2") # hide
@@ -485,125 +504,131 @@ panel("+proj=natearth2") # hide
 
 :::
 
-## `+proj=nell`
+## Nell projections
 
-```@example projections
+::: tabs
+
+== Nell
+
+````@example projections
 panel("+proj=nell") # hide
-```
+````
 
-## `+proj=nell_h`
+== Nell–Hammer
 
-```@example projections
+````@example projections
 panel("+proj=nell_h") # hide
-```
+````
 
-## `+proj=nicol`
+:::
+
+## Nicolosi Globular
 
 ```@example projections
 panel("+proj=nicol") # hide
 ```
 
-## `+proj=ob_tran +o_proj=mill +o_lon_p=40 +o_lat_p=50 +lon_0=60`
+## General Oblique Transformation
 
 ```@example projections
 panel("+proj=ob_tran +o_proj=mill +o_lon_p=40 +o_lat_p=50 +lon_0=60") # hide
 ```
 
-## `+proj=ocea`
+## Oblique Cylindrical Equal-Area
 
 ```@example projections
 panel("+proj=ocea") # hide
 ```
 
-## `+proj=oea +m=1 +n=2`
+## Oblated Equal-Area
 
 ```@example projections
 panel("+proj=oea +m=1 +n=2") # hide
 ```
 
-## `+proj=omerc +lat_1=45 +lat_2=55`
+## Oblique Mercator
 
 ```@example projections
 panel("+proj=omerc +lat_1=45 +lat_2=55") # hide
 ```
 
-## `+proj=ortel`
+## Ortelius Oval
 
 ```@example projections
 panel("+proj=ortel") # hide
 ```
 
-## `+proj=ortho`
+## Orthographic
 
 ```@example projections
 panel("+proj=ortho") # hide
 ```
 
-## `+proj=patterson`
+## Patterson Cylindrical
 
 ```@example projections
 panel("+proj=patterson") # hide
 ```
 
-## `+proj=poly`
+## American Polyconic
 
 ```@example projections
 panel("+proj=poly") # hide
 ```
 
-## `putp` family
+## Putniņš
 
 ::: tabs
 
-== putp1
+== P1
 
 ````@example projections
 panel("+proj=putp1") # hide
 ````
 
-== putp2
+== P2
 
 ````@example projections
 panel("+proj=putp2") # hide
 ````
 
-== putp3
+== P3
 
 ````@example projections
 panel("+proj=putp3") # hide
 ````
 
-== putp3p
+== P3′
 
 ````@example projections
 panel("+proj=putp3p") # hide
 ````
 
-== putp4p
+== P4′
 
 ````@example projections
 panel("+proj=putp4p") # hide
 ````
 
-== putp5
+== P5
 
 ````@example projections
 panel("+proj=putp5") # hide
 ````
 
-== putp5p
+== P5′
 
 ````@example projections
 panel("+proj=putp5p") # hide
 ````
 
-== putp6
+== P6
 
 ````@example projections
 panel("+proj=putp6") # hide
 ````
 
-== putp6p
+== P6′
 
 ````@example projections
 panel("+proj=putp6p") # hide
@@ -611,107 +636,107 @@ panel("+proj=putp6p") # hide
 
 :::
 
-## `+proj=qua_aut`
+## Quartic Authalic
 
 ```@example projections
 panel("+proj=qua_aut") # hide
 ```
 
-## `+proj=robin`
+## Robinson
 
 ```@example projections
 panel("+proj=robin") # hide
 ```
 
-## `+proj=rouss`
+## Roussilhe Stereographic
 
 ```@example projections
 panel("+proj=rouss") # hide
 ```
 
-## `+proj=rpoly`
+## Rectangular Polyconic
 
 ```@example projections
 panel("+proj=rpoly") # hide
 ```
 
-## `+proj=sinu`
+## Sinusoidal
 
 ```@example projections
 panel("+proj=sinu") # hide
 ```
 
-## `+proj=spilhaus`
+## Spilhaus
 
 ```@example projections
 panel("+proj=spilhaus") # hide
 ```
 
-## `+proj=times`
+## Times
 
 ```@example projections
 panel("+proj=times") # hide
 ```
 
-## `+proj=tissot +lat_1=60 +lat_2=65`
+## Tissot Modified Conic
 
 ```@example projections
 panel("+proj=tissot +lat_1=60 +lat_2=65") # hide
 ```
 
-## `+proj=tmerc`
+## Transverse Mercator
 
 ```@example projections
 panel("+proj=tmerc") # hide
 ```
 
-## `+proj=tobmerc`
+## Tobler–Mercator
 
 ```@example projections
 panel("+proj=tobmerc") # hide
 ```
 
-## `+proj=tpeqd +lat_1=60 +lat_2=65`
+## Two-Point Equidistant
 
 ```@example projections
 panel("+proj=tpeqd +lat_1=60 +lat_2=65") # hide
 ```
 
-## `+proj=urm5 +n=0.9 +alpha=2 +q=4`
+## Urmaev V
 
 ```@example projections
 panel("+proj=urm5 +n=0.9 +alpha=2 +q=4") # hide
 ```
 
-## `+proj=urmfps +n=0.5`
+## Urmaev Flat-Polar Sinusoidal
 
 ```@example projections
 panel("+proj=urmfps +n=0.5") # hide
 ```
 
-## `vandg` family
+## Van der Grinten
 
 ::: tabs
 
-== vandg
+== I
 
 ````@example projections
 panel("+proj=vandg") # hide
 ````
 
-== vandg2
+== II
 
 ````@example projections
 panel("+proj=vandg2") # hide
 ````
 
-== vandg3
+== III
 
 ````@example projections
 panel("+proj=vandg3") # hide
 ````
 
-== vandg4
+== IV
 
 ````@example projections
 panel("+proj=vandg4") # hide
@@ -719,53 +744,53 @@ panel("+proj=vandg4") # hide
 
 :::
 
-## `+proj=vitk1 +lat_1=45 +lat_2=55`
+## Vitkovsky I
 
 ```@example projections
 panel("+proj=vitk1 +lat_1=45 +lat_2=55") # hide
 ```
 
-## `wag` family
+## Wagner
 
 ::: tabs
 
-== wag1
+== I
 
 ````@example projections
 panel("+proj=wag1") # hide
 ````
 
-== wag2
+== II
 
 ````@example projections
 panel("+proj=wag2") # hide
 ````
 
-== wag3
+== III
 
 ````@example projections
 panel("+proj=wag3") # hide
 ````
 
-== wag4
+== IV
 
 ````@example projections
 panel("+proj=wag4") # hide
 ````
 
-== wag5
+== V
 
 ````@example projections
 panel("+proj=wag5") # hide
 ````
 
-== wag6
+== VI
 
 ````@example projections
 panel("+proj=wag6") # hide
 ````
 
-== wag7
+== VII
 
 ````@example projections
 panel("+proj=wag7") # hide
@@ -773,29 +798,29 @@ panel("+proj=wag7") # hide
 
 :::
 
-## `+proj=webmerc +datum=WGS84`
+## Web Mercator (Pseudo-Mercator)
 
 ```@example projections
 panel("+proj=webmerc +datum=WGS84") # hide
 ```
 
-## `+proj=weren`
+## Werenskiold I
 
 ```@example projections
 panel("+proj=weren") # hide
 ```
 
-## `wink` family
+## Winkel
 
 ::: tabs
 
-== wink1
+== I
 
 ````@example projections
 panel("+proj=wink1") # hide
 ````
 
-== wink2
+== II
 
 ````@example projections
 panel("+proj=wink2") # hide
@@ -803,7 +828,7 @@ panel("+proj=wink2") # hide
 
 :::
 
-## `+proj=wintri`
+## Winkel Tripel
 
 ```@example projections
 panel("+proj=wintri") # hide
@@ -815,17 +840,20 @@ Stereographic centred on each pole and zoomed to the cap — the way you'd view 
 or tripolar-grid fields. Stereographic is azimuthal: its only discontinuity is the
 *antipode* (the opposite pole), so the on-sphere clip is an antipodal cap, and the
 graticule stays concentric right up to the centre. GeoAxis `limits` are in lon/lat, so
-the cap is "all longitudes, lat in `[55, 90]`" (or the southern mirror), which the
-projection maps to the disk.
+the cap is "all longitudes, lat in `[lat_cap, 90]`" (or the southern mirror), which the
+projection maps to a disk. We draw the bounding parallel (`lat_cap`) as a circular spine.
 
 ```@example projections
-polar = Figure(size = (840, 440))
-for (i, (d, lims, ttl)) in enumerate([
-        ("+proj=stere +lat_0=90 +lon_0=0",  ((-180, 180), (55, 90)),   "North polar stereographic"),
-        ("+proj=stere +lat_0=-90 +lon_0=0", ((-180, 180), (-90, -55)), "South polar stereographic")])
+polar = Figure(size = (840, 460))
+for (i, (d, latcap, ttl)) in enumerate([
+        ("+proj=stere +lat_0=90 +lon_0=0",   55, "North polar stereographic"),
+        ("+proj=stere +lat_0=-90 +lon_0=0", -55, "South polar stereographic")])
+    lims = latcap > 0 ? ((-180, 180), (latcap, 90)) : ((-180, 180), (-90, latcap))
     ga = GeoAxis(polar[1, i]; dest = d, limits = lims, title = ttl, titlesize = 11)
     hidedecorations!(ga; grid = false)
     poly!(ga, LAND; color = (:gray70, 0.55), strokecolor = :black, strokewidth = 0.3)
+    ## circular spine: the bounding parallel at the cap latitude (a circle in stereographic)
+    lines!(ga, Point2f.(-180:180, latcap); color = :black, linewidth = 1.0)
 end
 polar # hide
 ```
