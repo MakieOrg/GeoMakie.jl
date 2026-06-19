@@ -796,10 +796,9 @@ function Makie.initialize_block!(axis::GeoAxis)
     elements[:ygrid] = latgridplot
     elements[:xticklabels] = lontex
     elements[:yticklabels] = lattex
-    # The spine is the projection-domain outline (decoration), NOT data — exclude it from the
-    # auto-limit computation (`getlimits` skips plots in `elements`). For a projection whose domain
-    # boundary reaches a singularity (e.g. the pole on conic `lcc`), the spine projects to ∞/huge
-    # coordinates; if it drove the limits the whole map would zoom out to a speck.
+    # Register the spine so `getlimits` can find it: it frames BOUNDED projections (its
+    # pre-projected outline is the true map extent), but is dropped from the limits when unbounded
+    # (a conic/cylindrical reaching a pole singularity, e.g. `lcc`, runs off to ∞). See getlimits.
     elements[:spine] = spineplot
 
     subtitlepos = lift(axis.blockscene, scene.viewport, axis.titlegap, axis.titlealign, axis.xaxisposition;

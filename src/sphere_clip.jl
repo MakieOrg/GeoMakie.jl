@@ -1678,6 +1678,23 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
     _interpolate!(clip, nothing, nothing, 1, raw)        # full clip boundary, rotated frame
     if clip isa AntimeridianClip
         base = _projector(create_transform(_centred_dest(dest), source))
+        # Conic projections (lcc, lcca, eqdc, aea…) extend to infinity OPPOSITE the cone's apex:
+        # one pole projects finite (the apex), the other to ∞. Their antimeridian "seam" outline
+        # then degenerates to a radial ray. Follow cartopy (`LambertConformal`, `cutoff`): build the
+        # boundary as the apex pole joined to a CUTOFF PARALLEL on the far side (cartopy's default
+        # cuts 30° past the equator) — a finite cone outline that frames the map. See
+        # https://scitools.org.uk/cartopy `LambertConformal.__init__`.
+        npf = all(isfinite, base(0.0, 90.0)); spf = all(isfinite, base(0.0, -90.0))
+        if npf ⊻ spf
+            plat = npf ? 90.0 : -90.0
+            cutoff = plat > 0 ? -30.0 : 30.0
+            cone = Point2d[Point2d(base(0.0, plat)...)]
+            for lon in LinRange(180.0 - 1.0e-3, -180.0 + 1.0e-3, 181)
+                push!(cone, Point2d(base(lon, cutoff)...))
+            end
+            push!(cone, Point2d(base(0.0, plat)...))
+            return cone
+        end
         lm = clip.lat_max                       # clamp lat (merc): the great-circle densify arcs
         project = lm < 90 ? ((lo, la) -> base(lo, clamp(la, -lm, lm))) : base   # over the pole
         ring = _densify_geo(Point2d[Point2d(q[1] * _R2D, q[2] * _R2D) for q in raw], 24)

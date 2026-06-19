@@ -273,7 +273,16 @@ function Makie.getlimits(la::GeoAxis, dim)
         error("Dimension $dim not allowed. Only 1 or 2.")
     end
     axis_plots = Set(values(la.elements))
+    # The projection-domain outline (spine) is the right frame for a BOUNDED projection (moll,
+    # bertin, ortho…) — drawn from pre-projected points, its bbox is the true map extent, whereas a
+    # nonlinear plot's data bbox can underestimate. But for a projection whose domain reaches a
+    # singularity (a conic/cylindrical pole, e.g. `lcc`) the spine runs off to ∞ and would zoom the
+    # axis out to a speck. So include the spine in the limits only when its own bbox is finite.
+    spine = get(la.elements, :spine, nothing)
+    spine_finite = spine !== nothing && Makie.isfinite_rect(Makie.data_limits(spine))
     function exclude(plot)
+        # the spine frames bounded projections; drop it only when it's unbounded (∞)
+        plot === spine && return !spine_finite
         # dont use axis decorations!
         plot in axis_plots && return true
         # only use plots with autolimits = true
