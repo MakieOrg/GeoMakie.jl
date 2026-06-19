@@ -273,17 +273,8 @@ function Makie.getlimits(la::GeoAxis, dim)
         error("Dimension $dim not allowed. Only 1 or 2.")
     end
     axis_plots = Set(values(la.elements))
-    # The projection-domain outline (spine) is the right frame for a BOUNDED projection (moll,
-    # bertin, ortho…) — drawn from pre-projected points, its bbox is the true map extent, whereas a
-    # nonlinear plot's data bbox can underestimate. But for a projection whose domain reaches a
-    # singularity (a conic/cylindrical pole, e.g. `lcc`) the spine runs off to ∞ and would zoom the
-    # axis out to a speck. So include the spine in the limits only when its own bbox is finite.
-    spine = get(la.elements, :spine, nothing)
-    spine_finite = spine !== nothing && Makie.isfinite_rect(Makie.data_limits(spine))
     function exclude(plot)
-        # the spine frames bounded projections; drop it only when it's unbounded (∞)
-        plot === spine && return !spine_finite
-        # dont use axis decorations!
+        # dont use axis decorations (grid, ticklabels, AND the spine — see the domain clamp below)!
         plot in axis_plots && return true
         # only use plots with autolimits = true
         to_value(get(plot, dim == 1 ? :xautolimits : :yautolimits, true)) || return true
@@ -292,14 +283,25 @@ function Makie.getlimits(la::GeoAxis, dim)
         # only use visible plots for limits
         return !to_value(get(plot, :visible, true))
     end
-    # get all data limits, minus the excluded plots
-    boundingbox = Makie.boundingbox(la.scene, exclude)
-    # if there are no bboxes remaining, `nothing` signals that no limits could be determined
-    Makie.isfinite_rect(boundingbox) || return nothing
-
-    # otherwise start with the first box
-    mini, maxi = minimum(boundingbox), maximum(boundingbox)
-    return (mini[dim], maxi[dim])
+    # Fit to the DATA, then clamp to the projection's finite domain — exactly cartopy's
+    # `GeoAxes.autoscale_view` (matplotlib autoscale, then bound to `projection.x_limits`/
+    # `y_limits`). The domain here is the spine outline (finite via the conic cutoff cone). The
+    # clamp (a) bounds data that runs to a projection singularity — a pole on a conic — to the map
+    # instead of zooming out to a speck, and (b) frames an empty axis to the full projection.
+    data_bb = Makie.boundingbox(la.scene, exclude)
+    mn = minimum(data_bb)[dim]; mx = maximum(data_bb)[dim]
+    lo = isfinite(mn) ? mn : -Inf
+    hi = isfinite(mx) ? mx : Inf
+    spine = get(la.elements, :spine, nothing)
+    if spine !== nothing
+        dom = Makie.data_limits(spine)
+        dlo = minimum(dom)[dim]; dhi = maximum(dom)[dim]
+        isfinite(dlo) && (lo = max(lo, dlo))
+        isfinite(dhi) && (hi = min(hi, dhi))
+    end
+    # if no finite window could be determined, `nothing` signals "leave the limits alone"
+    (isfinite(lo) && isfinite(hi) && hi > lo) || return nothing
+    return (lo, hi)
 end
 
 getxlimits(la::GeoAxis) = getlimits(la, 1)

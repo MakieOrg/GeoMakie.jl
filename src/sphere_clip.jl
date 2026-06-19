@@ -386,6 +386,14 @@ function Makie.apply_transform(c::_NativeCentred, r::Makie.Rect2{T}) where {T}
     (umin, umax), (vmin, vmax) = iterated_bounds(c, (mn[1], mx[1]), (mn[2], mx[2]))
     return Makie.Rect2{T}(Makie.Vec2{T}(umin, vmin), Makie.Vec2{T}(umax - umin, vmax - vmin))
 end
+# A plot's data limits arrive as a Rect3; without this, Makie projects the box's CORNERS, which for
+# a nonlinear projection under-estimates the extent (a bertin land box's corners sit at high
+# latitude where the ellipse is narrow → the map auto-zoomed to a cropped strip). Sample via the
+# Rect2 method (iterated_bounds) instead, mirroring `apply_transform(::Proj.Transformation, ::Rect3)`.
+function Makie.apply_transform(c::_NativeCentred, r::Makie.Rect3{T}) where {T}
+    r2 = Makie.apply_transform(c, Makie.Rect2{T}(r))
+    return Makie.Rect3{T}((Makie.origin(r2)..., r.origin[3]), (Makie.widths(r2)..., r.widths[3]))
+end
 # Geometry overloads (defensive): Makie has no generic apply_transform(f, ::Polygon/LineString) and
 # special-cases Proj.Transformation, so a native transform should handle these too for any code path
 # that transforms a geometry directly. (Makie's poly!/lines! recipes actually transform the decomposed

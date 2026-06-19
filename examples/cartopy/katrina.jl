@@ -49,10 +49,7 @@ direct_states.color .= Makie.wong_colors()[end-1]
 fig = Figure()
 ga = GeoAxis(
     fig[1, 1];
-    dest = "+proj=lcc +lon_0=-96 +lat_0=39 +lat_1=33 +lat_2=45",
-    # zoom to the continental US (like cartopy's `set_extent`); a bare conic otherwise frames to its
-    # full cone (apex pole → cutoff parallel), the projection's natural extent.
-    limits = ((-122, -68), (22, 50)),
+    dest = "+proj=lcc +lon_0=-96 +lat_0=39 +lat_1=33 +lat_2=45"
 )
 hidedecorations!(ga)
 poly!(ga, states_df.geometry; color = states_df.color, strokecolor = :black, strokewidth = 1.3)
