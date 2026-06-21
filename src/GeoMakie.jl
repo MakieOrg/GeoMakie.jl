@@ -62,6 +62,8 @@ include("makie-axis.jl")
 include("mesh_image.jl")
 include("linesplitting.jl")
 
+include("polar.jl") # GeoPolarAxis: pole-centred azimuthal maps on a Makie PolarAxis
+
 include("sphere/unit_sphere_transforms.jl")
 include("sphere/icosphere.jl")
 include("sphere/globetransform.jl")
@@ -74,7 +76,7 @@ export Proj
 
 export FileIO
 
-export GeoAxis, automatic
+export GeoAxis, GeoPolarAxis, automatic
 export datalims, datalims!
 @deprecate datalims Makie.autolimits
 @deprecate datalims! Makie.reset_limits!
