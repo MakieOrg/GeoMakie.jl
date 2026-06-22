@@ -834,31 +834,68 @@ panel("+proj=wink2") # hide
 panel("+proj=wintri") # hide
 ```
 
-## Polar (stereographic)
+```@setup projections
+## GeoPolarAxis fills are meshes drawn inside a clipped PolarAxis; CairoMakie renders those in
+## SVG with `feImage` filters that reference internal document fragments inside `<defs>`, which
+## Firefox does not support (Mozilla bugs 455986 / 1538554), so those panels show blank there
+## (Safari/Chrome are fine). Switch to PNG for this section — raster output renders everywhere.
+CairoMakie.activate!(px_per_unit = 2, type = :png)
+```
 
-Stereographic centred on each pole and zoomed to the cap — the way you'd view sea-ice
-or tripolar-grid fields. Stereographic is azimuthal: its only discontinuity is the
-*antipode* (the opposite pole), so the on-sphere clip is an antipodal cap, and the
-graticule stays concentric right up to the centre. GeoAxis `limits` are in lon/lat, so
-the cap is "all longitudes, lat in `[lat_cap, 90]`" (or the southern mirror), which the
-projection maps to a disk. We draw the bounding parallel (`lat_cap`) as a circular spine.
+## Polar (stereographic) — `GeoPolarAxis`
+
+For a **circular-boundary** polar map — stereographic centred on a pole and zoomed to a cap,
+the way you'd view sea-ice or a tripolar-grid field (cartopy's
+[`always_circular_stereo`](https://cartopy.readthedocs.io/latest/gallery/lines_and_polygons/always_circular_stereo.html))
+— use [`GeoPolarAxis`](@ref). A pole-centred azimuthal projection *is* a polar plot
+(`project(lon, lat) → (x, y)`, then `θ = atan2(y, x)`, `r = hypot(x, y)`), so `GeoPolarAxis`
+re-expresses the projection on a Makie `PolarAxis` and gets the **circular clip**, the **polar
+graticule** (parallels as r-rings, meridians as θ-spokes) and the **circular spine** for free.
+
+Pass the cap latitude as `latcap` — its sign picks the pole (`latcap ≥ 0` north, `< 0` south) —
+then plot with the usual verbs (`lines!`, `scatter!`, `poly!`, `surface!`, `heatmap!`,
+`contourf!`) using **geographic** `(lon, lat)` data:
 
 ```@example projections
 polar = Figure(size = (840, 460))
-for (i, (d, latcap, ttl)) in enumerate([
-        ("+proj=stere +lat_0=90 +lon_0=0",   55, "North polar stereographic"),
-        ("+proj=stere +lat_0=-90 +lon_0=0", -55, "South polar stereographic")])
-    lims = latcap > 0 ? ((-180, 180), (latcap, 90)) : ((-180, 180), (-90, latcap))
-    ga = GeoAxis(polar[1, i]; dest = d, limits = lims, title = ttl, titlesize = 11)
-    hidedecorations!(ga; grid = false)
-    poly!(ga, LAND; color = (:gray70, 0.55), strokecolor = :black, strokewidth = 0.3)
-    ## circular spine: the bounding parallel at the cap latitude (a circle in stereographic)
-    lines!(ga, Point2f.(-180:180, latcap); color = :black, linewidth = 1.0)
+for (i, (latcap, ttl)) in enumerate([
+        (55, "North polar stereographic"),
+        (-55, "South polar stereographic")])
+    gpa = GeoPolarAxis(polar[1, i]; latcap = latcap, title = ttl, titlesize = 11)
+    poly!(gpa, LAND; color = (:gray70, 0.55), strokecolor = :black, strokewidth = 0.3)
 end
 polar # hide
 ```
 
-```@setup projections
-## Restore the global PNG backend so later (raster-heavy) doc pages are not emitted as SVG.
-CairoMakie.activate!(px_per_unit = 2, type = :png)
+Use a non-default azimuthal projection (e.g. Lambert azimuthal equal-area, or a rotated
+`lon_0`) via the `dest` keyword, and plot a smooth field with `surface!`/`heatmap!`/`contourf!`.
+A field defined on the sphere must be **single-valued at the pole** (every longitude at
+`lat = ±90` is the same point), so build it as a function of the Cartesian point `(x, y, z)`:
+
+```@example projections
+## a C∞ field on the sphere: a smooth function of (x, y, z), sampled at (lon, lat)
+xyz(lon, lat) = (cosd(lat) * cosd(lon), cosd(lat) * sind(lon), sind(lat))
+function field(lon, lat)
+    x, y, z = xyz(lon, lat)
+    f = 0.3z
+    for (clon, clat, a) in ((0.0, 72.0, 1.0), (130.0, 60.0, 0.8), (-110.0, 66.0, 0.9))
+        cx, cy, cz = xyz(clon, clat)
+        f += a * exp(-6 * ((x - cx)^2 + (y - cy)^2 + (z - cz)^2))
+    end
+    return f
+end
+lons = -180:4:180; lats = 50:2:90
+zs = [field(lo, la) for lo in lons, la in lats]
+
+caps = Figure(size = (840, 460))
+gpa = GeoPolarAxis(caps[1, 1]; latcap = 50,
+    dest = "+proj=laea +lat_0=90 +lon_0=0", title = "Lambert azimuthal — contourf")
+contourf!(gpa, lons, lats, zs; levels = 12)
+lines!(gpa, GeoMakie.coastlines(); color = (:black, 0.6), linewidth = 0.4)
+
+gpb = GeoPolarAxis(caps[1, 2]; latcap = 50, title = "Stereographic — surface")
+sf = surface!(gpb, lons, lats, zs)
+lines!(gpb, GeoMakie.coastlines(); color = (:black, 0.6), linewidth = 0.4)
+Colorbar(caps[1, 3], sf)
+caps # hide
 ```

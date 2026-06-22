@@ -32,7 +32,7 @@ const _POLAR_SOURCE = "+proj=longlat +datum=WGS84"
 """
     GeoPolarAxis(figure_position; latcap, dest, kwargs...) -> GeoPolarAxis
 
-A polar map on a Makie [`PolarAxis`](@extref Makie.PolarAxis), for **pole-centred azimuthal**
+A polar map on a Makie `PolarAxis`, for **pole-centred azimuthal**
 projections (`stere`, `aeqd`, `laea`, `gnom`, …). The map is a disk clipped to the cap latitude
 `latcap`, with a circular spine and a polar graticule (parallels as r-rings, meridians as
 θ-spokes) — cartopy's `always_circular_stereo` look.
