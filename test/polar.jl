@@ -2,70 +2,69 @@ using Test
 using GeoMakie, CairoMakie, GeometryBasics
 const G = GeoMakie
 
-# project a (θ, r) vertex back to Cartesian (PolarAxis defaults: theta_0 = 0, direction = +1)
-_toxy(v) = (v[2] * cos(v[1]), v[2] * sin(v[1]))
-
 @testset "construction & defaults" begin
     fig = Figure()
     gpa = GeoPolarAxis(fig[1, 1]; latcap = 50)
     @test gpa isa GeoPolarAxis
     @test gpa.axis isa Makie.PolarAxis
-    @test occursin("lat_0=90", gpa.dest)         # north pole inferred from latcap ≥ 0
+    @test occursin("lat_0=90", gpa.dest)          # north pole inferred from latcap ≥ 0
     @test gpa.axis.rlimits[] == (0.0, G._polar_radius(gpa.transform, 50.0))
+    @test gpa.axis.direction[] == 1                # north: 0°-meridian at the bottom
 
     gps = GeoPolarAxis(fig[1, 2]; latcap = -60)
-    @test occursin("lat_0=-90", gps.dest)         # south pole inferred from latcap < 0
+    @test occursin("lat_0=-90", gps.dest)          # south pole inferred from latcap < 0
+    @test gps.axis.direction[] == -1               # south: 0°-meridian at the top
 end
 
-@testset "radial law & angle (exact via projector)" begin
-    gpa = GeoPolarAxis(Figure()[1, 1]; latcap = 50)
-    t = gpa.transform
-    # pole maps to r = 0
-    @test G._polar_radius(t, 90.0) ≈ 0 atol = 1e-6
-    # r is monotone in colatitude
-    @test G._polar_radius(t, 80.0) < G._polar_radius(t, 60.0)
-    # (θ, r) round-trips to the true projected (x, y)
-    for (lon, lat) in ((0.0, 70.0), (90.0, 65.0), (-120.0, 80.0))
-        θr = G._polar_θr(t, lon, lat)
-        x, y = t(lon, lat)
-        @test _toxy(θr)[1] ≈ x atol = 1e-3
-        @test _toxy(θr)[2] ≈ y atol = 1e-3
+@testset "radial law (exact) & orientation matches the projection" begin
+    for (latcap, pole) in ((50.0, 90.0), (-50.0, -90.0))
+        gpa = GeoPolarAxis(Figure()[1, 1]; latcap = latcap)
+        t = gpa.transform
+        @test G._polar_radius(t, pole) ≈ 0 atol = 1e-6         # the pole maps to r = 0
+        @test G._polar_radius(t, 0.7pole) < G._polar_radius(t, 0.55pole)  # monotone in colatitude
+        # θ = lon, and the auto-derived (direction, theta_0) place it exactly where the projection does
+        dir, th0 = G._polar_orientation(t, 0.6pole)
+        @test gpa.axis.direction[] == dir                      # the axis is configured from the projection
+        @test gpa.axis.theta_0[] ≈ th0 atol = 1e-5             # (PolarAxis stores theta_0 as Float32)
+        for (lon, lat) in ((0.0, 0.7pole), (90.0, 0.6pole), (-120.0, 0.8pole))
+            θ, r = G._polar_θr(t, lon, lat)
+            @test θ ≈ deg2rad(lon)
+            x, y = t(lon, lat)
+            @test r * cos(dir * θ + th0) ≈ x atol = 1e-3
+            @test r * sin(dir * θ + th0) ≈ y atol = 1e-3
+        end
     end
 end
 
-@testset "cap-clipped fills stay within the cap" begin
-    for (latcap, name) in ((50.0, "north"), (-50.0, "south"))
-        gpa = GeoPolarAxis(Figure()[1, 1]; latcap = latcap)
+@testset "antimeridian split: Antarctica fills to the pole, pieces simple" begin
+    gpa = GeoPolarAxis(Figure()[1, 1]; latcap = -50)
+    polys, group = G._anti_split(gpa, GeoMakie.land())
+    @test !isempty(polys)
+    @test length(group) == length(polys)
+    θrpolys = [G._polar_polygon(gpa.transform, p) for p in polys]
+    # a pole-enclosing polygon (Antarctica) must reach r = 0 after the pole-walk
+    minr = minimum(q[2] for poly in θrpolys for q in GeometryBasics.coordinates(poly.exterior))
+    @test minr ≈ 0 atol = 1.0
+end
+
+@testset "stroke seams the antimeridian (no radial cut to the pole)" begin
+    for (latcap, d) in ((50.0, "+proj=stere +lat_0=90 +lon_0=0"), (-50.0, "+proj=stere +lat_0=-90 +lon_0=0"))
+        gpa = GeoPolarAxis(Figure()[1, 1]; latcap = latcap, dest = d)
+        polys, _ = G._anti_split(gpa, GeoMakie.land())
+        sp = G._polar_stroke_points(gpa.transform, polys)
         rcap = G._polar_radius(gpa.transform, latcap)
-        polys, group = G._cap_split(gpa, GeoMakie.land())
-        @test !isempty(polys)
-        @test length(group) == length(polys)
-        meshes = [G._polar_fill_mesh(gpa.transform, p) for p in polys]
-        merged, _ = G._merge_fill_meshes(meshes, nothing)
-        verts = GeometryBasics.coordinates(merged)
-        @test !isempty(verts)
-        # every vertex within the cap radius (a tiny tolerance for the boundary arc)
-        @test maximum(v[2] for v in verts) ≤ rcap * (1 + 1e-6)
-        # no triangle edge spans more than the disk diameter (would signal a branch-cut artifact)
-        diam = 2rcap
-        maxedge = 0.0
-        for f in GeometryBasics.faces(merged)
-            a, b, c = _toxy(verts[f[1]]), _toxy(verts[f[2]]), _toxy(verts[f[3]])
-            for (p, q) in ((a, b), (b, c), (c, a))
-                maxedge = max(maxedge, hypot(p[1] - q[1], p[2] - q[2]))
+        toxy(v) = (v[2] * cos(v[1]), v[2] * sin(v[1]))
+        cuts = 0
+        for i in 2:length(sp)
+            (any(isnan, sp[i]) || any(isnan, sp[i - 1])) && continue
+            a = toxy(sp[i]); b = toxy(sp[i - 1])
+            # a long chord whose midpoint is well inside the disk == a seam edge cutting across
+            if hypot(a[1] - b[1], a[2] - b[2]) > 0.15rcap && hypot((a[1] + b[1]) / 2, (a[2] + b[2]) / 2) < 0.85rcap
+                cuts += 1
             end
         end
-        @test maxedge ≤ diam
+        @test cuts == 0
     end
-end
-
-@testset "Antarctica fills to the pole" begin
-    gpa = GeoPolarAxis(Figure()[1, 1]; latcap = -50)
-    polys, _ = G._cap_split(gpa, GeoMakie.land())
-    meshes = [G._polar_fill_mesh(gpa.transform, p) for p in polys]
-    merged, _ = G._merge_fill_meshes(meshes, nothing)
-    # a pole-enclosing polygon must reach r = 0 (the south pole is land)
-    @test minimum(v[2] for v in GeometryBasics.coordinates(merged)) ≈ 0 atol = 1.0
 end
 
 @testset "every verb plots without error" begin
@@ -91,4 +90,16 @@ end
     @test contourf!(gpd, lons, lats, z; levels = 8) isa Makie.AbstractPlot
 
     @test (save(tempname() * ".png", fig); true)          # full render path
+end
+
+@testset "filled artists stay vector in SVG (no rasterised mesh)" begin
+    fig = Figure()
+    gpa = GeoPolarAxis(fig[1, 1]; latcap = -50)
+    poly!(gpa, GeoMakie.land(); color = (:gray70, 0.7), strokecolor = :black, strokewidth = 0.6)
+    path = tempname() * ".svg"
+    save(path, fig)
+    svg = read(path, String)
+    # poly! fills render as vector paths; a regression to mesh-based fills would emit <feImage>/<image>
+    @test !occursin("feImage", svg)
+    @test !occursin("<image", svg)
 end

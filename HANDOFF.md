@@ -4,93 +4,64 @@
 
 ## Where this stands
 
-`GeoPolarAxis` (in `src/polar.jl`) is **implemented and tested**. This session finished the
-"NOT YET DONE" items from the previous handoff and started chasing one **open visual bug** (a
-fill mirror the maintainer spotted) — that bug is the only thing left before docs/PR are final.
+`GeoPolarAxis` (in `src/polar.jl`) is **implemented, refactored, and green** (48 tests). The big
+open items from earlier handoffs — the fill "mirror", the antimeridian cut, the heatmap smear — are
+all **resolved**. What's left is mostly review/polish before the PR (see "Remaining").
 
-### Done this session
-- **Tests pass.** `test/polar.jl` (32 tests) and the full `test/runtests.jl` (**179/179**) are green.
-  - Run the suite directly against the dev manifest: `julia --project=. test/runtests.jl`.
-    Do **not** use `Pkg.test()` here — the test target pulls in GLMakie, which the sandbox
-    re-resolve can't satisfy against the dev-pinned Makie 0.24.12 (pre-existing env issue, unrelated).
-- **Demo field fixed.** Earlier demos used `cosd(lat)*sind(2lon)+0.5cosd(3lon)`, which is
-  **multivalued at the pole** (the `cosd(3lon)` term varies with lon at lat=90) → surface looked
-  discontinuous and contourf smeared. Replaced everywhere with a **C∞ field built as a function of
-  Cartesian `(x,y,z)` then sampled at `(lon,lat)`** (sum of Gaussians) → single-valued at the pole
-  (verified: spread over all lons at lat=90 is exactly 0). This is the canonical way to make sphere
-  test data; keep it.
-- **Integration render** `/tmp/polar_integration.{png,pdf}` (regenerate with `/tmp/polar_integration.jl`):
-  6 panels exercising every verb (poly+lines, scatter-coloured-by-field, Antarctica-to-pole,
-  surface+colorbar, heatmap, contourf). Maintainer reviewed the PNG → **LGTM**. contourf verified
-  programmatically healthy: 22 bands → 22 meshes, all 12 level colours present, every vertex ≤ rcap,
-  fills reach r=0, max-edge/diameter = 0.61 (no branch-cut smear).
-- **Docs** `docs/src/projections.md` "Polar (stereographic) — `GeoPolarAxis`": replaced the old
-  parallel-circle GeoAxis hack with a real `GeoPolarAxis` section (N/S land caps + a laea-contourf /
-  stere-surface field panel). Both example blocks were test-rendered and run clean.
-  - The section is forced to **PNG** (a `@setup` switches the backend just before it): GeoPolarAxis
-    fills are meshes inside a clipped PolarAxis, which CairoMakie emits in SVG via `feImage` filters
-    referencing internal `<defs>` fragments — **Firefox can't render those** (Mozilla bugs
-    [455986](https://bugzilla.mozilla.org/show_bug.cgi?id=455986),
-    [1538554](https://bugzilla.mozilla.org/show_bug.cgi?id=1538554); Safari/Chrome are fine). This is
-    why the maintainer saw blank SVGs in Firefox but not Safari. PNG renders everywhere.
-- **Docstring**: removed an `@extref Makie.PolarAxis` from the `GeoPolarAxis` docstring — this docs
-  build has no DocumenterInterLinks, so `@extref` would have broken it. `api.md` is `@autodocs`, so
-  the (exported, documented) `GeoPolarAxis` is picked up automatically. The `[`GeoPolarAxis`](@ref)`
-  link in projections.md resolves against that.
+## The design (after the refactor — read this first)
 
-## ⚠️ OPEN — the fill "mirror" bug (do this first)
+A pole-centred azimuthal projection is **separable** in polar coords, so we map directly:
+- **`θ = lon`** (the display orientation is set by PolarAxis `direction`/`theta_0`)
+- **`r = radial(lat) = hypot(project(lon₀, lat))`** (the projection's exact radial law)
 
-**Symptom (maintainer, viewing `/tmp/docs_polar_block1.pdf`):** in the N/S land caps, the grey
-**fill** looks **mirrored over the horizontal axis** (the 90°E–90°W line) relative to the **stroke**
-(black land outline), even though it's clipped to inside that outline. Stroke = correct, fill = wrong.
+`direction`/`theta_0` are **auto-derived from the projector** (`_polar_orientation`) so the layout
+matches the true azimuthal projection exactly (verified 0 m error; the projected bearing is provably
+lon-only). N cap → 0° at bottom, S cap → 0° at top. Both overridable.
 
-**Ruled out so far (all via `/tmp/diag_*.jl`, kept as scratch):**
-- The `(θ,r)` data is not mirrored: for a single in-cap polygon the fill-mesh vertices equal the
-  stroke vertices **exactly**, and both equal the direct `project(lon,lat)` (`/tmp/diag_mirror.jl`).
-- It is not a render-backend mirror for the simple case: a single asymmetric polygon (no holes,
-  inside the cap) drawn as red fill + blue stroke has **coincident centroids in BOTH PNG and PDF**
-  (Δrow≈Δcol≈0; a vertical mirror would give Δrow≈−110…−147 px). See `/tmp/diag_pixel.jl`,
-  `/tmp/diag_pdf_vs_png.jl`. So `_polar_fill_mesh` + `mesh!` + the Polar transform are correct, and
-  CairoMakie applies the Polar `transform_func` to mesh vertices (`positions_transformed_f32c`).
-- `_cap_split`/`_rings_to_polygons` return **lon/lat** polygons (the returned `Polygon` uses the
-  original `valid` rings, not the projected ones), so the fill is not double-projected.
+**Why `θ = lon` and not `atan2(y,x)`** (the previous approach — *don't go back to it*): `atan2`
+puts the branch cut at a weird meridian (lon ≈ −90 for lon₀=0), which forced filled artists through
+a hand-built `mesh!` in projected (x,y). `mesh!` is what made CairoMakie **rasterise** the fill into
+`feImage`/`<image>` tiles → the **PDF mirror/shift** and **SVG seam**. With `θ = lon` the only seam
+is the **antimeridian (lon ±180)** — a constant-longitude graticule line — so we reuse the existing
+`AntimeridianClip` (with pole-walk for Antarctica) and then filled artists go through **ordinary
+`poly!`/`contourf!`** → **clean vector paths**.
 
-**Inconclusive / suspicious:** whole-`land()` red-fill vs blue-stroke centroids differ by
-Δcol≈+49 px (PNG) / +37 px (PDF) with only small Δrow (`/tmp/diag_land.jl`) — that's a horizontal
-shift, **not** the clean vertical mirror the symptom describes, and is probably just
-area-centroid-vs-perimeter-centroid for an asymmetric landmass. The crude global centroid test
-can't localise a partial mirror.
+### Per-verb (all in `src/polar.jl`)
+- `lines!`/`scatter!`: `split_resample_line` (antipode clip + resample) → map to `(θ,r)`.
+- `poly!`: `_anti_split` (antimeridian split, lon0=0, pole-walk) → `_polar_polygon` → native `poly!`
+  (vector). Antarctica's two pieces abut on the same radial line (θ=±π) so the **fill is seamless to
+  r=0**. The **stroke** is drawn separately (`_polar_stroke_points`) and **skips antimeridian-aligned
+  edges** so there's no radial cut to the pole.
+- `contourf!`: map coords → native `contourf!` (bands are simple in (θ,r) → **vector**).
+- `surface!`/`heatmap!`: a `(θ,r)` **pcolormesh** (`_polar_field_mesh!`), data as per-vertex colour,
+  warped per-vertex. **Raster data on a nonlinear axis MUST be a mesh** (heatmap's native image path
+  smears — same reason GeoAxis meshes its grids), so these **rasterise in vector backends**
+  (`feImage` → slow PDF, blank in Firefox SVG). **This is inherent to raster fields — use
+  `contourf!` for a vector field.** Not a bug; don't try to "fix" it.
 
-**What I had NOT tested yet (start here):**
-1. A single polygon that **crosses the cap boundary** (so `_cap_split` actually clips it and inserts
-   boundary arcs / may reorient rings), through the full `poly!` path → red fill / blue stroke,
-   pixel-centroid compare. If a mirror shows up only here, suspect ring reorientation in
-   `_split_polygon`/`_rings_to_polygons` or triangulation of clipped rings.
-2. A single polygon **with a hole** (land polys have holes) → same compare.
-3. Ground-truth overlay: project `land()` to `(x,y)`, draw on a plain `Axis` (equal aspect) scaled to
-   the same disk, and overlay the GeoPolarAxis fill — shows directly whether the whole fill or only
-   parts diverge, and in which direction.
-4. Worth keeping in mind: **lines/scatter are not cap-clipped** (they use `split_resample_line` +
-   the PolarAxis `rlimits` visual clip), whereas **fills are cap-clipped geometrically**. So near the
-   boundary the stroke and the fill legitimately trace slightly different paths — check this isn't
-   being misread as a mirror. (It wouldn't explain a *horizontal-axis* mirror, but rule it out.)
+## Verified this session
+- Maintainer: `poly!` land caps LGTM in **PNG, SVG, and PDF** — no mirror/shift, no antimeridian cut.
+- Heatmap smear fixed (was the native-image regression); now a proper pcolormesh.
+- 48 tests green (`test/polar.jl`). Run: `julia --project=. -e 'using GeoMakie,CairoMakie,GeometryBasics,Test; const G=GeoMakie; include("test/polar.jl")'`
+  (or full suite `julia --project=. test/runtests.jl`; **not** `Pkg.test()` — it pulls GLMakie which
+  the sandbox can't resolve against dev-pinned Makie).
+- New regression test asserts the poly-fill SVG has no `feImage`/`<image>` (guards against a
+  mesh-fill relapse).
 
-If it turns out to be real, the fix is almost certainly in the fill path (`_polar_fill_mesh` /
-`_cap_split` / `_merge_fill_meshes` in `src/polar.jl`), not in the data or the PolarAxis.
-
-## After the mirror is resolved
-- Re-confirm the docs panels look right (they share the fill path).
-- Optional (previous handoff "consider"): a dedicated `examples/` page reproducing cartopy's
-  `always_circular_stereo` (south cap −65°, coastlines, empty corners). The projections.md section
-  already cites and covers it, so this is a nice-to-have.
-- Delete this file + `HANDOFF_poles.png` (old equidistant prototype image) before the PR merges.
+## Remaining (before PR)
+1. **Re-render the docs section** `docs/src/projections.md` "Polar (stereographic) — `GeoPolarAxis`"
+   and eyeball: the `poly!` caps block + the `contourf!`/`surface!` field block. Both updated this
+   session (description now says `θ=lon`/`r=radial`; the `@setup` PNG caveat now correctly scopes the
+   Firefox/`feImage` issue to `surface!`/`heatmap!` only). Confirm they build clean.
+2. **Optional**: a dedicated `examples/` page reproducing cartopy `always_circular_stereo` (south cap
+   −65°, coastlines, empty corners). projections.md already cites/covers it — nice-to-have.
+3. **Cleanup before merge**: delete this file + `HANDOFF_poles.png` (stale equidistant prototype).
+4. Scratch (throwaway, `/tmp`, not committed): `polar_check_all.jl`, `polar_field_check.jl`,
+   `polar_mirror_check.jl`, `polaraxis_poly_mwe.jl`, `diag_*.jl` and their image output.
 
 ## Files
-- Source: `src/polar.jl` (+ `src/GeoMakie.jl` include/export), `test/polar.jl`, `test/runtests.jl`
-  — all committed earlier (734cf9b).
-- This session's uncommitted-until-now changes: `docs/src/projections.md`, `src/polar.jl` (docstring).
-- Scratch (throwaway, in `/tmp`, not committed): `polar_integration.jl`, `polar_pdfs.jl`,
-  `diag_mirror.jl`, `diag_pixel.jl`, `diag_pdf_vs_png.jl`, `diag_land.jl` and their `.png/.pdf` output.
+- `src/polar.jl` (rewritten), `src/GeoMakie.jl` (include/export), `test/polar.jl`,
+  `test/runtests.jl`, `docs/src/projections.md`.
 
 ### Prior context (still-relevant upstream follow-ups, NOT this PR)
 When GeometryOps ships #417–#421 (spherical clip / arc intersection / point-in-polygon /

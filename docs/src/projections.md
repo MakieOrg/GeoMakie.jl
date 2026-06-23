@@ -835,10 +835,12 @@ panel("+proj=wintri") # hide
 ```
 
 ```@setup projections
-## GeoPolarAxis fills are meshes drawn inside a clipped PolarAxis; CairoMakie renders those in
-## SVG with `feImage` filters that reference internal document fragments inside `<defs>`, which
-## Firefox does not support (Mozilla bugs 455986 / 1538554), so those panels show blank there
-## (Safari/Chrome are fine). Switch to PNG for this section — raster output renders everywhere.
+## `poly!`/`lines!`/`contourf!` on a GeoPolarAxis render as clean vector paths. But `surface!`/
+## `heatmap!` are raster fields: a pixel grid can't follow the nonlinear polar axis as an image, so
+## they are drawn as a pcolormesh, which CairoMakie rasterises in SVG via `feImage` filters that
+## reference internal `<defs>` fragments — Firefox shows those blank (Mozilla bugs 455986 / 1538554;
+## Safari/Chrome are fine). The `surface!` panel below uses one, so this section is forced to PNG,
+## which renders everywhere. (Prefer `contourf!` for a *vector* field.)
 CairoMakie.activate!(px_per_unit = 2, type = :png)
 ```
 
@@ -847,10 +849,10 @@ CairoMakie.activate!(px_per_unit = 2, type = :png)
 For a **circular-boundary** polar map — stereographic centred on a pole and zoomed to a cap,
 the way you'd view sea-ice or a tripolar-grid field (cartopy's
 [`always_circular_stereo`](https://cartopy.readthedocs.io/latest/gallery/lines_and_polygons/always_circular_stereo.html))
-— use [`GeoPolarAxis`](@ref). A pole-centred azimuthal projection *is* a polar plot
-(`project(lon, lat) → (x, y)`, then `θ = atan2(y, x)`, `r = hypot(x, y)`), so `GeoPolarAxis`
-re-expresses the projection on a Makie `PolarAxis` and gets the **circular clip**, the **polar
-graticule** (parallels as r-rings, meridians as θ-spokes) and the **circular spine** for free.
+— use [`GeoPolarAxis`](@ref). A pole-centred azimuthal projection *is* a polar plot, separable as
+`θ = lon` and `r = radial(lat)` (the projection's radial law), so `GeoPolarAxis` re-expresses the
+projection on a Makie `PolarAxis` and gets the **circular clip**, the **polar graticule**
+(parallels as r-rings, meridians as θ-spokes) and the **circular spine** for free.
 
 Pass the cap latitude as `latcap` — its sign picks the pole (`latcap ≥ 0` north, `< 0` south) —
 then plot with the usual verbs (`lines!`, `scatter!`, `poly!`, `surface!`, `heatmap!`,

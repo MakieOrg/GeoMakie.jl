@@ -5,26 +5,28 @@ This reproduces cartopy's `always_circular_stereo` example: a polar map whose bo
 **circle** (a cap at a chosen latitude) with everything outside the circle clipped, plus a polar
 graticule (parallels as r-rings, meridians as θ-spokes).
 
-A pole-centred azimuthal projection IS a polar plot: `project(lon, lat) → (x, y)` with
-`θ = atan2(y, x)`, `r = hypot(x, y)`. We therefore re-express the chosen PROJ azimuthal projection
-in polar coordinates and let Makie's `PolarAxis` supply the circular clip, the polar grid and the
-circular spine for free (`rlimits` clips to the cap circle).
+A pole-centred azimuthal projection is **separable** in polar coordinates:
+
+  - `θ = lon`            — a pure rotation (the display orientation is set with `theta_0`/`direction`)
+  - `r = radial(lat)`    — the projection's radial law, `hypot(project(lon₀, lat))`
+
+so we map `(lon, lat) → (θ, r)` directly and let Makie's `PolarAxis` supply the circular clip
+(`rlimits`), the polar grid and the circular spine for free.
+
+Because `θ = lon`, the only discontinuity is the **antimeridian** (`lon = ±180`) — a constant-
+longitude graticule line, exactly where GeoMakie's `AntimeridianClip` already tears (with a
+pole-walk for pole-enclosing land like Antarctica). After that split every polygon is simple in
+`(θ, r)`, so filled artists go through Makie's ordinary `poly!`/`contourf!` (which triangulate in
+`(θ, r)`) and render as clean vector paths — no bespoke mesh, no rasterised-mesh artifacts.
+
+The antimeridian split produces two pieces that abut along `lon = ±180`; on the disk `θ = +π` and
+`θ = −π` are the *same* radial direction, so the **fill** is seamless (the cut is zero-width). The
+**stroke** would still draw that seam edge as a radial line to the pole, so `_polar_stroke_points`
+skips antimeridian-aligned edges, visually seaming the pieces back together.
 
 `GeoPolarAxis` is a thin wrapper around a `PolarAxis` plus the projection. The geographic plotting
 verbs (`lines!`, `scatter!`, `poly!`, `surface!`, `heatmap!`, `contourf!`) are overloaded on it:
-they take geographic (lon, lat) inputs, map them to `(θ, r)` and forward to the wrapped axis.
-
-## The atan2 branch cut
-
-`θ = atan2(y, x)` is discontinuous across one meridian (where it flips ±π). This is harmless for
-**lines** (a `PolarAxis` transforms each vertex to Cartesian and draws straight segments between
-them, so a step from θ≈π to θ≈−π is a short, correct segment) but **fatal for fills**, which
-triangulate in `(θ, r)` space: a triangle spanning the branch cut warps across the whole disk.
-
-The fix for every filled artist (`poly!`, `surface!`, `heatmap!`, `contourf!`) is to build the
-triangle mesh in **projected `(x, y)`** space — where the azimuthal projection is continuous and
-there is no seam — and only then remap the mesh vertices to `(θ, r)`. The round-trip
-`(x, y) → (θ, r) → (x, y)` is exact, so the `PolarAxis` recovers the original projected triangles.
+they take geographic `(lon, lat)` inputs, map them to `(θ, r)` and forward to the wrapped axis.
 =#
 
 const _POLAR_SOURCE = "+proj=longlat +datum=WGS84"
@@ -47,10 +49,13 @@ Plot onto it with the usual verbs, passing **geographic** `(lon, lat)` data:
   Use this for `laea`/`aeqd`/`gnom` or a rotated `lon_0`. Must be a pole-centred azimuthal projection.
 - `latticks` / `lonticks`: latitudes (parallels, r-rings) and longitudes (meridians, θ-spokes) to
   label. `automatic` picks sensible defaults from the cap.
+- `direction` / `theta_0`: the `PolarAxis` orientation. `automatic` derives them from the projection
+  so the layout matches the true azimuthal projection (0°-meridian at the bottom for a north cap, at
+  the top for a south cap); override to taste.
 - grid styling (`rgridcolor`, `thetagridcolor`, `rgridwidth`, `thetagridwidth`, `spinecolor`,
   `spinewidth`): default to GeoMakie's `GeoAxis` graticule (faint black @ 12%, opaque spine), not
   `PolarAxis`'s much darker defaults.
-- any further keyword is forwarded to the underlying `PolarAxis` (`title`, `theta_0`, `direction`, …).
+- any further keyword is forwarded to the underlying `PolarAxis` (`title`, …).
 
 The wrapped axis is available as `gpa.axis`.
 """
@@ -64,17 +69,25 @@ end
 
 Makie.get_scene(gpa::GeoPolarAxis) = Makie.get_scene(gpa.axis)
 
-# (lon, lat)° -> (θ [rad], r) via the azimuthal projector
-@inline function _polar_θr(t::Proj.Transformation, lon, lat)
-    xy = t(Float64(lon), Float64(lat))
-    return Point2{Float64}(atan(xy[2], xy[1]), hypot(xy[1], xy[2]))
-end
-
-# projected metres (x, y) -> (θ [rad], r)
-@inline _xy_to_θr(p) = Point2f(atan(Float64(p[2]), Float64(p[1])), hypot(Float64(p[1]), Float64(p[2])))
-
 # radius of the parallel `lat` — for a pole-centred azimuthal projection r depends only on latitude
 _polar_radius(t::Proj.Transformation, lat) = (xy = t(0.0, Float64(lat)); hypot(xy[1], xy[2]))
+
+# (lon, lat)° -> (θ = lon [rad], r). `r = hypot(project(lon, lat))` is the exact azimuthal radial
+# law (independent of lon); `θ` comes straight from the longitude — no atan2, no branch cut.
+@inline function _polar_θr(t::Proj.Transformation, lon, lat)
+    xy = t(Float64(lon), Float64(lat))
+    return Point2{Float64}(deg2rad(Float64(lon)), hypot(xy[1], xy[2]))
+end
+
+# Derive `(direction, theta_0)` from the projector so the polar layout matches the true azimuthal
+# projection: the projected bearing of a meridian, `α(lon) = atan2(project(lon, latref))`, is affine
+# in lon — `α = direction·deg2rad(lon) + theta_0` — and PolarAxis applies exactly that to `θ = lon`.
+function _polar_orientation(t::Proj.Transformation, latref)
+    α(lon) = (xy = t(Float64(lon), Float64(latref)); atan(xy[2], xy[1]))
+    α0 = α(0.0)
+    direction = _wrapλ(α(1.0) - α0) ≥ 0 ? 1 : -1
+    return direction, α0
+end
 
 # default parallels to label: nice round latitudes strictly between the cap and the pole
 function _default_latticks(latcap, pole)
@@ -97,6 +110,8 @@ function GeoPolarAxis(figpos;
         source = _POLAR_SOURCE,
         latticks = automatic,
         lonticks = automatic,
+        direction = automatic,
+        theta_0 = automatic,
         rgridcolor = RGBAf(0, 0, 0, 0.12),
         thetagridcolor = RGBAf(0, 0, 0, 0.12),
         rgridwidth = 1.0,
@@ -108,19 +123,23 @@ function GeoPolarAxis(figpos;
     pole = latcap ≥ 0 ? 90.0 : -90.0
     rcap = _polar_radius(t, latcap)
 
+    dir, th0 = _polar_orientation(t, (latcap + pole) / 2)
+    direction === automatic && (direction = dir)
+    theta_0 === automatic && (theta_0 = th0)
+
     lt = latticks === automatic ? _default_latticks(latcap, pole) : latticks
     rvals = Float64[_polar_radius(t, l) for l in lt]
     rlabels = String[_lat_label(l) for l in lt]
 
     lons = lonticks === automatic ? collect(-180.0:45.0:135.0) : collect(Float64, lonticks)
-    latref = (latcap + pole) / 2
-    θvals = Float64[_polar_θr(t, lo, latref)[1] for lo in lons]
+    θvals = Float64[deg2rad(lo) for lo in lons]
     θlabels = String[_lon_label(lo) for lo in lons]
 
     ax = Makie.PolarAxis(figpos;
         rlimits = (0.0, rcap),
         rticks = (rvals, rlabels),
         thetaticks = (θvals, θlabels),
+        direction, theta_0,
         rgridcolor, thetagridcolor, rgridwidth, thetagridwidth,
         spinecolor, spinewidth,
         kwargs...)
@@ -162,24 +181,14 @@ function Makie.scatter!(gpa::GeoPolarAxis, args...; kwargs...)
 end
 
 #-----------------------------------------------------------------------------------------------
-# filled artists: build the mesh in projected (x, y), then remap vertices to (θ, r)
+# filled polygons: antimeridian-split (so each piece is simple in (θ, r)) then ordinary poly!
 #-----------------------------------------------------------------------------------------------
 
-@inline _proj_xy(t, p) = (xy = t(Float64(p[1]), Float64(p[2])); Point2f(xy[1], xy[2]))
-_ring_finite(ring) = all(p -> isfinite(p[1]) && isfinite(p[2]), ring)
-
-# The cap as a sphere-space small-circle clip about the pole (colatitude = 90 − |latcap|). Used to
-# trim filled geometry to the disk *before* triangulating, so far-away land/bands aren't meshed only
-# to be clipped by `rlimits` (and a pole-enclosing polygon like Antarctica still fills to r = 0).
-function _cap_clip(gpa::GeoPolarAxis)
-    pole = gpa.latcap ≥ 0 ? 90.0 : -90.0
-    return CircleClip(0.0, pole, 90.0 - abs(gpa.latcap))
-end
-
-# Cap-clip + resample polygonal geographic `geom`; return (lon/lat polygons, group) where `group[i]`
-# is the index of the input polygon piece `i` came from (so per-polygon colours map to pieces).
-function _cap_split(gpa::GeoPolarAxis, geom; winding::Symbol = :spherical)
-    clip = _cap_clip(gpa)
+# Split polygonal geographic `geom` at the antimeridian (lon = ±180 — the only seam once θ = lon),
+# with a pole-walk for pole-enclosing land. Returns (lon/lat polygons, group) where `group[i]` is the
+# index of the input polygon piece `i` came from (so per-polygon colours map onto the pieces).
+function _anti_split(gpa::GeoPolarAxis, geom; winding::Symbol = :spherical)
+    clip = AntimeridianClip(0.0)
     project = _projector(gpa.transform)
     scale = resample_scale(project)
     polys = GeometryBasics.Polygon{2, Float32}[]
@@ -192,55 +201,31 @@ function _cap_split(gpa::GeoPolarAxis, geom; winding::Symbol = :spherical)
     return polys, group
 end
 
-# Triangulate a single lon/lat polygon in projected (x, y) space; return (θr_vertices, faces) or
-# `nothing` if the polygon projects to a non-finite/degenerate shape.
-function _polar_fill_mesh(t, poly)
-    extxy = Point2f[_proj_xy(t, p) for p in GeometryBasics.coordinates(poly.exterior)]
-    (_ring_finite(extxy) && length(extxy) ≥ 3) || return nothing
-    holesxy = Vector{Point2f}[]
-    for h in poly.interiors
-        hxy = Point2f[_proj_xy(t, p) for p in GeometryBasics.coordinates(h)]
-        _ring_finite(hxy) && length(hxy) ≥ 3 && push!(holesxy, hxy)
-    end
-    pxy = isempty(holesxy) ? GeometryBasics.Polygon(extxy) : GeometryBasics.Polygon(extxy, holesxy)
-    local m
-    try
-        m = GeometryBasics.triangle_mesh(pxy)
-    catch
-        return nothing
-    end
-    (m === nothing || isempty(GeometryBasics.faces(m))) && return nothing
-    θr = Point2f[_xy_to_θr(v) for v in GeometryBasics.coordinates(m)]
-    return (θr, GeometryBasics.faces(m))
+# map a lon/lat polygon (with holes) to a (θ, r) polygon
+function _polar_polygon(t, poly)
+    ext = Point2f[Point2f(_polar_θr(t, q[1], q[2])) for q in GeometryBasics.coordinates(poly.exterior)]
+    isempty(poly.interiors) && return GeometryBasics.Polygon(ext)
+    holes = [Point2f[Point2f(_polar_θr(t, q[1], q[2])) for q in GeometryBasics.coordinates(h)] for h in poly.interiors]
+    return GeometryBasics.Polygon(ext, holes)
 end
 
-# Merge per-polygon (θr, faces) meshes into one mesh, replicating each polygon's colour onto its
-# vertices (when `colors` is per-polygon) so a single `mesh!` call carries the colormap.
-function _merge_fill_meshes(meshes, colors)
-    verts = Point2f[]
-    faces = GeometryBasics.GLTriangleFace[]
-    vcols = colors === nothing ? nothing : eltype(colors)[]
-    off = 0
-    for (i, mesh) in enumerate(meshes)
-        mesh === nothing && continue
-        θr, fcs = mesh
-        append!(verts, θr)
-        for f in fcs
-            push!(faces, GeometryBasics.GLTriangleFace(f[1] + off, f[2] + off, f[3] + off))
-        end
-        vcols === nothing || append!(vcols, fill(colors[i], length(θr)))
-        off += length(θr)
-    end
-    return GeometryBasics.Mesh(verts, faces), vcols
-end
-
-# Stroke (polygon outlines) as (θ, r) lines, one NaN-separated path over all rings.
+# Stroke (polygon outlines) as (θ, r) lines, one NaN-separated path over all rings. Edges that run
+# along the antimeridian (lon = ±180) are NOT stroked: they are the artificial seam the antimeridian
+# split inserts (the pole-walk for Antarctica, the cut for dateline-spanning land), and would draw a
+# radial line to the pole / across the disk. Breaking there seams the split pieces back together,
+# since lon = +180 and lon = −180 are the same radial direction. The fill already closes seamlessly.
+_on_antimeridian(p) = abs(p[1]) > 179.5
 function _polar_stroke_points(t, polys)
     out = Point2f[]
     for poly in polys
         for ring in (poly.exterior, poly.interiors...)
-            isempty(out) || push!(out, Point2f(NaN, NaN))
-            for p in GeometryBasics.coordinates(ring)
+            cs = GeometryBasics.coordinates(ring)
+            (isempty(out) || isnan(out[end][1])) || push!(out, Point2f(NaN, NaN))
+            for i in eachindex(cs)
+                p = cs[i]
+                if i > 1 && _on_antimeridian(cs[i - 1]) && _on_antimeridian(p) && !isnan(out[end][1])
+                    push!(out, Point2f(NaN, NaN))       # don't stroke the antimeridian seam edge
+                end
                 push!(out, Point2f(_polar_θr(t, p[1], p[2])))
             end
         end
@@ -251,76 +236,60 @@ end
 function Makie.poly!(gpa::GeoPolarAxis, geom;
         color = :gray70, colormap = :viridis, colorrange = Makie.automatic,
         strokecolor = :black, strokewidth = 0, kwargs...)
-    polys, group = _cap_split(gpa, geom)
-    meshes = [_polar_fill_mesh(gpa.transform, p) for p in polys]
+    polys, group = _anti_split(gpa, geom)
+    θrpolys = [_polar_polygon(gpa.transform, p) for p in polys]
     pervertex = color isa AbstractVector && length(color) == maximum(group; init = 0)
-    perpoly = pervertex ? color[group] : nothing
-    merged, vcols = _merge_fill_meshes(meshes, perpoly)
-    plt = Makie.mesh!(gpa.axis, merged;
-        color = vcols === nothing ? color : vcols,
-        colormap, colorrange, shading = Makie.NoShading, kwargs...)
-    if strokewidth > 0
-        Makie.lines!(gpa.axis, _polar_stroke_points(gpa.transform,
-            [p for (p, m) in zip(polys, meshes) if m !== nothing]);
-            color = strokecolor, linewidth = strokewidth)
-    end
+    col = pervertex ? color[group] : color
+    # fill via ordinary poly! (clean vector); stroke separately so the antimeridian seam is skipped
+    plt = Makie.poly!(gpa.axis, θrpolys; color = col, colormap, colorrange, strokewidth = 0, kwargs...)
+    strokewidth > 0 && Makie.lines!(gpa.axis, _polar_stroke_points(gpa.transform, polys);
+        color = strokecolor, linewidth = strokewidth)
     return plt
 end
 
 #-----------------------------------------------------------------------------------------------
-# fields: surface! / heatmap! reuse the GeoAxis grid mesher, then remap to (θ, r)
+# fields
 #-----------------------------------------------------------------------------------------------
 
-# Remap a projected-(x,y) mesh (from `_geo_grid_mesh`) to (θ, r).
-function _remap_mesh_θr(mesh)
-    θr = Point2f[_xy_to_θr(v) for v in GeometryBasics.coordinates(mesh)]
-    return GeometryBasics.Mesh(θr, GeometryBasics.faces(mesh))
-end
+# `contourf!` is vector-clean: it builds filled-band polygons, which (with θ = lon) are simple in
+# (θ, r), so the native PolarAxis recipe draws them as paths. Just map the grid coordinates.
+_polar_θ(lons) = Float64[deg2rad(Float64(lo)) for lo in lons]
+_polar_r(t, lats) = Float64[_polar_radius(t, la) for la in lats]
 
-function _polar_grid!(gpa::GeoPolarAxis, xs, ys, vals;
+Makie.contourf!(gpa::GeoPolarAxis, xs, ys, zs; kwargs...) =
+    Makie.contourf!(gpa.axis, _polar_θ(xs), _polar_r(gpa.transform, ys), zs; kwargs...)
+
+# `surface!`/`heatmap!` are *raster* fields. A pixel field can't follow a nonlinear (polar) axis as
+# an image — `heatmap!`'s native path smears — so we draw it as a pcolormesh: a (θ, r) vertex grid
+# with the data as per-vertex colour, warped per-vertex by the PolarAxis transform. (Same reason
+# GeoAxis meshes its grids.) This rasterises in vector backends — that is inherent to raster data;
+# use `contourf!` for a vector field. Heatmap cell EDGES (n+1) are collapsed to centres to match z.
+function _polar_field_mesh!(gpa::GeoPolarAxis, xs, ys, vals;
         colormap = :viridis, colorrange = Makie.automatic, nan_color = :transparent, kwargs...)
-    mesh, cols = _geo_grid_mesh(gpa.dest, gpa.source, xs, ys, vals)
-    return Makie.mesh!(gpa.axis, _remap_mesh_θr(mesh);
-        color = cols, colormap, colorrange, nan_color, shading = Makie.NoShading, kwargs...)
+    nx, ny = size(vals)
+    xs = length(xs) == nx + 1 ? [(xs[i] + xs[i + 1]) / 2 for i in 1:nx] : xs
+    ys = length(ys) == ny + 1 ? [(ys[j] + ys[j + 1]) / 2 for j in 1:ny] : ys
+    θ = Float64[deg2rad(Float64(x)) for x in xs]
+    r = Float64[_polar_radius(gpa.transform, y) for y in ys]
+    verts = Vector{Point2f}(undef, nx * ny)
+    cols = similar(vals, nx * ny)
+    for (k, ci) in enumerate(CartesianIndices((nx, ny)))
+        verts[k] = Point2f(θ[ci[1]], r[ci[2]])
+        cols[k] = vals[ci]
+    end
+    faces = GeometryBasics.decompose(Makie.GLTriangleFace, GeometryBasics.Tesselation(Rect2f(0, 0, 1, 1), (nx, ny)))
+    return Makie.mesh!(gpa.axis, GeometryBasics.Mesh(verts, faces);
+        color = vec(cols), colormap, colorrange, nan_color, shading = Makie.NoShading, kwargs...)
 end
 
 function Makie.surface!(gpa::GeoPolarAxis, xs, ys, zs; color = nothing, kwargs...)
     vals = color isa AbstractMatrix ? _resample_to_grid(color, size(zs, 1), size(zs, 2)) : zs
-    return _polar_grid!(gpa, xs, ys, vals; kwargs...)
+    return _polar_field_mesh!(gpa, xs, ys, vals; kwargs...)
 end
 
-Makie.heatmap!(gpa::GeoPolarAxis, xs, ys, zs; kwargs...) = _polar_grid!(gpa, xs, ys, zs; kwargs...)
+Makie.heatmap!(gpa::GeoPolarAxis, xs, ys, zs; kwargs...) = _polar_field_mesh!(gpa, xs, ys, zs; kwargs...)
 
-#-----------------------------------------------------------------------------------------------
-# contourf!: harvest the filled bands (lon/lat), then mesh-fill in projected (x, y)
-#-----------------------------------------------------------------------------------------------
-
-function Makie.contourf!(gpa::GeoPolarAxis, xs, ys, zs; kwargs...)
-    # realise a throwaway contourf on a detached scene to harvest the band polygons + colours
-    probe = Makie.contourf!(Makie.Scene(), xs, ys, zs; kwargs...)
-    bands = probe.polys[]
-    bandcols = probe.computed_colors[]
-    clip = _cap_clip(gpa)
-    project = _projector(gpa.transform)
-    scale = resample_scale(project)
-    # cap-clip + resample each band (contourf bands use planar winding), then mesh-fill in (x, y)
-    meshes = Any[]
-    colors = eltype(bandcols)[]
-    for (band, col) in zip(bands, bandcols)
-        for piece in _split_polygon(clip, _poly_rings(band), project, scale; winding = :planar)
-            m = _polar_fill_mesh(gpa.transform, piece)
-            m === nothing && continue
-            push!(meshes, m); push!(colors, col)
-        end
-    end
-    merged, vcols = _merge_fill_meshes(meshes, colors)
-    return Makie.mesh!(gpa.axis, merged;
-        color = vcols,
-        colormap = probe.computed_colormap[],
-        colorrange = probe.computed_colorrange[],
-        shading = Makie.NoShading)
-end
-
-# also accept the (zs,) form, mirroring Makie's contourf
-Makie.contourf!(gpa::GeoPolarAxis, zs::AbstractMatrix; kwargs...) =
-    Makie.contourf!(gpa, axes(zs, 1), axes(zs, 2), zs; kwargs...)
+# also accept the (zs,) form, mirroring Makie's field verbs
+Makie.surface!(gpa::GeoPolarAxis, zs::AbstractMatrix; kwargs...) = Makie.surface!(gpa, axes(zs, 1), axes(zs, 2), zs; kwargs...)
+Makie.heatmap!(gpa::GeoPolarAxis, zs::AbstractMatrix; kwargs...) = Makie.heatmap!(gpa, axes(zs, 1), axes(zs, 2), zs; kwargs...)
+Makie.contourf!(gpa::GeoPolarAxis, zs::AbstractMatrix; kwargs...) = Makie.contourf!(gpa, axes(zs, 1), axes(zs, 2), zs; kwargs...)
