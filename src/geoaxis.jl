@@ -88,6 +88,8 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         subtitlecolor::RGBAf = @inherit(:textcolor, :black)
         "The axis subtitle line height multiplier."
         subtitlelineheight::Float64 = 1
+        "The background color of the axis plot area. Defaults to `:white`. Set to `:transparent` or any `RGBAf` value to change the fill behind all map content."
+        backgroundcolor::RGBAf = :white
 
 
         "The xlabel string."
@@ -602,7 +604,7 @@ function Makie.initialize_block!(axis::GeoAxis)
         for lat in yticks
             range = LinRange(xticks[1], xticks[end], 100)
             project_tick_points!(lat_transformed, trans, trans_inverse, range, lat, 2, limit_rect,
-                                 spines.left, spines.right)
+                spines.left, spines.right)
         end
         lonticks_line_obs[] = lon_transformed
         latticks_line_obs[] = lat_transformed
@@ -685,32 +687,32 @@ function Makie.initialize_block!(axis::GeoAxis)
     # scatter!(axis.blockscene, latpoints, markersize=7, color=(:blue, 0.5))
 
     lattex = text!(axis.blockscene, lat_points_px;
-        text=lat_text, 
-        space=:pixel, 
+        text=lat_text,
+        space=:pixel,
         align=(:center, :center),
-        font=axis.xticklabelfont, 
+        font=axis.xticklabelfont,
         color=axis.xticklabelcolor,
-        fontsize=axis.xticklabelsize, 
+        fontsize=axis.xticklabelsize,
         visible=axis.xticklabelsvisible,
     )
 
     lontex = text!(axis.blockscene, lon_points_px;
-        text=lon_text, 
-        space=:pixel, 
+        text=lon_text,
+        space=:pixel,
         align=(:center, :center),
         font=axis.yticklabelfont,
         color=axis.yticklabelcolor,
-        fontsize=axis.yticklabelsize, 
+        fontsize=axis.yticklabelsize,
         visible=axis.yticklabelsvisible,
-        )
+    )
 
     fonts = theme(axis.blockscene, :fonts)
     # Finally calculate protrusions and report all bounding boxes
     # to the layout system.
     approx_x_protrusion = map(
-        axis.blockscene, 
+        axis.blockscene,
         axis.yticklabelfont, axis.yticklabelsize, axis.yticklabelpad, lat_text, axis.yticklabelsvisible
-        ) do ticklabel_font, ticklabel_size, ticklabel_pad, text, ticklabelsvisible
+    ) do ticklabel_font, ticklabel_size, ticklabel_pad, text, ticklabelsvisible
         ret = 0.0f0
 
         if ticklabelsvisible
@@ -726,9 +728,9 @@ function Makie.initialize_block!(axis::GeoAxis)
     end
 
     approx_y_protrusion = map(
-        axis.blockscene, 
+        axis.blockscene,
         axis.xticklabelfont, axis.xticklabelsize, axis.xticklabelpad, lon_text, axis.xticklabelsvisible,
-        ) do ticklabel_font, ticklabel_size, ticklabel_pad, text, ticklabelsvisible
+    ) do ticklabel_font, ticklabel_size, ticklabel_pad, text, ticklabelsvisible
 
         ret = 0.0f0
 
@@ -747,6 +749,15 @@ function Makie.initialize_block!(axis::GeoAxis)
 
     elements = Dict{Symbol,Any}()
     setfield!(axis, :elements, elements)
+    background = poly!(
+        axis.blockscene, scene.viewport;
+        color=axis.backgroundcolor,
+        inspectable=false,
+        shading=NoShading,
+        strokecolor=:transparent
+    )
+    translate!(background, 0, 0, -100)
+    elements[:background] = background
     elements[:xgrid] = longridplot
     elements[:ygrid] = latgridplot
     elements[:xticklabels] = lontex
@@ -799,7 +810,7 @@ function Makie.initialize_block!(axis::GeoAxis)
     xaxis = (; protrusion=approx_y_protrusion)
     map!(compute_protrusions, axis.blockscene, axis.layoutobservables.protrusions, axis.title, axis.titlesize,
         axis.titlegap, axis.titlevisible,
-        xaxis.protrusion, 
+        xaxis.protrusion,
         yaxis.protrusion,
         axis.subtitle, axis.subtitlevisible, axis.subtitlesize, axis.subtitlegap,
         axis.titlelineheight, axis.subtitlelineheight, subtitlet, titlet)
@@ -862,7 +873,7 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
     # remove the reset_limits kwarg if there is one, this determines whether to automatically reset limits
     # on plot insertion
     reset_limits = to_value(pop!(plot.kw, :reset_limits, true))
-    
+
     # actually plot
     Makie.plot!(axis.scene, plot)
 
