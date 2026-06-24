@@ -6,13 +6,16 @@ const G = GeoMakie
     fig = Figure()
     gpa = GeoPolarAxis(fig[1, 1]; latcap = 50)
     @test gpa isa GeoPolarAxis
+    @test gpa isa Makie.AbstractAxis               # a proper Block (sibling of GeoAxis)
+    @test gpa in fig.content                        # registered in the figure
+    @test Makie.current_axis(fig) === gpa          # and set as the current axis
     @test gpa.axis isa Makie.PolarAxis
-    @test occursin("lat_0=90", gpa.dest)          # north pole inferred from latcap ≥ 0
+    @test occursin("lat_0=90", gpa.dest[])         # north pole inferred from latcap ≥ 0
     @test gpa.axis.rlimits[] == (0.0, G._polar_radius(gpa.transform, 50.0))
     @test gpa.axis.direction[] == 1                # north: 0°-meridian at the bottom
 
     gps = GeoPolarAxis(fig[1, 2]; latcap = -60)
-    @test occursin("lat_0=-90", gps.dest)          # south pole inferred from latcap < 0
+    @test occursin("lat_0=-90", gps.dest[])        # south pole inferred from latcap < 0
     @test gps.axis.direction[] == -1               # south: 0°-meridian at the top
 end
 
@@ -30,8 +33,11 @@ end
             θ, r = G._polar_θr(t, lon, lat)
             @test θ ≈ deg2rad(lon)
             x, y = t(lon, lat)
-            @test r * cos(dir * θ + th0) ≈ x atol = 1e-3
-            @test r * sin(dir * θ + th0) ≈ y atol = 1e-3
+            # Makie's `Polar` transform places θ at screen angle `direction·(θ + theta_0)`, which
+            # must reproduce the true projected (x, y) — this is what the orientation fix guarantees
+            # (north `dir=+1` is insensitive to it; south `dir=-1` would be 180°-flipped if wrong).
+            @test r * cos(dir * (θ + th0)) ≈ x atol = 1e-3
+            @test r * sin(dir * (θ + th0)) ≈ y atol = 1e-3
         end
     end
 end

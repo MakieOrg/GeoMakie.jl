@@ -42,6 +42,12 @@ GeoMakie.earth();
 
 using Literate
 
+# Regenerate the projection gallery page (docs/src/projections.md) from its data-driven source of
+# truth, so every panel shows a self-contained, copy-pasteable code cell. Edit
+# docs/generate_projections.jl, never the generated markdown.
+include(joinpath(@__DIR__, "generate_projections.jl"))
+generate_projections(joinpath(@__DIR__, "src", "projections.md"))
+
 examples = String[
     "basic.jl",
     # "new.jl",
@@ -52,6 +58,7 @@ examples = String[
     "world_population.jl",
     "graph_on_usa.jl",
     "orthographic.jl",
+    "polar_stereo.jl",
     "geostationary_image.jl",
     # "multiple_crs.jl",
     "rasters.jl",

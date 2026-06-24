@@ -1,67 +1,83 @@
-# HANDOFF — `GeoPolarAxis` (circular-boundary polar maps)
+# HANDOFF — `GeoPolarAxis` polish (orientation fix · docs generator · Block promotion)
 
-*(Working note for the next session/machine. Delete before the PR merges.)*
+*(Working note for continuing on another machine. Delete before the PR merges.)*
 
 ## Where this stands
 
-`GeoPolarAxis` (in `src/polar.jl`) is **implemented, refactored, and green** (48 tests). The big
-open items from earlier handoffs — the fill "mirror", the antimeridian cut, the heatmap smear — are
-all **resolved**. What's left is mostly review/polish before the PR (see "Remaining").
+All three items from this session are **implemented and green** (`test/polar.jl`, 6 testsets, all
+pass). What's left is mostly a full docs build + cleanup before the PR (see "Remaining").
 
-## The design (after the refactor — read this first)
+### 1. South polar stereographic orientation — FIXED
+The south cap was rotated 180° (0E at bottom, 90E to the left). Root cause: `_polar_orientation`
+returned `theta_0 = α0`, but Makie's `Polar` transform is `θ_screen = direction·(θ + theta_0)`
+(the offset is applied *inside* the direction flip — see
+`~/.julia/dev/Makie/Makie/src/layouting/transformation.jl:673`). For a north cap `direction=+1`
+so it was harmless; for a south cap `direction=-1` it negated the offset.
+Fix (`src/polar.jl`, `_polar_orientation`): `return direction, direction * α0`. North is unchanged;
+south now reads 0E at top, 90E right, 180 bottom, 90W left. The orientation testset asserts the real
+Makie convention `r·(cos|sin)(dir·(θ + th0)) ≈ (x, y)` (was `dir·θ + th0`, which only held for north).
 
-A pole-centred azimuthal projection is **separable** in polar coords, so we map directly:
-- **`θ = lon`** (the display orientation is set by PolarAxis `direction`/`theta_0`)
-- **`r = radial(lat) = hypot(project(lon₀, lat))`** (the projection's exact radial law)
+### 2. `projections.md` is now generated from a data list
+`docs/src/projections.md` is **auto-generated** by `docs/generate_projections.jl` (the single source
+of truth: the `PROJECTION_SECTIONS` list — 82 sections, 13 tabbed). `make.jl` runs the generator on
+every build (just after `using Literate`). Each panel now shows a **self-contained, copy-pasteable**
+`@example` cell (full `GeoAxis(...) + poly!`) above its figure, instead of a hidden `panel(proj)`
+call. A visible preamble cell (`using …; land = GeoMakie.land()`) is shared by all panels. To
+add/edit a projection, edit `PROJECTION_SECTIONS`, never the generated markdown (it has a
+"DO NOT EDIT" banner). The page resets CairoMakie to PNG at the end (process-global backend) so later
+raster-heavy example pages don't balloon into SVG.
 
-`direction`/`theta_0` are **auto-derived from the projector** (`_polar_orientation`) so the layout
-matches the true azimuthal projection exactly (verified 0 m error; the projected bearing is provably
-lon-only). N cap → 0° at bottom, S cap → 0° at top. Both overridable.
+### 3. Polar field demo moved out + `GeoPolarAxis` is now a real Makie Block
+- **Docs**: the `contourf!`/`surface!`/`Colorbar` field demo (the "fluff") moved from
+  `projections.md` to a new Literate example, `examples/polar_stereo.jl` (heading
+  **"Polar stereographic cap"**, added to the `examples` list in `make.jl`). `projections.md` now
+  shows only the land panels for the polar section, consistent with every other projection, and links
+  to the new example.
+- **Architecture**: `GeoPolarAxis` was promoted from a plain struct to
+  `Makie.@Block GeoPolarAxis <: Makie.AbstractAxis` — a **sibling of `GeoAxis`** (it can't be a
+  subtype: both are concrete `@Block`s). It uses **`@forwarded_layout`** and creates its wrapped
+  `PolarAxis` at `gpa.layout[1, 1]` (the `SliderGrid` pattern — the only supported way to nest a
+  Block; see `~/.julia/dev/Makie/Makie/src/makielayout/blocks/slidergrid.jl`). It now places/sizes
+  like any axis and registers as the **current axis**.
 
-**Why `θ = lon` and not `atan2(y,x)`** (the previous approach — *don't go back to it*): `atan2`
-puts the branch cut at a weird meridian (lon ≈ −90 for lon₀=0), which forced filled artists through
-a hand-built `mesh!` in projected (x,y). `mesh!` is what made CairoMakie **rasterise** the fill into
-`feImage`/`<image>` tiles → the **PDF mirror/shift** and **SVG seam**. With `θ = lon` the only seam
-is the **antimeridian (lon ±180)** — a constant-longitude graticule line — so we reuse the existing
-`AntimeridianClip` (with pole-walk for Antarctica) and then filled artists go through **ordinary
-`poly!`/`contourf!`** → **clean vector paths**.
-
-### Per-verb (all in `src/polar.jl`)
-- `lines!`/`scatter!`: `split_resample_line` (antipode clip + resample) → map to `(θ,r)`.
-- `poly!`: `_anti_split` (antimeridian split, lon0=0, pole-walk) → `_polar_polygon` → native `poly!`
-  (vector). Antarctica's two pieces abut on the same radial line (θ=±π) so the **fill is seamless to
-  r=0**. The **stroke** is drawn separately (`_polar_stroke_points`) and **skips antimeridian-aligned
-  edges** so there's no radial cut to the pole.
-- `contourf!`: map coords → native `contourf!` (bands are simple in (θ,r) → **vector**).
-- `surface!`/`heatmap!`: a `(θ,r)` **pcolormesh** (`_polar_field_mesh!`), data as per-vertex colour,
-  warped per-vertex. **Raster data on a nonlinear axis MUST be a mesh** (heatmap's native image path
-  smears — same reason GeoAxis meshes its grids), so these **rasterise in vector backends**
-  (`feImage` → slow PDF, blank in Firefox SVG). **This is inherent to raster fields — use
-  `contourf!` for a vector field.** Not a bug; don't try to "fix" it.
+#### Block gotchas already handled (read before touching it)
+- Makie rejects any kwarg that isn't a declared attribute (`_check_remaining_kwargs`,
+  `blocks.jl:334`), so the old `kwargs...`→`PolarAxis` passthrough is gone. Every accepted keyword
+  (`latcap`, `dest`, `source`, `lat/lonticks`, `direction`, `theta_0`, grid styling, and the
+  `title*` family) is a **declared attribute**; anything else must be set via `gpa.axis`.
+- `latcap`/`dest`/etc. are now attributes (Observables): `gpa.dest[]` (tests use `[]`), not
+  `gpa.dest`. `gpa.axis` and `gpa.transform` are plain fields (no `[]`). `dest`/`source` resolve in
+  `initialize_block!` and the resolved PROJ strings are written back into the attributes.
+- It owns no limits → `Makie.update_state_before_display!(gpa)` forwards to `gpa.axis`, else the
+  generic `AbstractAxis` path hits `reset_limits!`/`gpa.limits` and errors on `save`.
+- The construction is read-once (not reactive to later `gpa.latcap[] = …`); that matches the old
+  behavior. Full reactivity would be a follow-up.
 
 ## Verified this session
-- Maintainer: `poly!` land caps LGTM in **PNG, SVG, and PDF** — no mirror/shift, no antimeridian cut.
-- Heatmap smear fixed (was the native-image regression); now a proper pcolormesh.
-- 48 tests green (`test/polar.jl`). Run: `julia --project=. -e 'using GeoMakie,CairoMakie,GeometryBasics,Test; const G=GeoMakie; include("test/polar.jl")'`
-  (or full suite `julia --project=. test/runtests.jl`; **not** `Pkg.test()` — it pulls GLMakie which
-  the sandbox can't resolve against dev-pinned Makie).
-- New regression test asserts the poly-fill SVG has no `feImage`/`<image>` (guards against a
-  mesh-fill relapse).
+- `test/polar.jl` green (construction/current-axis, exact radial law + orientation for N&S,
+  antimeridian split to the pole, stroke seams, every verb renders incl. `save`, poly! stays vector
+  in SVG). Run:
+  `julia --project=. -e 'using GeoMakie,CairoMakie,GeometryBasics,Test; include("test/polar.jl")'`
+- Render spot-checks (in `/tmp`, throwaway): `polar_block_check.png` (N/S land panels, Block +
+  orientation), `polar_example_southcap.png`, `polar_example_field.png`. (Per project convention,
+  eyeball these visually; correctness is otherwise asserted in tests.)
 
 ## Remaining (before PR)
-1. **Re-render the docs section** `docs/src/projections.md` "Polar (stereographic) — `GeoPolarAxis`"
-   and eyeball: the `poly!` caps block + the `contourf!`/`surface!` field block. Both updated this
-   session (description now says `θ=lon`/`r=radial`; the `@setup` PNG caveat now correctly scopes the
-   Firefox/`feImage` issue to `surface!`/`heatmap!` only). Confirm they build clean.
-2. **Optional**: a dedicated `examples/` page reproducing cartopy `always_circular_stereo` (south cap
-   −65°, coastlines, empty corners). projections.md already cites/covers it — nice-to-have.
-3. **Cleanup before merge**: delete this file + `HANDOFF_poles.png` (stale equidistant prototype).
-4. Scratch (throwaway, `/tmp`, not committed): `polar_check_all.jl`, `polar_field_check.jl`,
-   `polar_mirror_check.jl`, `polaraxis_poly_mwe.jl`, `diag_*.jl` and their image output.
+1. **Full docs build** to confirm the generated page + new example compile end-to-end:
+   `julia --project=docs docs/make.jl` (slow; or `DRAFT=true` for a structure-only pass). Eyeball the
+   generated `projections.md` panels and the `examples/polar_stereo.md` figures.
+2. **Full test suite**: `julia --project=. test/runtests.jl` (**not** `Pkg.test()` — it pulls GLMakie
+   which the sandbox can't resolve against dev-pinned Makie).
+3. **Cleanup before merge**: delete this file + `HANDOFF_poles.png` (stale prototype) and the `/tmp`
+   scratch renders.
 
-## Files
-- `src/polar.jl` (rewritten), `src/GeoMakie.jl` (include/export), `test/polar.jl`,
-  `test/runtests.jl`, `docs/src/projections.md`.
+## Files touched this session
+- `src/polar.jl` (orientation fix + Block promotion + `update_state_before_display!`)
+- `test/polar.jl` (attribute `[]` access, Block assertions, corrected orientation reconstruction)
+- `docs/generate_projections.jl` (new — generator + `PROJECTION_SECTIONS`)
+- `docs/src/projections.md` (now generated)
+- `docs/make.jl` (run generator; add `polar_stereo.jl` to examples)
+- `examples/polar_stereo.jl` (new — the moved field demo / cartopy `always_circular_stereo`)
 
 ### Prior context (still-relevant upstream follow-ups, NOT this PR)
 When GeometryOps ships #417–#421 (spherical clip / arc intersection / point-in-polygon /

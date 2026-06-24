@@ -24,28 +24,30 @@ The antimeridian split produces two pieces that abut along `lon = ±180`; on the
 **stroke** would still draw that seam edge as a radial line to the pole, so `_polar_stroke_points`
 skips antimeridian-aligned edges, visually seaming the pieces back together.
 
-`GeoPolarAxis` is a thin wrapper around a `PolarAxis` plus the projection. The geographic plotting
-verbs (`lines!`, `scatter!`, `poly!`, `surface!`, `heatmap!`, `contourf!`) are overloaded on it:
-they take geographic `(lon, lat)` inputs, map them to `(θ, r)` and forward to the wrapped axis.
+`GeoPolarAxis` is a Makie `@Block` (a sibling of `GeoAxis`, both `<: Makie.AbstractAxis`) that wraps
+a `PolarAxis` plus the projection: it uses `@forwarded_layout` to own a `PolarAxis` that fills its
+cell, so it places, sizes and registers (as the current axis) like any other Makie axis. The
+geographic plotting verbs (`lines!`, `scatter!`, `poly!`, `surface!`, `heatmap!`, `contourf!`) are
+overloaded on it: they take geographic `(lon, lat)` inputs, map them to `(θ, r)` and forward to the
+wrapped `PolarAxis`.
 =#
-
-const _POLAR_SOURCE = "+proj=longlat +datum=WGS84"
 
 """
     GeoPolarAxis(figure_position; latcap, dest, kwargs...) -> GeoPolarAxis
 
-A polar map on a Makie `PolarAxis`, for **pole-centred azimuthal**
-projections (`stere`, `aeqd`, `laea`, `gnom`, …). The map is a disk clipped to the cap latitude
-`latcap`, with a circular spine and a polar graticule (parallels as r-rings, meridians as
-θ-spokes) — cartopy's `always_circular_stereo` look.
+A polar map `@Block` (sibling of [`GeoAxis`](@ref)) backed by a Makie `PolarAxis`, for
+**pole-centred azimuthal** projections (`stere`, `aeqd`, `laea`, `gnom`, …). The map is a disk
+clipped to the cap latitude `latcap`, with a circular spine and a polar graticule (parallels as
+r-rings, meridians as θ-spokes) — cartopy's `always_circular_stereo` look.
 
 Plot onto it with the usual verbs, passing **geographic** `(lon, lat)` data:
 `lines!`, `scatter!`, `poly!`, `surface!`, `heatmap!`, `contourf!`.
 
-# Keywords
-- `latcap` (required): the cap (boundary) latitude in degrees. Its sign selects the pole: `latcap ≥ 0`
-  is a north-polar cap (`lat ∈ [latcap, 90]`), `latcap < 0` a south-polar cap (`lat ∈ [-90, latcap]`).
-- `dest`: the destination PROJ string. Defaults to a polar stereographic at the matching pole.
+# Attributes
+- `latcap`: the cap (boundary) latitude in degrees (default `60`). Its sign selects the pole:
+  `latcap ≥ 0` is a north-polar cap (`lat ∈ [latcap, 90]`), `latcap < 0` a south-polar cap
+  (`lat ∈ [-90, latcap]`).
+- `dest`: the destination PROJ string. `automatic` → a polar stereographic at the matching pole.
   Use this for `laea`/`aeqd`/`gnom` or a rotated `lon_0`. Must be a pole-centred azimuthal projection.
 - `latticks` / `lonticks`: latitudes (parallels, r-rings) and longitudes (meridians, θ-spokes) to
   label. `automatic` picks sensible defaults from the cap.
@@ -55,19 +57,86 @@ Plot onto it with the usual verbs, passing **geographic** `(lon, lat)` data:
 - grid styling (`rgridcolor`, `thetagridcolor`, `rgridwidth`, `thetagridwidth`, `spinecolor`,
   `spinewidth`): default to GeoMakie's `GeoAxis` graticule (faint black @ 12%, opaque spine), not
   `PolarAxis`'s much darker defaults.
-- any further keyword is forwarded to the underlying `PolarAxis` (`title`, …).
+- `title`, `titlesize`, `titlefont`, `titlegap`, `titlecolor`, `titlealign`, `titlevisible`:
+  forwarded to the wrapped `PolarAxis`.
 
-The wrapped axis is available as `gpa.axis`.
+Because this is a Block, only declared attributes are accepted as keywords; for any other `PolarAxis`
+setting, reach the wrapped axis via `gpa.axis`.
 """
-struct GeoPolarAxis
-    axis::Makie.PolarAxis
-    dest::String
-    source::String
-    transform::Proj.Transformation   # source (lon/lat) -> dest (azimuthal)
-    latcap::Float64
+Makie.@Block GeoPolarAxis <: Makie.AbstractAxis begin
+    @forwarded_layout                  # a GridLayout this block forwards its size/protrusions to
+    axis::Makie.PolarAxis              # the wrapped PolarAxis, created to fill `layout[1, 1]`
+    transform::Proj.Transformation     # source (lon/lat) -> dest (azimuthal)
+    @attributes begin
+        # Layout (standard Block layout attributes; required by `@forwarded_layout`)
+        "The horizontal alignment of the block in its suggested bounding box."
+        halign = :center
+        "The vertical alignment of the block in its suggested bounding box."
+        valign = :center
+        "The width setting of the block."
+        width = Makie.Auto()
+        "The height setting of the block."
+        height = Makie.Auto()
+        "Controls if the parent layout can adjust to this block's width."
+        tellwidth::Bool = true
+        "Controls if the parent layout can adjust to this block's height."
+        tellheight::Bool = true
+        "The align mode of the block in its parent GridLayout."
+        alignmode = Makie.Inside()
+
+        # Geographic projection
+        "The cap (boundary) latitude in degrees; its sign selects the pole (`≥ 0` north, `< 0` south)."
+        latcap = 60.0
+        "Destination PROJ string (a pole-centred azimuthal projection). `automatic` → polar stereographic at the matching pole."
+        dest = automatic
+        "Source PROJ string for the incoming `(lon, lat)` data."
+        source = "+proj=longlat +datum=WGS84"
+        "Latitudes to label as r-rings (parallels). `automatic` picks defaults from the cap."
+        latticks = automatic
+        "Longitudes to label as θ-spokes (meridians). `automatic` labels every 45°."
+        lonticks = automatic
+        "PolarAxis θ direction (`+1`/`-1`). `automatic` derives it from the projection."
+        direction = automatic
+        "PolarAxis θ offset. `automatic` derives it from the projection."
+        theta_0 = automatic
+
+        # Graticule + spine styling (GeoAxis-like faint graticule, not PolarAxis's darker default)
+        "Colour of the r-grid (parallels)."
+        rgridcolor = RGBAf(0, 0, 0, 0.12)
+        "Colour of the θ-grid (meridians)."
+        thetagridcolor = RGBAf(0, 0, 0, 0.12)
+        "Width of the r-grid lines."
+        rgridwidth = 1.0
+        "Width of the θ-grid lines."
+        thetagridwidth = 1.0
+        "Colour of the circular spine."
+        spinecolor = RGBAf(0, 0, 0, 1)
+        "Width of the circular spine."
+        spinewidth = 1.0
+
+        # Title (forwarded to the wrapped PolarAxis; defaults match PolarAxis so appearance is unchanged)
+        "The axis title string."
+        title = ""
+        "The title's font size."
+        titlesize::Float64 = @inherit(:fontsize, 16.0f0)
+        "The font family of the title."
+        titlefont = :bold
+        "The gap between axis and title."
+        titlegap::Float64 = 4.0
+        "The color of the title."
+        titlecolor::RGBAf = @inherit(:textcolor, :black)
+        "The horizontal alignment of the title."
+        titlealign::Symbol = :center
+        "Controls if the title is visible."
+        titlevisible::Bool = true
+    end
 end
 
 Makie.get_scene(gpa::GeoPolarAxis) = Makie.get_scene(gpa.axis)
+
+# GeoPolarAxis owns no limits of its own — the wrapped PolarAxis does. Forward the pre-display state
+# update (which would otherwise hit `reset_limits!`/`gpa.limits` on the generic AbstractAxis path).
+Makie.update_state_before_display!(gpa::GeoPolarAxis) = Makie.update_state_before_display!(gpa.axis)
 
 # radius of the parallel `lat` — for a pole-centred azimuthal projection r depends only on latitude
 _polar_radius(t::Proj.Transformation, lat) = (xy = t(0.0, Float64(lat)); hypot(xy[1], xy[2]))
@@ -80,13 +149,17 @@ _polar_radius(t::Proj.Transformation, lat) = (xy = t(0.0, Float64(lat)); hypot(x
 end
 
 # Derive `(direction, theta_0)` from the projector so the polar layout matches the true azimuthal
-# projection: the projected bearing of a meridian, `α(lon) = atan2(project(lon, latref))`, is affine
-# in lon — `α = direction·deg2rad(lon) + theta_0` — and PolarAxis applies exactly that to `θ = lon`.
+# projection. The projected bearing of a meridian, `α(lon) = atan2(project(lon, latref))`, is affine
+# in lon with unit slope: `α(lon) = α0 + direction·deg2rad(lon)`. Makie's `Polar` transform places θ
+# at screen angle `direction·(θ + theta_0)` (the offset is applied *inside* the direction flip), so
+# with `θ = deg2rad(lon)` matching `α` requires `direction·(deg2rad(lon) + theta_0) = α(lon)`, i.e.
+# `theta_0 = direction·α0` (for a north cap `direction=+1` so this is just `α0`; for a south cap
+# `direction=-1` the offset must be negated, else the disk is rotated 180°).
 function _polar_orientation(t::Proj.Transformation, latref)
     α(lon) = (xy = t(Float64(lon), Float64(latref)); atan(xy[2], xy[1]))
     α0 = α(0.0)
     direction = _wrapλ(α(1.0) - α0) ≥ 0 ? 1 : -1
-    return direction, α0
+    return direction, direction * α0
 end
 
 # default parallels to label: nice round latitudes strictly between the cap and the pole
@@ -104,47 +177,56 @@ function _lon_label(l)
     return string(round(Int, abs(l)), "°", l > 0 ? "E" : "W")
 end
 
-function GeoPolarAxis(figpos;
-        latcap,
-        dest = "+proj=stere +lat_0=$(latcap ≥ 0 ? 90 : -90) +lon_0=0",
-        source = _POLAR_SOURCE,
-        latticks = automatic,
-        lonticks = automatic,
-        direction = automatic,
-        theta_0 = automatic,
-        rgridcolor = RGBAf(0, 0, 0, 0.12),
-        thetagridcolor = RGBAf(0, 0, 0, 0.12),
-        rgridwidth = 1.0,
-        thetagridwidth = 1.0,
-        spinecolor = RGBAf(0, 0, 0, 1),
-        spinewidth = 1.0,
-        kwargs...)
-    t = create_transform(dest, source)
+# Build the wrapped PolarAxis from the attributes. The geographic quantities (transform, cap radius,
+# orientation, ticks) are resolved once here from the cap/projection; the resolved `dest`/`source`
+# strings are written back into their attributes so `gpa.dest[]` reads the actual PROJ string.
+function Makie.initialize_block!(gpa::GeoPolarAxis)
+    latcap = Float64(gpa.latcap[])
     pole = latcap ≥ 0 ? 90.0 : -90.0
+
+    dest = gpa.dest[] === automatic ?
+        "+proj=stere +lat_0=$(latcap ≥ 0 ? 90 : -90) +lon_0=0" : String(gpa.dest[])
+    source = String(gpa.source[])
+    gpa.dest[] = dest
+    gpa.source[] = source
+
+    t = create_transform(dest, source)
+    gpa.transform = t
     rcap = _polar_radius(t, latcap)
 
     dir, th0 = _polar_orientation(t, (latcap + pole) / 2)
-    direction === automatic && (direction = dir)
-    theta_0 === automatic && (theta_0 = th0)
+    direction = gpa.direction[] === automatic ? dir : gpa.direction[]
+    theta_0 = gpa.theta_0[] === automatic ? th0 : gpa.theta_0[]
 
-    lt = latticks === automatic ? _default_latticks(latcap, pole) : latticks
+    lt = gpa.latticks[] === automatic ? _default_latticks(latcap, pole) : gpa.latticks[]
     rvals = Float64[_polar_radius(t, l) for l in lt]
     rlabels = String[_lat_label(l) for l in lt]
 
-    lons = lonticks === automatic ? collect(-180.0:45.0:135.0) : collect(Float64, lonticks)
+    lons = gpa.lonticks[] === automatic ? collect(-180.0:45.0:135.0) : collect(Float64, gpa.lonticks[])
     θvals = Float64[deg2rad(lo) for lo in lons]
     θlabels = String[_lon_label(lo) for lo in lons]
 
-    ax = Makie.PolarAxis(figpos;
+    gpa.axis = Makie.PolarAxis(gpa.layout[1, 1];
         rlimits = (0.0, rcap),
         rticks = (rvals, rlabels),
         thetaticks = (θvals, θlabels),
-        direction, theta_0,
-        rgridcolor, thetagridcolor, rgridwidth, thetagridwidth,
-        spinecolor, spinewidth,
-        kwargs...)
+        direction = direction,
+        theta_0 = theta_0,
+        rgridcolor = gpa.rgridcolor[],
+        thetagridcolor = gpa.thetagridcolor[],
+        rgridwidth = gpa.rgridwidth[],
+        thetagridwidth = gpa.thetagridwidth[],
+        spinecolor = gpa.spinecolor[],
+        spinewidth = gpa.spinewidth[],
+        title = gpa.title[],
+        titlesize = gpa.titlesize[],
+        titlefont = gpa.titlefont[],
+        titlegap = gpa.titlegap[],
+        titlecolor = gpa.titlecolor[],
+        titlealign = gpa.titlealign[],
+        titlevisible = gpa.titlevisible[])
 
-    return GeoPolarAxis(ax, String(dest), String(source), t, Float64(latcap))
+    return gpa
 end
 
 #-----------------------------------------------------------------------------------------------
