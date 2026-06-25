@@ -150,6 +150,13 @@ end
 const _MAXDEPTH = 16          # d3 maxDepth
 const _DELTA2 = 0.5         # d3 default precision² (projected units after scaling)
 const _COSMIN = cos(30 * _D2R)   # d3 cosMinDistance
+# The spine is a single cheap ring drawn at the very edge of the domain, where curvature is
+# highest (a pointed pole tucks the boundary in sharply). Resample it on a tighter threshold than
+# bulk geometry so the outline reads as a smooth curve rather than a visible polygon: multiplying
+# the resample scale by this factor shrinks the projected chord tolerance by the same factor. True
+# corners (conic apex, flat-pole and square boundaries) are vertices between straight edges and stay
+# sharp regardless.
+const _SPINE_REFINE = 6.0
 
 # Port of d3 resample.js `resampleLineTo`, emitting **lon/lat** midpoints (the child
 # projects them). The straightness test is measured in *projected* space via `project`.
@@ -1696,12 +1703,15 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
         if npf ⊻ spf
             plat = npf ? 90.0 : -90.0
             cutoff = plat > 0 ? -30.0 : 30.0
-            cone = Point2d[Point2d(base(0.0, plat)...)]
+            # Build the cone as a lon/lat ring (apex pole → cutoff parallel → apex) and let the
+            # adaptive resampler smooth the cutoff arc. The apex→parallel edges are straight
+            # meridians (no points added), so the apex corner stays sharp.
+            cone = Point2d[Point2d(0.0, plat)]
             for lon in LinRange(180.0 - 1.0e-3, -180.0 + 1.0e-3, 181)
-                push!(cone, Point2d(base(lon, cutoff)...))
+                push!(cone, Point2d(lon, cutoff))
             end
-            push!(cone, Point2d(base(0.0, plat)...))
-            return cone
+            push!(cone, Point2d(0.0, plat))
+            return _proj_ring(cone, base; scale = resample_scale(base) * _SPINE_REFINE)
         end
         lm = clip.lat_max                       # clamp lat (merc): the great-circle densify arcs
         project = lm < 90 ? ((lo, la) -> base(lo, clamp(la, -lm, lm))) : base   # over the pole
@@ -1711,7 +1721,7 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
         sm = clip isa ObliqueAntimeridianClip          # nudge off the exact rotated ±π seam
         ring = Point2d[Point2d(_unrotate(inv, q[1], q[2], sm)...) for q in raw]
     end
-    return _proj_ring(ring, project)
+    return _proj_ring(ring, project; scale = resample_scale(project) * _SPINE_REFINE)
 end
 
 ############################################################

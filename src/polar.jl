@@ -113,6 +113,9 @@ Makie.@Block GeoPolarAxis <: Makie.AbstractAxis begin
         spinecolor = RGBAf(0, 0, 0, 1)
         "Width of the circular spine."
         spinewidth = 1.0
+        "Show the r/θ tick labels. Off by default to match the `GeoAxis` gallery panels (the grid
+        rings, spokes and spine stay visible)."
+        ticklabelsvisible::Bool = false
 
         # Title (forwarded to the wrapped PolarAxis; defaults match PolarAxis so appearance is unchanged)
         "The axis title string."
@@ -218,6 +221,8 @@ function Makie.initialize_block!(gpa::GeoPolarAxis)
         thetagridwidth = gpa.thetagridwidth[],
         spinecolor = gpa.spinecolor[],
         spinewidth = gpa.spinewidth[],
+        rticklabelsvisible = gpa.ticklabelsvisible[],
+        thetaticklabelsvisible = gpa.ticklabelsvisible[],
         title = gpa.title[],
         titlesize = gpa.titlesize[],
         titlefont = gpa.titlefont[],

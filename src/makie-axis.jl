@@ -266,6 +266,10 @@ function transformed_limits(scenelike, exclude=(p) -> false)
     return bb_ref[]
 end
 
+# When auto-fit data reaches within this fraction of the projection domain (spine) on an edge, the
+# limit snaps out to the spine so the full boundary is framed instead of cropped a few degrees short.
+const _SPINE_SNAP = 0.1
+
 function Makie.getlimits(la::GeoAxis, dim)
     # find all plots that don't have exclusion attributes set
     # for this dimension
@@ -296,8 +300,16 @@ function Makie.getlimits(la::GeoAxis, dim)
     if spine !== nothing
         dom = Makie.data_limits(spine)
         dlo = minimum(dom)[dim]; dhi = maximum(dom)[dim]
-        isfinite(dlo) && (lo = max(lo, dlo))
-        isfinite(dhi) && (hi = min(hi, dhi))
+        if isfinite(dlo) && isfinite(dhi) && dhi > dlo
+            # When the data already reaches close to a spine edge, snap that edge out to the spine
+            # so the projection boundary shows in full (world land falls a few degrees short of the
+            # pole, but the gallery should frame the whole projection). Otherwise clamp the data
+            # within the domain, so a regional plot stays zoomed to its data. Data running to a
+            # singularity (a pole projecting to ∞ on a conic) is non-finite, so it snaps too.
+            tol = _SPINE_SNAP * (dhi - dlo)
+            lo = (lo - dlo) <= tol ? dlo : max(lo, dlo)
+            hi = (dhi - hi) <= tol ? dhi : min(hi, dhi)
+        end
     end
     # if no finite window could be determined, `nothing` signals "leave the limits alone"
     (isfinite(lo) && isfinite(hi) && hi > lo) || return nothing
