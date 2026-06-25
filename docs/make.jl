@@ -25,7 +25,7 @@ CairoMakie.activate!(px_per_unit = 2, type = :png)
 # advertises JPEG, so any page rendered while GLMakie is the active backend gets saved as
 # lossy, blurry JPEG. Demote JPEG below SVG/PNG so figures render as crisp SVG (CairoMakie
 # vector pages) or lossless PNG (GLMakie pages) instead. (Method override on a build-time
-# helper — intentional, scoped to this docs build.)
+# helper, intentional, scoped to this docs build.)
 DocumenterVitepress.mime_priority(::MIME"image/jpeg") = 2.5
 # Rasters should download into the artifacts folder (so they can be cached :D)
 raster_data_sources_path = joinpath(first(Base.DEPOT_PATH), "artifacts")

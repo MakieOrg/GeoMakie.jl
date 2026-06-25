@@ -15,7 +15,7 @@ import GeometryOps as GO
 ita_df = try
     GADM.get("ITA"; depth = 1) |> DataFrame
 catch e
-    @warn "GADM is unreachable (server offline) — using a placeholder geometry so the docs still build. The published docs use the real data whenever GADM is up." exception = (e, catch_backtrace())
+    @warn "GADM is unreachable (server offline); using a placeholder geometry so the docs still build. The published docs use the real data whenever GADM is up." exception = (e, catch_backtrace())
     ## rough stand-in outline of Italy (lon/lat) so the centroid/poly/figure below still work
     DataFrame(geom = [GeoMakie.GeometryBasics.Polygon(Point2f[(7, 44), (13, 40), (18, 40), (12, 46), (7, 46), (7, 44)])])
 end

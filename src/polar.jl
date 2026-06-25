@@ -1,5 +1,5 @@
 #=
-# `GeoPolarAxis` — polar (pole-centred azimuthal) maps on a Makie `PolarAxis`
+# `GeoPolarAxis`: polar (pole-centred azimuthal) maps on a Makie `PolarAxis`
 
 This reproduces cartopy's `always_circular_stereo` example: a polar map whose boundary is a
 **circle** (a cap at a chosen latitude) with everything outside the circle clipped, plus a polar
@@ -7,17 +7,17 @@ graticule (parallels as r-rings, meridians as θ-spokes).
 
 A pole-centred azimuthal projection is **separable** in polar coordinates:
 
-  - `θ = lon`            — a pure rotation (the display orientation is set with `theta_0`/`direction`)
-  - `r = radial(lat)`    — the projection's radial law, `hypot(project(lon₀, lat))`
+  - `θ = lon`            (a pure rotation; the display orientation is set with `theta_0`/`direction`)
+  - `r = radial(lat)`    (the projection's radial law, `hypot(project(lon₀, lat))`)
 
 so we map `(lon, lat) → (θ, r)` directly and let Makie's `PolarAxis` supply the circular clip
 (`rlimits`), the polar grid and the circular spine for free.
 
-Because `θ = lon`, the only discontinuity is the **antimeridian** (`lon = ±180`) — a constant-
+Because `θ = lon`, the only discontinuity is the **antimeridian** (`lon = ±180`): a constant-
 longitude graticule line, exactly where GeoMakie's `AntimeridianClip` already tears (with a
 pole-walk for pole-enclosing land like Antarctica). After that split every polygon is simple in
 `(θ, r)`, so filled artists go through Makie's ordinary `poly!`/`contourf!` (which triangulate in
-`(θ, r)`) and render as clean vector paths — no bespoke mesh, no rasterised-mesh artifacts.
+`(θ, r)`) and render as clean vector paths: no bespoke mesh, no rasterised-mesh artifacts.
 
 The antimeridian split produces two pieces that abut along `lon = ±180`; on the disk `θ = +π` and
 `θ = −π` are the *same* radial direction, so the **fill** is seamless (the cut is zero-width). The
@@ -38,7 +38,7 @@ wrapped `PolarAxis`.
 A polar map `@Block` (sibling of [`GeoAxis`](@ref)) backed by a Makie `PolarAxis`, for
 **pole-centred azimuthal** projections (`stere`, `aeqd`, `laea`, `gnom`, …). The map is a disk
 clipped to the cap latitude `latcap`, with a circular spine and a polar graticule (parallels as
-r-rings, meridians as θ-spokes) — cartopy's `always_circular_stereo` look.
+r-rings, meridians as θ-spokes), the cartopy `always_circular_stereo` look.
 
 Plot onto it with the usual verbs, passing **geographic** `(lon, lat)` data:
 `lines!`, `scatter!`, `poly!`, `surface!`, `heatmap!`, `contourf!`.
@@ -134,15 +134,15 @@ end
 
 Makie.get_scene(gpa::GeoPolarAxis) = Makie.get_scene(gpa.axis)
 
-# GeoPolarAxis owns no limits of its own — the wrapped PolarAxis does. Forward the pre-display state
+# GeoPolarAxis owns no limits of its own; the wrapped PolarAxis does. Forward the pre-display state
 # update (which would otherwise hit `reset_limits!`/`gpa.limits` on the generic AbstractAxis path).
 Makie.update_state_before_display!(gpa::GeoPolarAxis) = Makie.update_state_before_display!(gpa.axis)
 
-# radius of the parallel `lat` — for a pole-centred azimuthal projection r depends only on latitude
+# radius of the parallel `lat`: for a pole-centred azimuthal projection r depends only on latitude
 _polar_radius(t::Proj.Transformation, lat) = (xy = t(0.0, Float64(lat)); hypot(xy[1], xy[2]))
 
 # (lon, lat)° -> (θ = lon [rad], r). `r = hypot(project(lon, lat))` is the exact azimuthal radial
-# law (independent of lon); `θ` comes straight from the longitude — no atan2, no branch cut.
+# law (independent of lon); `θ` comes straight from the longitude: no atan2, no branch cut.
 @inline function _polar_θr(t::Proj.Transformation, lon, lat)
     xy = t(Float64(lon), Float64(lat))
     return Point2{Float64}(deg2rad(Float64(lon)), hypot(xy[1], xy[2]))
@@ -266,7 +266,7 @@ end
 # filled polygons: antimeridian-split (so each piece is simple in (θ, r)) then ordinary poly!
 #-----------------------------------------------------------------------------------------------
 
-# Split polygonal geographic `geom` at the antimeridian (lon = ±180 — the only seam once θ = lon),
+# Split polygonal geographic `geom` at the antimeridian (lon = ±180, the only seam once θ = lon),
 # with a pole-walk for pole-enclosing land. Returns (lon/lat polygons, group) where `group[i]` is the
 # index of the input polygon piece `i` came from (so per-polygon colours map onto the pieces).
 function _anti_split(gpa::GeoPolarAxis, geom; winding::Symbol = :spherical)
@@ -342,9 +342,9 @@ Makie.contourf!(gpa::GeoPolarAxis, xs, ys, zs; kwargs...) =
     Makie.contourf!(gpa.axis, _polar_θ(xs), _polar_r(gpa.transform, ys), zs; kwargs...)
 
 # `surface!`/`heatmap!` are *raster* fields. A pixel field can't follow a nonlinear (polar) axis as
-# an image — `heatmap!`'s native path smears — so we draw it as a pcolormesh: a (θ, r) vertex grid
+# an image (`heatmap!`'s native path smears), so we draw it as a pcolormesh: a (θ, r) vertex grid
 # with the data as per-vertex colour, warped per-vertex by the PolarAxis transform. (Same reason
-# GeoAxis meshes its grids.) This rasterises in vector backends — that is inherent to raster data;
+# GeoAxis meshes its grids.) This rasterises in vector backends; that is inherent to raster data;
 # use `contourf!` for a vector field. Heatmap cell EDGES (n+1) are collapsed to centres to match z.
 function _polar_field_mesh!(gpa::GeoPolarAxis, xs, ys, vals;
         colormap = :viridis, colorrange = Makie.automatic, nan_color = :transparent, kwargs...)

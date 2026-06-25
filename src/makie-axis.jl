@@ -274,7 +274,7 @@ function Makie.getlimits(la::GeoAxis, dim)
     end
     axis_plots = Set(values(la.elements))
     function exclude(plot)
-        # dont use axis decorations (grid, ticklabels, AND the spine — see the domain clamp below)!
+        # dont use axis decorations (grid, ticklabels, AND the spine; see the domain clamp below)!
         plot in axis_plots && return true
         # only use plots with autolimits = true
         to_value(get(plot, dim == 1 ? :xautolimits : :yautolimits, true)) || return true
@@ -283,10 +283,10 @@ function Makie.getlimits(la::GeoAxis, dim)
         # only use visible plots for limits
         return !to_value(get(plot, :visible, true))
     end
-    # Fit to the DATA, then clamp to the projection's finite domain — exactly cartopy's
+    # Fit to the DATA, then clamp to the projection's finite domain: exactly cartopy's
     # `GeoAxes.autoscale_view` (matplotlib autoscale, then bound to `projection.x_limits`/
     # `y_limits`). The domain here is the spine outline (finite via the conic cutoff cone). The
-    # clamp (a) bounds data that runs to a projection singularity — a pole on a conic — to the map
+    # clamp (a) bounds data that runs to a projection singularity (a pole on a conic) to the map
     # instead of zooming out to a speck, and (b) frames an empty axis to the full projection.
     data_bb = Makie.boundingbox(la.scene, exclude)
     mn = minimum(data_bb)[dim]; mx = maximum(data_bb)[dim]

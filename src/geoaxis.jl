@@ -660,7 +660,7 @@ function Makie.initialize_block!(axis::GeoAxis)
     lat_points_px = Obs(Point2d[])
 
     # The spine/tick-label positions feed the axis protrusions, which feed the layout, which
-    # changes `cam.projectionview` — re-triggering this very callback *synchronously* on the same
+    # changes `cam.projectionview`, re-triggering this very callback *synchronously* on the same
     # stack. For most projections that settles in 1–2 passes, but some full-disk azimuthal aspects
     # (e.g. equatorial `+proj=laea`) never converge and recurse until the stack overflows. Cap the
     # synchronous re-entry depth: converging projections never approach the cap, while a runaway is
@@ -797,7 +797,7 @@ function Makie.initialize_block!(axis::GeoAxis)
     elements[:xticklabels] = lontex
     elements[:yticklabels] = lattex
     # Register the spine as a decoration (excluded from data limits) AND as the projection-domain
-    # outline that `getlimits` clamps the data window to — cartopy's `projection.x_limits`. See
+    # outline that `getlimits` clamps the data window to (cartopy's `projection.x_limits`). See
     # getlimits in makie-axis.jl.
     elements[:spine] = spineplot
 
@@ -918,7 +918,7 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
     # reset limits ONLY IF the user has not said otherwise
     if reset_limits
         # some area-like plots (meshimage/surface) look better covering the whole plot area, so
-        # tighten the margins — but keep a 1% sliver rather than (0,0) so the projection-boundary
+        # tighten the margins, but keep a 1% sliver rather than (0,0) so the projection-boundary
         # spine, drawn at the very edge of the projected domain, isn't half-clipped by the axis.
         if Makie.needs_tight_limits(plot)
             axis.xautolimitmargin = (0.01, 0.01)

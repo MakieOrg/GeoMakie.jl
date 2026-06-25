@@ -72,7 +72,7 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Contourf)
     end
 
     # the split child must draw in the SAME frame the split polys were emitted in: centred
-    # transform for the antimeridian (rotated frame), full transform otherwise — decided inside one
+    # transform for the antimeridian (rotated frame), full transform otherwise, decided inside one
     # lift (`_child_transformfunc`) so the geometry frame and transform switch atomically with `dest`.
     child = _find_child(plot, Makie.Poly)
     if child !== nothing
@@ -102,7 +102,7 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Contourf)
 end
 
 # The transform the split child must draw with: centred (lon_0=0) for the antimeridian seam
-# (Option B — geometry is emitted in the rotated frame), the full transform otherwise.
+# (Option B, geometry is emitted in the rotated frame), the full transform otherwise.
 function _child_transformfunc(axis, source)
     lift(axis.dest, source) do dest, src
         ftf = create_transform(dest, src); clip = clip_strategy(ftf)
@@ -136,7 +136,7 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Poly{<:Tuple{<:AbstractVector{<:
     source = pop!(plot.kw, :source, axis.source)
     reset_limits = to_value(pop!(plot.kw, :reset_limits, true))
     # Connect the original plot so its cycle colour / palette resolves from the scene (e.g.
-    # `poly!(ga, geom)` with no explicit colour), but hide its unsplit drawing — the split
+    # `poly!(ga, geom)` with no explicit colour), but hide its unsplit drawing; the split
     # geometry is rendered separately below.
     Makie.plot!(axis.scene, plot); plot.visible = false
     split = lift(_split_geom, plot[1], axis.dest, source)
@@ -222,8 +222,8 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.Lines{<:Tuple{<:AbstractVector{<
 end
 
 # Build a projected, discontinuity-clipped triangle mesh from a rectilinear lon/lat grid
-# (`xs`, `ys` vectors) with per-vertex values `vals`. The grid is projected (Option B — rotated
-# frame + centred projector — for the antimeridian, so lon_0=180 doesn't collapse), triangulated,
+# (`xs`, `ys` vectors) with per-vertex values `vals`. The grid is projected (Option B: rotated
+# frame + centred projector, for the antimeridian, so lon_0=180 doesn't collapse), triangulated,
 # and faces straddling the tear are subdivided/dropped (`_clip_faces`). Returns (mesh, flat colour vector).
 function _geo_grid_mesh(dest, source, xs, ys, vals)
     ftf = create_transform(dest, source); clip = clip_strategy(ftf)

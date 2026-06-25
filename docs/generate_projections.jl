@@ -1,13 +1,10 @@
-# Generator for `docs/src/projections.md`.
+# Generator for `docs/src/projections.md`, the single source of truth for the projection gallery.
+# Edit the `PROJECTION_SECTIONS` list (or the prose constants) below, NOT the generated markdown,
+# which `make.jl` overwrites on every build via `generate_projections(...)`.
 #
-# This is the **single source of truth** for the projection gallery page. Edit the
-# `PROJECTION_SECTIONS` list (or the prose constants) below — NOT the generated markdown, which
-# `make.jl` overwrites on every build via `generate_projections(...)`.
-#
-# Why generate it? We want every panel to show a *self-contained, copy-pasteable* code cell above
-# its figure (so a reader can reproduce any projection), but hand-maintaining ~110 near-identical
-# `@example` blocks is error-prone. Keeping the data here and emitting the markdown gives us both:
-# one short list to maintain, and fully spelled-out code on the page.
+# Generating it keeps one short list to maintain here while emitting a self-contained,
+# copy-pasteable `@example` cell above each figure, instead of hand-maintaining ~110 near-identical
+# blocks.
 
 # (section title, payload): payload is a single PROJ string for a plain section, or a vector of
 # (tab label, PROJ string) for a tabbed family. Order is preserved as the page order.
@@ -163,48 +160,33 @@ const PROJECTION_SECTIONS = [
 const _HEADER = """
 # Projections
 
-GeoMakie clips and resamples geometry **on the sphere before projection**, so filled
-contours, polygons, lines, and the projection boundary stay correct across each
-projection's discontinuity — the antimeridian, interrupted lobes (`igh`/`imoll`),
-azimuthal/perspective horizons (`ortho`/`geos`), and oblique seams (`spilhaus`/`bertin`).
+A `GeoAxis` can draw (almost) every projection PROJ provides. Each section below shows the
+PROJ string for a projection and the code that draws it, with related variants grouped into
+tabs.
 
-Each section below draws the **bare** projection on a `GeoAxis` — the coastline land
-polygons and the graticule — for (almost) every projection PROJ provides, one panel per
-projection (the PROJ string is shown as each panel's title), with related variants grouped
-into tabs. The land outline and graticule stay correct right up to each projection's
-discontinuity, with no smears across the tear.
-
-(For a *filled-field* test on a curvilinear grid — `contourf!` of an Oceananigans tripolar
-field, with `add_cyclic_point` and the interrupted `imoll_o` projection — see the
-[Tripolar grid](@ref) example.)
-
-Every panel below is the same handful of lines with a different `dest` — copy this preamble
-once, then any panel reproduces on its own:
+Every panel is the same few lines with a different `dest`. Copy this preamble once, then any
+panel below reproduces on its own:
 
 ```@example projections
 using GeoMakie, CairoMakie
-CairoMakie.activate!(type = :svg)   # this page is pure vector content, so render crisp SVG
+CairoMakie.activate!(type = :svg)
 
-land = GeoMakie.land()              # Natural Earth land polygons, reused by every panel
+land = GeoMakie.land()
 nothing # hide
 ```
 """
 
-# The polar tail: `GeoPolarAxis` land panels (the *field* demo lives in its own example page).
+# The polar tail: `GeoPolarAxis` land panels (the field demo lives in its own example page).
 const _POLAR_TAIL = """
-## Polar (stereographic) — `GeoPolarAxis`
+## Polar stereographic (`GeoPolarAxis`)
 
-For a **circular-boundary** polar map — stereographic centred on a pole and zoomed to a cap,
-the way you'd view sea-ice or a tripolar-grid field (cartopy's
-[`always_circular_stereo`](https://cartopy.readthedocs.io/latest/gallery/lines_and_polygons/always_circular_stereo.html))
-— use [`GeoPolarAxis`](@ref). A pole-centred azimuthal projection *is* a polar plot, separable as
-`θ = lon` and `r = radial(lat)` (the projection's radial law), so `GeoPolarAxis` re-expresses the
-projection on a Makie `PolarAxis` and gets the **circular clip**, the **polar graticule**
-(parallels as r-rings, meridians as θ-spokes) and the **circular spine** for free.
+!!! note "A separate axis type"
+    Pole-centred polar maps use [`GeoPolarAxis`](@ref) rather than `GeoAxis`. It is a
+    distinct axis type on purpose, so that a circular boundary, a polar graticule, and a
+    circular spine all come for free.
 
-Pass the cap latitude as `latcap` — its sign picks the pole (`latcap ≥ 0` north, `< 0` south) —
-then plot with the usual verbs (`lines!`, `scatter!`, `poly!`, `surface!`, `heatmap!`,
-`contourf!`) using **geographic** `(lon, lat)` data:
+Pass the cap latitude as `latcap` (its sign picks the pole: `latcap ≥ 0` north, `< 0` south),
+then plot with the usual verbs using geographic `(lon, lat)` data:
 
 ```@example projections
 polar = Figure(size = (840, 460))
@@ -217,13 +199,11 @@ end
 polar
 ```
 
-For a *filled field* on a cap (`contourf!`/`surface!`/`heatmap!` with a colorbar and a
-non-default azimuthal projection, reproducing cartopy's `always_circular_stereo`), see the
-[Polar stereographic cap](@ref) example.
+For a filled field on a cap, see the [Polar stereographic cap](@ref) example.
 
 ```@setup projections
-## Backend type is process-global in CairoMakie. This page is pure vector content (rendered as
-## SVG above); reset to PNG so later raster-heavy example pages don't balloon into huge SVGs.
+## Reset CairoMakie to PNG (the backend type is process-global) so later raster-heavy example
+## pages don't balloon into huge SVGs.
 CairoMakie.activate!(px_per_unit = 2, type = :png)
 ```
 """
@@ -265,8 +245,13 @@ Write the projection gallery markdown to `outpath` from `PROJECTION_SECTIONS`. C
 """
 function generate_projections(outpath)
     io = IOBuffer()
-    println(io, "<!-- AUTO-GENERATED by docs/generate_projections.jl — DO NOT EDIT BY HAND. -->")
-    println(io, "<!-- Edit PROJECTION_SECTIONS in that script and rebuild the docs.        -->\n")
+    # A `@raw html` block passes the comment through verbatim so it stays a true (hidden) HTML
+    # comment in the built page; a bare `<!-- -->` gets mangled into visible text by the
+    # Documenter -> Vitepress markdown round-trip.
+    println(io, "```@raw html")
+    println(io, "<!-- AUTO-GENERATED by docs/generate_projections.jl. Do not edit by hand;")
+    println(io, "     edit PROJECTION_SECTIONS in that script and rebuild the docs. -->")
+    println(io, "```\n")
     println(io, _HEADER)
     for (title, payload) in PROJECTION_SECTIONS
         _emit_section!(io, title, payload)

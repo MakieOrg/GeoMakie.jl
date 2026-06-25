@@ -66,7 +66,7 @@ function _gc_midpoint(lo1, la1, lo2, la2)
 end
 
 # Clip mesh faces at the projection's discontinuity. An edge "crosses" a tear if projecting its
-# great-circle midpoint lands far from the midpoint of the two projected endpoints — this tells a
+# great-circle midpoint lands far from the midpoint of the two projected endpoints: this tells a
 # real tear (antimeridian / horizon / interrupted lobe / oblique seam) from mere projection
 # distortion (which keeps them close), regardless of edge length. A straddling triangle is
 # SUBDIVIDED toward the seam (keep the clean sub-triangles, recurse on the rest up to `depth`)
@@ -92,7 +92,7 @@ function _clip_faces(points, latlon, faces, proj; factor = 0.3, depth = 4)
         idx = length(pts); midcache[key] = idx; return idx
     end
     # Projected extent, so most edges can be decided from the ALREADY-projected vertices and skip
-    # an extra midpoint projection per edge — the cost that made npoints=1000 take 5 min + 56 GiB
+    # an extra midpoint projection per edge: the cost that made npoints=1000 take 5 min + 56 GiB
     # (geos→natearth curvature subdividing every face). Mirrors cartopy: detect wraps from projected
     # coords; don't forward-project every face.
     xmin = ymin = Inf; xmax = ymax = -Inf
@@ -107,8 +107,8 @@ function _clip_faces(points, latlon, faces, proj; factor = 0.3, depth = 4)
         p1 = pts[a]; p2 = pts[b]
         (_fin(p1) && _fin(p2)) || return true
         dx = p1[1] - p2[1]; dy = p1[2] - p2[2]; e2 = dx * dx + dy * dy
-        e2 > seam2 && return true            # wraps the seam — from projected vertices only, no proj
-        e2 < skip2 && return false           # too short to show curvature — skip the projection
+        e2 > seam2 && return true            # wraps the seam, from projected vertices only, no proj
+        e2 < skip2 && return false           # too short to show curvature, skip the projection
         la = ll[a]; lb = ll[b]
         m = _gc_midpoint(la[1], la[2], lb[1], lb[2]); pm = proj(m[1], m[2])
         _fin(pm) || return true
@@ -117,7 +117,7 @@ function _clip_faces(points, latlon, faces, proj; factor = 0.3, depth = 4)
     end
     out = eltype(faces)[]
     function emit(a, b, c, d)
-        # Fully off-map face (all three vertices non-finite — e.g. the entire back hemisphere of an
+        # Fully off-map face (all three vertices non-finite, e.g. the entire back hemisphere of an
         # azimuthal/perspective projection like ortho/geos): drop in O(1). Without this, every such
         # cell subdivides to `depth` (up to 4^depth sub-triangles) only to be discarded, which made a
         # dense raster `heatmap`/`surface` on a GeoAxis take minutes (≈half the grid × 256). Genuine
@@ -201,8 +201,8 @@ function Makie.plot!(plot::MeshImage)
 
         # The seam clip assumes the x/y inputs are lon/lat (it tears at a PROJECTION
         # discontinuity via great-circle midpoints). That only holds for a geographic
-        # projection (a `Proj.Transformation`, i.e. a `GeoAxis`). For any other transform —
-        # the affine/log-scaled `Axis` cases, or a 3D `GlobeAxis` (no seam) — `_gc_midpoint`
+        # projection (a `Proj.Transformation`, i.e. a `GeoAxis`). For any other transform,
+        # such as the affine/log-scaled `Axis` cases or a 3D `GlobeAxis` (no seam), `_gc_midpoint`
         # on non-lon/lat coordinates produces garbage and mangles the mesh, so emit the plain
         # rectangle mesh (the original behaviour) there.
         if !(tfunc isa Proj.Transformation)

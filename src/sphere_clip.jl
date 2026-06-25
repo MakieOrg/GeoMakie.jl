@@ -17,7 +17,7 @@ own `+lon_0`/`+lat_0` rotation, so emitting geographic coordinates is correct.
 
 A single generic clip driver ([`_clip_polygon`](@ref)/[`_clip_open`](@ref)) is parameterised
 by a [`SphereClip`](@ref) supplying *visibility*, a *line clipper*, a boundary *interpolate*,
-and a *start* seed — the same four hooks d3 feeds to `clip/index.js`. Antimeridian and circle
+and a *start* seed: the same four hooks d3 feeds to `clip/index.js`. Antimeridian and circle
 share the driver and `rejoin`, so there is no projected-space surgery and no `GeometryOps`
 strip-clipping fallback.
 
@@ -40,8 +40,8 @@ equivalent (GO's `Spherical()` clip is polygon∩polygon; its predicates and res
 distance-based, not seam-aware or projection-adaptive).
 
 What DOES defer to the lower-level packages:
-- planar helpers on already-projected points — the oblique-square boundary's convex hull and
-  Douglas–Peucker simplify — defer to `GO.convex_hull` / `GO.simplify`;
+- planar helpers on already-projected points (the oblique-square boundary's convex hull and
+  Douglas–Peucker simplify) defer to `GO.convex_hull` / `GO.simplify`;
 - the great-circle interpolation (`_geo_interp`) and angular distance (`_gcdist_deg`) used by the
   boundary builders defer to `GO.UnitSpherical.slerp` / `spherical_distance`.
 
@@ -69,13 +69,13 @@ const _EPS2 = 1.0e-12           # d3 epsilon2 (squared tolerance for exact-point
 const _US_FROM_GEO = GO.UnitSpherical.UnitSphereFromGeographic()  # (lon,lat)° → UnitSphericalPoint
 const _GEO_FROM_US = GO.UnitSpherical.GeographicFromUnitSphere()  # UnitSphericalPoint → (lon,lat)°
 
-# unit cartesian of a lon/lat (degrees) — delegated to UnitSpherical's `UnitSphereFromGeographic`
+# unit cartesian of a lon/lat (degrees), delegated to UnitSpherical's `UnitSphereFromGeographic`
 # (identical maths: sinϕ·cosθ with ϕ=90−lat, θ=lon; benchmarks identical to the hand-rolled form).
 # Returns the `NTuple{3,Float64}` the d3 ports thread through.
 @inline _cart(lon, lat) = (p = _US_FROM_GEO((Float64(lon), Float64(lat))); (p[1], p[2], p[3]))
 # unit cartesian -> (lon,lat) degrees. Kept hand-rolled: UnitSpherical's `GeographicFromUnitSphere`
 # does NOT `clamp(z, -1, 1)`, so on a normalised vector with |z| a hair over 1 (FP) it throws a
-# DomainError where this must stay total. (Filed upstream — see HANDOFF.)
+# DomainError where this must stay total. (Filed upstream; see HANDOFF.)
 @inline function _sph(v)
     x, y, z = v
     return (atan(y, x) * _R2D, asin(clamp(z, -1.0, 1.0)) * _R2D)
@@ -196,7 +196,7 @@ Adaptively densify one **break-free** lon/lat polyline `sub` (vector of point-li
 degrees) so that, once projected by `project(lon, lat) -> (x,y)`, the curve is smooth.
 Returns lon/lat points (the caller's transform does the projecting). Midpoints are taken
 on the sphere (great-circle); the error test is in projected space. `scale` converts
-projected units to the threshold's units — see [`resample_scale`](@ref).
+projected units to the threshold's units; see [`resample_scale`](@ref).
 
 Direction-symmetric: `resample_sphere(sub) == reverse(resample_sphere(reverse(sub)))`.
 """
@@ -289,7 +289,7 @@ end
 # Spherical area (steradians, range [0, 4π]) of the region a lon/lat ring BOUNDS under d3's
 # winding convention (port of d3-geo area.js). A ring traversed so its interior is the small
 # region returns < 2π; one traversed the other way (interior = complement) returns > 2π. We use
-# this to canonicalise Makie's arbitrarily-wound contourf bands before clipping — a band wound
+# this to canonicalise Makie's arbitrarily-wound contourf bands before clipping: a band wound
 # as its own complement would otherwise be clipped to fill (nearly) the whole map.
 function _geo_area(ring)
     n = length(ring)
@@ -323,7 +323,7 @@ a start seed, plus a rotation mapping the projection centre to the canonical fra
 """
 abstract type SphereClip end
 
-"No discontinuity — pass geometry through unchanged (non-Proj / `+over`)."
+"No discontinuity: pass geometry through unchanged (non-Proj / `+over`)."
 struct NoClip <: SphereClip end
 
 """
@@ -331,7 +331,7 @@ struct NoClip <: SphereClip end
 
 Tear at the meridian `lon0 ± 180` (the periodicity seam). Port of `clip/antimeridian.js`.
 `lon0` (degrees) is the projection centre (`+lon_0 +pm`). `lat_max < 90` additionally clamps
-geometry/boundary to ±`lat_max` for normal Mercator (merc/webmerc), whose y → ±∞ at the poles —
+geometry/boundary to ±`lat_max` for normal Mercator (merc/webmerc), whose y → ±∞ at the poles;
 otherwise Antarctica (and the spine's ±90) blow the y-limits to ~12× the useful map.
 """
 struct AntimeridianClip <: SphereClip
@@ -360,12 +360,12 @@ end
 Antimeridian seam in a *rotated* (oblique) frame, drawn with Option B via a NATIVE centred
 projector. `fwd`/`inv` rotate geographic ↔ the oblique frame (radians); the clip cuts at the
 rotated antimeridian, and `centred::_NativeCentred` projects the rotated-frame split directly to
-metres — exactly d3's `rotate(...) → clipAntimeridian → centredProjection`. Drawing in the rotated
+metres, exactly d3's `rotate(...) → clipAntimeridian → centredProjection`. Drawing in the rotated
 frame (rather than unrotating back through PROJ) is essential: PROJ's `atan2` collapses the ±π
 seam onto one edge, smearing geometry that straddles it (Antarctica on bertin).
 
 Used for **bertin1953** (a rotated, fudged Hammer that PROJ ships with no inverse): see
-[`_bertin_rotation`](@ref)/[`_bertin_centred`](@ref). NOT used for spilhaus — that's a *square*
+[`_bertin_rotation`](@ref)/[`_bertin_centred`](@ref). NOT used for spilhaus: that's a *square*
 (adams) whose oblique pole is a sharp corner the antimeridian pole-walk can't match, so it stays
 on the no-smear [`PolygonClip`] hull (rounded corners, documented workaround).
 """
@@ -397,7 +397,7 @@ end
 # Geometry overloads (defensive): Makie has no generic apply_transform(f, ::Polygon/LineString) and
 # special-cases Proj.Transformation, so a native transform should handle these too for any code path
 # that transforms a geometry directly. (Makie's poly!/lines! recipes actually transform the decomposed
-# point arrays, so the array method already covers the common case — these are belt-and-suspenders.)
+# point arrays, so the array method already covers the common case; these are belt-and-suspenders.)
 Makie.apply_transform(c::_NativeCentred, p::GeometryBasics.Polygon) =
     GeometryBasics.Polygon(
     Makie.apply_transform(c, GeometryBasics.coordinates(p.exterior)),
@@ -420,7 +420,7 @@ end
     ProjectedClip()
 
 Lighter fallback for projections whose tear is an arbitrary curve with no simple analytic
-sphere boundary — oblique squares (`spilhaus`/`guyou`/`ob_tran`/`ocea`/`oea`) and interrupted
+sphere boundary: oblique squares (`spilhaus`/`guyou`/`ob_tran`/`ocea`/`oea`) and interrupted
 lobes (`igh`/`igh_o`/`imoll`/`goode`). Rather than clip on the sphere, we densify in lon/lat,
 project, and break the line wherever the **projected** segment jumps abnormally (cartopy-style,
 validated for `spilhaus`). Output stays geographic + full transform. (A future phase will add a
@@ -431,7 +431,7 @@ struct ProjectedClip <: SphereClip end
 """
     PolygonClip(boundary)
 
-Clip against an arbitrary spherical polygon `boundary` (vector of lon/lat-degree rings) — d3's
+Clip against an arbitrary spherical polygon `boundary` (vector of lon/lat-degree rings); d3's
 `clipPolygon`. Used for oblique squares (boundary derived by inverse-projecting the projected
 outline, d3 `reclip`) and interrupted lobes (explicit lobe polygon). `segs` are the boundary
 edges as precomputed great-circle `_IxSeg`s (radians) for fast intersection.
@@ -443,7 +443,7 @@ struct PolygonClip <: SphereClip
 end
 function PolygonClip(boundary::Vector{<:AbstractVector})
     rings = [Point2d[Point2d(p[1], p[2]) for p in r] for r in boundary]
-    # Orient so the boundary bounds its LARGER region — the projection interior (≈ the whole
+    # Orient so the boundary bounds its LARGER region: the projection interior (≈ the whole
     # sphere for an oblique square). Otherwise `polygonContains` treats mapped geometry as
     # OUTSIDE and the clip fills the entire domain.
     _geo_area(rings[1]) < 2π && (rings[1] = reverse(rings[1]))
@@ -478,7 +478,7 @@ end
 
 # Derive the spherical clip boundary of an oblique projection (d3 `reclip`, in-order variant).
 # These projections map the whole sphere into a CONVEX projected domain (square / ellipse), so
-# the in-order domain outline is exactly the convex hull of the projected points — which hits the
+# the in-order domain outline is exactly the convex hull of the projected points, which hits the
 # corners (the radial scan rounded them) and is naturally ordered. Densify the hull edges
 # (straight in projected space), inset slightly toward the centroid, and inverse-project each →
 # the spherical boundary with sharp corners. Bail (→ ProjectedClip) if the inverse is unavailable
@@ -617,7 +617,7 @@ struct _CPt
     t::Float64
 end
 _randsign(i, j) = sign(sin(100 * i + j))
-# geodesic distance between two cartesian unit vectors — UnitSpherical's `spherical_distance` is the
+# geodesic distance between two cartesian unit vectors; UnitSpherical's `spherical_distance` is the
 # identical atan2(‖a×b‖, a·b) form; the NTuple→UnitSphericalPoint wrap is allocation-free.
 _cp_dist(a, b) = GO.UnitSpherical.spherical_distance(
     GO.UnitSpherical.UnitSphericalPoint(a), GO.UnitSpherical.UnitSphericalPoint(b)
@@ -805,7 +805,7 @@ end
 function _clip_against_polygon(pc::PolygonClip, rings_deg)
     isempty(pc.segs) && return [Point2d[Point2d(p[1], p[2]) for p in r] for r in rings_deg]
     # Rings arrive already canonically wound from `_split_polygon` (role-based, by the caller's
-    # `:spherical`/`:planar` regime). Do NOT re-wind here — re-deciding would undo that and flip
+    # `:spherical`/`:planar` regime). Do NOT re-wind here; re-deciding would undo that and flip
     # the parity (e.g. shrinking igh/imoll contourf bands that bound >½ the globe).
     start_pt = (pc.flat[1][1], pc.flat[1][2])           # the clip boundary's start vertex (deg)
     segments = Vector{_CPt}[]
@@ -878,7 +878,7 @@ _rotation(c::ObliqueAntimeridianClip) = (c.fwd, c.inv)
 # PROJ bakes the oblique aspect into the forward (lam += −16.5°, then a −42° rotation about the
 # y-axis, dgamma=0). d3 does the same as `rotate([-16.5,-42])` then `clipAntimeridian`. A pure
 # rotation IS analytically invertible (unlike the full bertin forward), so we clip at the rotated
-# antimeridian and — crucially — draw with the native CENTRED Hammer (`_bertin_centred`), Option B,
+# antimeridian and (crucially) draw with the native CENTRED Hammer (`_bertin_centred`), Option B,
 # rather than unrotating through PROJ (whose atan2 collapses the ±π seam, smearing Antarctica).
 const _BERTIN_DL = deg2rad(-16.5)
 const _BERTIN_CD = cosd(-42.0)
@@ -1261,7 +1261,7 @@ function _clip_polygon(c::SphereClip, rings_rad)
     poly_deg = [[(_R2D * p[1], _R2D * p[2]) for p in ring] for ring in rings_rad]
     st = _start(c); st_deg = (_R2D * st[1], _R2D * st[2])
     # rings are already canonically wound (see `_split_polygon`), so use d3's raw winding-based
-    # containment directly — re-normalising here would undo the rewind and flip the parity.
+    # containment directly; re-normalising here would undo the rewind and flip the parity.
     contains = _polygon_contains(poly_deg, st_deg)
     if !isempty(segments)
         append!(out, _rejoin(segments, _compare_ix, contains, (f, t, d, o) -> _interpolate!(c, f, t, d, o)))
@@ -1303,7 +1303,7 @@ end
 # Assemble clipped rings into GB polygons by CONTAINMENT NESTING (d3's even-odd fill has no
 # explicit holes; Makie's `Polygon` needs them). A ring's depth (how many rings contain it)
 # decides exterior (even) vs hole (odd); each hole attaches to its smallest containing
-# exterior. Nesting is decided in PROJECTED space — where seam pieces (adjacent on the sphere
+# exterior. Nesting is decided in PROJECTED space, where seam pieces (adjacent on the sphere
 # but at opposite map edges) are genuinely separate and holes nest as the renderer sees them.
 # Output geometry stays lon/lat (the GeoAxis transform re-projects it).
 function _rings_to_polygons(rings, project)
@@ -1394,7 +1394,7 @@ end
 # `AntimeridianClip` rotation is LONGITUDE-ONLY (`_rotation`: (λ,φ)->(λ+dλ, φ)), so we zero only
 # the longitude origin (`lon_0`/`pm`) and MUST keep `lat_0`/`lat_1`/`lat_2`: for a conic such as
 # `lcc` (`lat_0=39 lat_1=33 lat_2=45`), zeroing `lat_0` shifts the false origin by megametres, so
-# the split geometry — emitted in the rotated frame and drawn with this centred projector — lands
+# the split geometry (emitted in the rotated frame and drawn with this centred projector) lands
 # far from where its own data limits expect it, zooming the GeoAxis out to a speck. (Harmless for
 # the pseudocylindricals that dominate this path, whose `lat_0` is already 0.)
 _centred_dest(d::AbstractString) = replace(
@@ -1425,10 +1425,10 @@ end
 # `rotated=true` (Option B, antimeridian only): emit coordinates in the CANONICAL ROTATED
 # frame and let the caller draw with the CENTRED transform (`+lon_0=0`). Because
 # `centred ∘ rotate == full` exactly for a pure-longitude rotation, the plot lands in the same
-# projected space as the axis — but the seam now sits at rotated ±180°, which the centred
+# projected space as the axis, but the seam now sits at rotated ±180°, which the centred
 # projection maps to distinct edges, so there is no longitude-wrap collapse and no nudge.
 # `project` must be the CENTRED projector.
-# Projected-space polygon fill for ProjectedClip. E1: pass through (fills not yet split — the
+# Projected-space polygon fill for ProjectedClip. E1: pass through (fills not yet split; the
 # proper cartopy-style densify→project→jump-cut→reattach-to-boundary lands in E2). Lines are
 # already handled via `_jump_split_line`.
 _projected_fill(rings_deg, project, scale) = _rings_to_polygons(rings_deg, project)
@@ -1441,7 +1441,7 @@ function _split_polygon(clip::SphereClip, rings_deg, project, scale; rotated::Bo
     clip isa ProjectedClip && return _projected_fill(rings_deg, project, scale)
     # ±lat clamp for pole-blowup cylindricals (merc): clamp the subject, resample through a
     # clamped projector (great-circle midpoints arc over the pole; the antimeridian clip adds the
-    # ±90 pole boundary — both project to merc(±90) ≈ 12× the useful map and explode the
+    # ±90 pole boundary, both project to merc(±90) ≈ 12× the useful map and explode the
     # resampler), then clamp the OUTPUT lat so the child plot's own projection stays bounded too.
     lm = clip isa AntimeridianClip ? clip.lat_max : 90.0
     lm < 90 && (rings_deg = [_clamp_lat(r, lm) for r in rings_deg])
@@ -1449,15 +1449,15 @@ function _split_polygon(clip::SphereClip, rings_deg, project, scale; rotated::Bo
     # Reconcile winding conventions to d3's spherical clip (exterior CW so its ≤½-sphere interior
     # is the side `_polygon_contains` reads as "inside"; holes the opposite). Two regimes:
     #
-    # `:spherical` (user geometry via poly!/`split_geometry`) — orient by RING ROLE using the
+    # `:spherical` (user geometry via poly!/`split_geometry`): orient by RING ROLE using the
     # SPHERICAL winding (`_geo_area`: the d3/S2 signed area, which honours the antimeridian and the
     # poles). The planar (lon/lat) shoelace this replaced is WRONG for rings that cross the seam
     # (their flat winding flips) and DEGENERATE for rings that encircle a pole (flat area ≈ 0, sign
-    # is noise) — so it spuriously reversed Tissot's seam/pole circles into bounding the complement
+    # is noise), so it spuriously reversed Tissot's seam/pole circles into bounding the complement
     # and filled the whole map. `_geo_area` is correct there, and still flips RFC-7946 exterior-CCW
     # inputs (e.g. shapefiles) to the CW the clip wants.
     #
-    # `:planar` (Makie contourf isobands) — orient by the planar shoelace. Bands are grid-rectangle
+    # `:planar` (Makie contourf isobands): orient by the planar shoelace. Bands are grid-rectangle
     # bounded (planar winding is reliable, never pole-degenerate) and a single band may legitimately
     # bound MORE than half the sphere; the spherical-area rule would wrongly shrink such a band to
     # its small complement (dropping bands), so the size-agnostic planar rule is the right one here.
@@ -1533,7 +1533,7 @@ function _nan_segments(pts)
 end
 
 # Projected-jump line split (ProjectedClip): densify in lon/lat, then break wherever a
-# *projected* segment is abnormally long relative to the line's median segment — the
+# *projected* segment is abnormally long relative to the line's median segment: the
 # discontinuity. A RELATIVE threshold catches both the full-map oblique tear (spilhaus) and the
 # ~⅓-map inter-lobe jump of interrupted projections (igh), which an absolute one misses. Output
 # stays geographic; the caller draws with the full transform.
@@ -1566,7 +1566,7 @@ end
 
 Clip a lon/lat polyline `pts` (which may already contain `NaN` breaks) at `t`'s discontinuity,
 adaptively resample each visible sub-line, and join with `NaN` breaks. With `rotated=true` the
-output stays in the canonical rotated frame (Option B — the caller draws with the centred
+output stays in the canonical rotated frame (Option B: the caller draws with the centred
 transform) and `project` must be the centred projector; otherwise output is geographic lon/lat.
 """
 function split_resample_line(
@@ -1633,7 +1633,7 @@ _proj_ring(ring, project; scale = resample_scale(project)) =
 """
     boundary_points(dest, source=longlat) -> Vector{Point2d}
 
-The projected outline of the map domain for destination `dest` — the d3 `.sphere()` boundary
+The projected outline of the map domain for destination `dest`: the d3 `.sphere()` boundary
 of the active clip: the limb circle for an azimuthal/perspective horizon, the antimeridian
 ellipse/rectangle for a cylindrical/pseudocylindrical projection. Returns already-projected
 points (matching the GeoAxis's own gridline space) ready to draw as the axis spine. Antimeridian
@@ -1646,7 +1646,7 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
     if clip isa PolygonClip                         # spine = the derived boundary, projected
         project = _projector(ftf)
         # the boundary is already dense and its vertices sit on the (straight, in projected space)
-        # domain edges, so project directly — great-circle densify/resample would bow the edges
+        # domain edges, so project directly; great-circle densify/resample would bow the edges
         # and round the corners.
         return Point2d[Point2d(project(p[1], p[2])...) for p in clip.boundary[1]]
     end
@@ -1690,7 +1690,7 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
         # one pole projects finite (the apex), the other to ∞. Their antimeridian "seam" outline
         # then degenerates to a radial ray. Follow cartopy (`LambertConformal`, `cutoff`): build the
         # boundary as the apex pole joined to a CUTOFF PARALLEL on the far side (cartopy's default
-        # cuts 30° past the equator) — a finite cone outline that frames the map. See
+        # cuts 30° past the equator): a finite cone outline that frames the map. See
         # https://scitools.org.uk/cartopy `LambertConformal.__init__`.
         npf = all(isfinite, base(0.0, 90.0)); spf = all(isfinite, base(0.0, -90.0))
         if npf ⊻ spf
@@ -1761,7 +1761,7 @@ function clip_strategy(t::Proj.Transformation)
         ρ = h > 0 ? acosd(R / (R + h)) : 89.5
         return CircleClip(lon0, lat0, max(ρ - 0.5, 1.0))
     elseif name in ("aeqd", "laea", "stere", "sterea", "ups")
-        # full-disk azimuthal/conformal: the ANTIPODE (180° from the centre) is the singularity — it
+        # full-disk azimuthal/conformal: the ANTIPODE (180° from the centre) is the singularity; it
         # maps to the whole boundary circle (stereographic sends it to infinity), so geometry crossing
         # it smears along the rim (NOT an antimeridian seam). Clip a thin cap at the antipode; the rim
         # becomes the spine. Routing `stere` through the default AntimeridianClip instead reprojected
@@ -1776,12 +1776,12 @@ function clip_strategy(t::Proj.Transformation)
         return ObliqueAntimeridianClip(fwd, inv, _NativeCentred(_bertin_centred))
     elseif name in ("spilhaus", "guyou", "gringorten", "peirce_q", "ob_tran", "ocea", "oea")
         # Oblique squares: derive the spherical boundary (convex hull of the projected grid,
-        # inverse-projected — our stand-in for d3 `reclip`, which traces the in-order outline) and
+        # inverse-projected, our stand-in for d3 `reclip`, which traces the in-order outline) and
         # clip against it (d3 clipPolygon). Falls back to the projected-jump split when the outline
         # derivation yields nothing (e.g. guyou, whose PROJ inverse is unavailable).
         #
         # WORKAROUND vs d3: the hull rounds the sharp square corners (grid sampling). The faithful
-        # route is `ObliqueAntimeridianClip` (clip at the oblique-frame antimeridian — exact
+        # route is `ObliqueAntimeridianClip` (clip at the oblique-frame antimeridian, exact
         # corners), but without a "centred" projector for that frame it can't apply Option B, so
         # pole-wrapping polygons smear. d3 avoids both because it owns its projections; matching it
         # needs a native (centred-frame) port. So we keep the no-smear hull and accept round corners.
@@ -1797,7 +1797,7 @@ function clip_strategy(t::Proj.Transformation)
         bnd = get!(() -> _interrupted_boundary(_IGH_O_LOBES, lon0), _BOUNDARY_CACHE, def)
         return PolygonClip(bnd)
     elseif name in ("merc", "webmerc")
-        # normal Mercator: antimeridian seam PLUS a ±lat clamp — y→±∞ at the poles, so without
+        # normal Mercator: antimeridian seam PLUS a ±lat clamp; y→±∞ at the poles, so without
         # this Antarctica/Greenland and the spine's ±90 blow the y-limits ~12× past the useful map.
         return AntimeridianClip(lon0, 85.0)
     end

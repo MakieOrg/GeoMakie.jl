@@ -34,7 +34,7 @@ end
             @test θ ≈ deg2rad(lon)
             x, y = t(lon, lat)
             # Makie's `Polar` transform places θ at screen angle `direction·(θ + theta_0)`, which
-            # must reproduce the true projected (x, y) — this is what the orientation fix guarantees
+            # must reproduce the true projected (x, y); this is what the orientation fix guarantees
             # (north `dir=+1` is insensitive to it; south `dir=-1` would be 180°-flipped if wrong).
             @test r * cos(dir * (θ + th0)) ≈ x atol = 1e-3
             @test r * sin(dir * (θ + th0)) ≈ y atol = 1e-3

@@ -136,7 +136,7 @@ end
     planar_worst = 0.0   # track whether the OLD `:planar` rewind blew anything up (anywhere)
     for dest in ["+proj=bertin1953", "+proj=moll +lon_0=180", "+proj=igh"]
         t = _t(dest); clip = G.clip_strategy(t)
-        # bounded frame the split is drawn in (centred for the Option-B clips) — to measure extent
+        # bounded frame the split is drawn in (centred for the Option-B clips), to measure extent
         c = clip isa G.ObliqueAntimeridianClip ? clip.centred.f :
             clip isa G.AntimeridianClip ? G._projector(_t(G._centred_dest(dest))) : G._projector(t)
         polys, _ = G._split_geom(subjects, dest, _LL)   # poly! path → `:spherical`
