@@ -24,17 +24,47 @@ done and have been removed; what remains is the medium slice (C, F, narrow D) an
 **Symptom:** equator graticule lines and a sliver of land run past the drawn boundary on the sides;
 the spine looks like it "short-cuts straight down" instead of following the real domain edge.
 
-**Affected:** Azimuthal Equidistant (equator gridlines + land beyond spine, L & R), Nicolosi
-Globular (land + grid beyond spine).
+**Affected:** Azimuthal Equidistant (`aeqd`), Nicolosi Globular (`nicol`); the other globular
+projections `apian`/`bacon`/`ortel` share `nicol`'s root cause (confirmed below).
 
-**Hypothesis:** for `aeqd` the CircleClip horizon (179.5°) is correct in topology, but the boundary
-ring isn't sampled densely enough on the left/right extremes so it chords across; the *clip* then
-admits geometry the *spine* visually excludes. Nicolosi is a globular disk routed to the default
-AntimeridianClip, so its disk domain isn't being clipped at all.
+### Findings (measured this session — two *distinct* root causes, not one)
 
-**Fix approach:** densify the CircleClip ring on the wide axis (aeqd); add globular projections
-(`nicol`, and check `apian`/`bacon`/`ortel`) to a disk/CircleClip-style domain so the clip matches
-the boundary. **Priority: medium.**
+Diagnosis method (reproducible): for a `dest`, compare `boundary_points(dest)` (the spine) against
+`split_geometry(GeoMakie.land(), t)` projected (the clipped land) and `split_resample_line` of the
+equator; flag spine chords by max consecutive-vertex gap as a % of the spine's diameter, and run a
+point-in-polygon test of land vertices vs the spine polygon. (All in `src/sphere_clip.jl`.)
+
+**C1 — `aeqd`: the SPINE drops the left/right caps; the data is fine.** The clipped land is fully
+inside the 179.5° horizon (max radius 1.82e7 vs spine 1.998e7; **0** land vertices beyond 179.5°),
+and the equator, through the real graticule path (`split_resample_line` → CircleClip), is clipped
+correctly to lon ±179.5 (max radius 1.99808e7 ≈ the intended 179.5° circle). The bug is in
+`boundary_points` for **CircleClip**: the spine polygon has **two straight chords ~the full diameter
+wide**, jumping `(±1.656e7, +1.119e7) → (±1.656e7, −1.119e7)` and skipping the ~68° arc through the
+extreme points `(±2.0e7, 0)`. So the drawn spine cuts the left/right caps off the disk → "short-cuts
+straight down", and ~29 land vertices then sit just outside the *chorded* (not the true) spine.
+- *Mechanism:* CircleClip branch of `boundary_points` (~L1719–1724): the canonical 2° circle is
+  `_unrotate`d to geographic then `_proj_ring`-resampled. The 179.5° ring passes next to the
+  **antipode** (lon≈±180); where it straddles the antimeridian the great-circle densify/resample
+  **drops that arc** → the chord. So this is NOT under-sampling — densifying the ring won't help;
+  the arc nearest the antipode is being lost. Fix the antimeridian-straddle in the CircleClip spine
+  build (handle the lon ±180 crossing, or build the rim directly in projected/azimuth space since
+  for an azimuthal projection the 179.5° horizon is an exact circle of radius `_polar_radius`-style).
+
+**C2 — `nicol` (and `apian`/`bacon`/`ortel`): wrong CLIP DOMAIN — land genuinely spills.** These are
+**whole-world** globular projections (every lon is finite; not hemisphere disks). `nicol` is untabled
+→ falls to `AntimeridianClip`. Its spine (the projected antimeridian, a clean oval x∈±2.0e7,
+y∈±1.0e7, well-sampled at 2.97% max chord) is the WRONG boundary: **1369/5224 clipped-land vertices
+fall OUTSIDE it.** The projection is non-convex w.r.t. the antimeridian — e.g. `nicol(120°,60°) =
+(6.08e6, 7.85e6)` sits *above* the rim point `nicol(180°,60°) = (7.14e6, 7.21e6)`, so interior
+meridians bulge past the antimeridian. The true outer boundary is the **envelope of all meridians**,
+not lon=±180.
+- *Fix:* route `nicol`/`apian`/`bacon`/`ortel` to **`PolygonClip` via `_oblique_boundary`** (convex
+  hull of the projected grid — the same machinery `spilhaus`/`ob_tran` use; the globular outline is
+  smooth and ~convex so the hull is a good fit). Add the names to that branch in `clip_strategy`.
+  **Verify first:** these need a working PROJ inverse for `_oblique_boundary`; if any lacks one it
+  falls back to `ProjectedClip` (no spine) and needs a per-projection analytic boundary instead.
+
+**Priority: medium.** Suggested order: C1 (`aeqd` spine, self-contained) then C2 (globular domain).
 
 ## Bucket D — gross smearing + wrong spine (oblique / multi-point family routed to AntimeridianClip)
 
@@ -102,13 +132,12 @@ line that coincides with the spine. **Priority: low.**
 ## Suggested plan / order of attack
 
 1. **Medium slice (next up — not started):**
-   - Bucket C — densify the aeqd CircleClip ring; route globular disks (nicol, …) to a disk clip.
-     Starting point: the CircleClip boundary is sampled at a fixed 2° canonical step in
-     `_interpolate!(c::CircleClip, …)` / `_circle_stream_arc!` (`src/sphere_clip.jl`), then adaptively
-     resampled; for the near-antipode full-disk radius (179.5°) that under-samples the rim. Globular
-     projections (`nicol`, and check `apian`/`bacon`/`ortel`) are untabled in `clip_strategy`, so
-     they hit the default AntimeridianClip and their disk domain isn't clipped — add them to the
-     azimuthal/disk branch.
+   - Bucket C — see the measured **Findings** under Bucket C above; two separate fixes:
+     **C1 `aeqd` spine** (CircleClip `boundary_points` drops the arc that straddles the antimeridian
+     near the antipode → a full-width chord; the data/graticule clip is already correct, so fix the
+     spine build, not the ring density) and **C2 globular domain** (`nicol`/`apian`/`bacon`/`ortel`
+     are whole-world and non-convex vs the antimeridian → route to `PolygonClip`/`_oblique_boundary`,
+     after verifying each has a PROJ inverse).
    - Bucket F — dedupe the antimeridian graticule overdraw.
    - Bucket D, narrow — make `tmerc`/`omerc` non-blank and stop `tpeqd`/`chamb` drawing the
      antimeridian through the interior (even if not pixel-perfect).
