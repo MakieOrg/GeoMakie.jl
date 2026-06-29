@@ -2,9 +2,9 @@
 
 Working tracker for the visual problems in the `projections.md` gallery. Delete before the PR
 merges. Issues are grouped by **root cause** (not by projection) so each fix lands once across all
-the projections it affects. Buckets A, B, C and H (spine crop, pole smoothness, azimuthal/globular
-clip-vs-spine, polar tick labels) are done and have been removed; what remains is F, the narrow
-slice of D, and the deferred work.
+the projections it affects. Buckets A, B, C, F and H (spine crop, pole smoothness, azimuthal/globular
+clip-vs-spine, antimeridian graticule overdraw, polar tick labels) are done and have been removed;
+what remains is the narrow slice of D and the deferred work.
 
 ## How the rendering works (the three knobs every issue touches)
 
@@ -65,19 +65,6 @@ they hit the default AntimeridianClip and get neither a square clip nor a square
 with the correct square frame; for `spilhaus` build the boundary from the analytic square rather than
 the convex hull). **Priority: low** (cosmetic, exotic).
 
-## Bucket F — antimeridian graticule line drawn twice
-
-**Symptom:** the ±180° meridian renders darker than the other graticule lines (overdraw).
-
-**Affected:** Bertin 1953 (clearly); check whether it happens elsewhere (any AntimeridianClip
-projection could draw the seam meridian on both the left and right edges).
-
-**Hypothesis:** after the antimeridian split both copies of the seam meridian land on the boundary
-and are stroked, or the graticule emits the ±180 line once and the spine re-draws it.
-
-**Fix approach:** dedupe the seam meridian in the graticule/clip, or skip stroking the graticule
-line that coincides with the spine. **Priority: low.**
-
 ## Bucket G — orientation / sanity checks
 
 - **Oblique Cylindrical Equal-Area (`ocea`)** looks upside-down — confirm against PROJ/d3 whether
@@ -88,7 +75,6 @@ line that coincides with the spine. **Priority: low.**
 ## Suggested plan / order of attack
 
 1. **Medium slice (next up):**
-   - Bucket F — dedupe the antimeridian graticule overdraw.
    - Bucket D, narrow — make `tmerc`/`omerc` non-blank and stop `tpeqd`/`chamb` drawing the
      antimeridian through the interior (even if not pixel-perfect).
 2. **Deferred / known-issues:**

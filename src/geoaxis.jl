@@ -4,6 +4,20 @@
 
 const Rect2d = Rect2{Float64}
 
+# Do lon = -180° and lon = +180° project to the same curve under `gridproj`? They are one physical
+# meridian: pseudocylindrical/interrupted frames place them on opposite map edges (distinct), while
+# oblique/azimuthal frames drawn with the full transform collapse them onto each other (the forward
+# is 360°-periodic). Sampled at the first visible latitude where both project finite.
+function _antimeridian_coincides(gridproj, ylo, yhi)
+    for φ in (35.0, -35.0, 55.0, -55.0, 10.0)
+        (φ < ylo || φ > yhi) && continue
+        a = gridproj(-180.0, φ); b = gridproj(180.0, φ)
+        (all(isfinite, a) && all(isfinite, b)) || continue
+        return hypot(a[1] - b[1], a[2] - b[2]) < 1.0    # coincident to < 1 m ⇒ the same curve
+    end
+    return false
+end
+
 Makie.@Block GeoAxis <: Makie.AbstractAxis begin
     scene::Scene
     targetlimits::Observable{Rect2d}
@@ -612,7 +626,18 @@ function Makie.initialize_block!(axis::GeoAxis)
             push!(out, Point2d(NaN, NaN))
         end
 
+        # The antimeridian is one physical meridian, but it appears as a tick at both -180° and
+        # +180°. Pseudocylindrical/interrupted frames map those to distinct map edges (draw both);
+        # oblique/azimuthal frames drawn with the full transform map them to the SAME curve
+        # (`f(-180)≡f(180)`, e.g. bertin/aeqd/spilhaus), where drawing both overdraws the seam. Drop
+        # the +180° duplicate only when it actually coincides with -180° (sampled at a visible lat).
+        skip180 = let lo = yticks[1], hi = yticks[end]
+            any(t -> isapprox(t, -180.0; atol = 1.0e-6), xticks) &&
+                any(t -> isapprox(t, 180.0; atol = 1.0e-6), xticks) &&
+                _antimeridian_coincides(gridproj, lo, hi)
+        end
         for lon in xticks
+            (skip180 && isapprox(lon, 180.0; atol = 1.0e-6)) && continue
             range = LinRange(yticks[1], yticks[end], 100)
             project_tick_points!(Point2d[], trans, trans_inverse, range, lon, 1, limit_rect, spines.bottom, spines.top)
             _gridline!(lon_transformed, Point2d[Point2d(lon, lat) for lat in range])
