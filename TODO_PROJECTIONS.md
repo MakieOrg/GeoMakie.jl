@@ -3,8 +3,11 @@
 Working tracker for the visual problems in the `projections.md` gallery. Delete before the PR
 merges. Issues are grouped by **root cause** (not by projection) so each fix lands once across all
 the projections it affects. Buckets A, B, C, F and H (spine crop, pole smoothness, azimuthal/globular
-clip-vs-spine, antimeridian graticule overdraw, polar tick labels) are done and have been removed,
-and the narrow slice of D (`tmerc`/`omerc`/`tpeqd`/`chamb`); what remains is the deferred work.
+clip-vs-spine, antimeridian graticule overdraw, polar tick labels) and the narrow slice of D
+(`tmerc`/`omerc`/`tpeqd`/`chamb`) are done and have been removed. Bucket G (`ocea` "upside-down") was
+verified as **correct PROJ output** — north-down is PROJ's bare-`+proj=ocea` oblique aspect,
+reproduced to 0 m and not mirrored, so do **not** add a flip. What remains is the deferred work:
+Bucket D exotics and Bucket E.
 
 ## How the rendering works (the three knobs every issue touches)
 
@@ -62,26 +65,15 @@ they hit the default AntimeridianClip and get neither a square clip nor a square
 with the correct square frame; for `spilhaus` build the boundary from the analytic square rather than
 the convex hull). **Priority: low** (cosmetic, exotic).
 
-## Bucket G — orientation / sanity checks — VERIFIED, no code fix
-
-- **Oblique Cylindrical Equal-Area (`ocea`)** — the north-at-bottom look is **PROJ's own output, not a
-  GeoMakie bug.** Verified: (1) GeoMakie's projector equals a raw `Proj.Transformation` for `ocea` to
-  **0 m** (no flip injected); (2) the GeoAxis pipeline has no global flip (`eqc` is north-up, 90°E at
-  right); (3) `ocea` is **orientation-preserving** (signed-area sign matches `eqc`/`cea`, so it is
-  *not* mirrored — continents aren't backwards). PROJ's `ocea` places the N pole at y=−R, S pole at
-  y=+R for the gallery's **bare `+proj=ocea`** (an unparameterized/degenerate oblique aspect — no
-  `lonc`/`alpha`/`lat_1`…). Do **not** add a flip (it would diverge from PROJ). *Optional gallery
-  tweak (not a fix):* give the panel explicit oblique params for a more conventional look.
-
 ---
 
 ## Suggested plan / order of attack
 
-The medium slice is done (Bucket F; Bucket D narrow). What remains is all deferred / known-issues:
+The medium slice is done (Bucket F; Bucket D narrow) and Bucket G is verified. What remains is all
+deferred / known-issues:
 
 - Bucket D exotics (`bipc`, `imw_p`, `isea`, `lsat`; minor `tobmerc`/`oea`/`guyou`) and Bucket E
   (square corners) — document as known-imperfect in a short note on the page rather than block the PR.
-- Bucket G — DONE (verified `ocea` is correct PROJ output, not a bug; see above).
 
 Re-render the gallery after each slice (`julia --project=docs docs/make.jl`, or the standalone
 generator for structure) and eyeball the panels — per project convention, the figures are reviewed
