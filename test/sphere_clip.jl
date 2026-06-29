@@ -66,6 +66,32 @@ end
     end
 end
 
+# Bucket C: azimuthal/perspective limbs (and the hemisphere-clipped globulars) must draw a clean
+# circular spine that encloses the clipped land. Regression guards: (1) `aeqd`'s spine used to drop
+# the arc straddling the antimeridian near the antipode, leaving a ~full-diameter chord that cut the
+# left/right caps off the disk; (2) the globular projections used to fall through to AntimeridianClip,
+# whose oval spine the (non-convex, folded) whole-world land spilled past.
+@testset "circular limb: no chord, encloses land (Bucket C)" begin
+    for dest in ["+proj=aeqd", "+proj=laea", "+proj=stere", "+proj=ortho",
+                 "+proj=nicol", "+proj=apian", "+proj=bacon", "+proj=ortel"]
+        t = _t(dest); proj = G._projector(t)
+        @test G.clip_strategy(t) isa G.CircleClip
+        sp = filter(p -> isfinite(p[1]) && isfinite(p[2]), G.boundary_points(dest))
+        @test length(sp) > 100
+        diam = 2 * maximum(hypot(p[1], p[2]) for p in sp)
+        maxchord = maximum(hypot(sp[i][1] - sp[i - 1][1], sp[i][2] - sp[i - 1][2]) for i in 2:length(sp))
+        @test maxchord < 0.05 * diam                      # no antipode-cap chord (was ~1.0)
+        cx = sum(p -> p[1], sp) / length(sp); cy = sum(p -> p[2], sp) / length(sp)
+        ρ = maximum(hypot(p[1] - cx, p[2] - cy) for p in sp)
+        landmax = 0.0
+        for poly in G.split_geometry(GeoMakie.land(), t), q in GeometryBasics.coordinates(poly.exterior)
+            xy = proj(q[1], q[2])
+            (isfinite(xy[1]) && isfinite(xy[2])) && (landmax = max(landmax, hypot(xy[1] - cx, xy[2] - cy)))
+        end
+        @test landmax <= ρ * 1.001                        # clipped land stays inside the limb
+    end
+end
+
 @testset "GeoAxis recipe overrides render" begin
     LAND = GeoMakie.land(); C = GeoMakie.coastlines()
     lons = -180.0:4.0:180.0; lats = -90.0:4.0:90.0

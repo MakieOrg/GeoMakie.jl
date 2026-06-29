@@ -1688,6 +1688,30 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
         end
         return _proj_ring(ring, project)
     end
+    if clip isa CircleClip
+        # An azimuthal/perspective horizon is an exact circle in projected space, so build the spine
+        # as one rather than great-circle-resampling the geographic horizon ring. For a near-antipode
+        # radius (179.5°, used by aeqd/laea/stere) that ring hugs the geographic antipode, where the
+        # projection is numerically unstable — ellipsoidal `aeqd` flips the projected bearing across
+        # lat≈0, so consecutive horizon points jump to opposite sides of the rim and the left/right
+        # caps get chorded off the disk. Centre the circle at the projected projection-centre and
+        # take the radius from the (stable) projected horizon distance: the unstable points keep the
+        # correct radius (only their angle is wrong), so the max over the sampled ring is robust.
+        _, inv = _rotation(clip)
+        project = _projector(ftf)
+        c = project(clip.lon0, clip.lat0)
+        cx, cy = _isfinitexy(c) ? (c[1], c[2]) : (0.0, 0.0)
+        raw = _Pt[]
+        _interpolate!(clip, nothing, nothing, 1, raw)
+        radii = Float64[]
+        for q in raw
+            xy = project(_unrotate(inv, q[1], q[2], false)...)
+            _isfinitexy(xy) && push!(radii, hypot(xy[1] - cx, xy[2] - cy))
+        end
+        isempty(radii) && return Point2d[]
+        ρ = maximum(radii); n = 720
+        return Point2d[Point2d(cx + ρ * cos(2π * i / n), cy + ρ * sin(2π * i / n)) for i in 0:n]
+    end
     fwd, inv = _rotation(clip)
     raw = _Pt[]
     _interpolate!(clip, nothing, nothing, 1, raw)        # full clip boundary, rotated frame
@@ -1778,6 +1802,14 @@ function clip_strategy(t::Proj.Transformation)
         # everything via the centred-frame (Option B), which collapses a polar `lat_0=±90` into an
         # equatorial aspect (the "Africa-centred" bug).
         return CircleClip(lon0, lat0, 179.5)
+    elseif name in ("nicol", "apian", "bacon", "ortel")
+        # Globular projections: classically a hemisphere drawn in a disk. PROJ extends them to the
+        # whole world, but that extension folds the back hemisphere over the front (severely for
+        # `nicol`) and is non-convex, so neither an AntimeridianClip nor a convex-hull spine frames it
+        # cleanly. Clip to the front hemisphere instead: its rim is the lon=±90° meridian, exactly 90°
+        # from the centre, which every globular maps to an exact circle — so the disk's boundary
+        # matches the (circular) spine the CircleClip branch of `boundary_points` draws.
+        return CircleClip(lon0, lat0, 89.9)
     elseif name == "bertin1953"
         # rotated, fudged Hammer (no PROJ inverse). d3: rotate([-16.5,-42]) + clipAntimeridian.
         # We clip at the rotated antimeridian and draw with the native centred Hammer (Option B),
