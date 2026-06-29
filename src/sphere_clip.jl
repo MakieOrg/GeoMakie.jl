@@ -1820,6 +1820,22 @@ function clip_strategy(t::Proj.Transformation)
         # so the ±π seam doesn't collapse (which smeared Antarctica when unrotating through PROJ).
         fwd, inv = _bertin_rotation()
         return ObliqueAntimeridianClip(fwd, inv, _NativeCentred(_bertin_centred))
+    elseif name in ("tpeqd", "chamb")
+        # Whole-globe compromise projections (two-point equidistant, Chamberlin trimetric) with NO
+        # antimeridian seam: they are continuous across ±180° (the forward is periodic, f(-180)≡f(180)
+        # to <3 m), so the geographic ±180° meridian is just an interior graticule line. Routing them
+        # through the default AntimeridianClip tears the map along that interior line; clip nothing.
+        return NoClip()
+    elseif name in ("tmerc", "etmerc", "utm", "omerc")
+        # Transverse/oblique Mercator are ZONE projections: x → ∞ at the two points 90° from the
+        # central axis (for `tmerc`, (lon_0±90°, 0)). Those sit 90° from the projection centre
+        # (lon_0, lat_0), so clipping to an ~85° cap around it excludes the singularity and frames the
+        # usable zone. The default AntimeridianClip instead puts the seam at the back of the central
+        # axis, which collapses to a near-vertical line (x≈0): a degenerate spine that blanks the
+        # panel. The cap boundary is not a circle in projected space, so the CircleClip branch of
+        # `boundary_points` traces it. (A general `omerc` with a centre away from (lon_0, lat_0) would
+        # need its true centre; the gallery's prime-meridian aspect is centred there.)
+        return CircleClip(lon0, lat0, 85.0)
     elseif name in ("spilhaus", "guyou", "gringorten", "peirce_q", "ob_tran", "ocea", "oea")
         # Oblique squares: derive the spherical boundary (convex hull of the projected grid,
         # inverse-projected, our stand-in for d3 `reclip`, which traces the in-order outline) and

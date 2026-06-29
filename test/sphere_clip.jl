@@ -21,7 +21,23 @@ _t(d) = G.create_transform(d, _LL)
     @test ct("+proj=igh_o") isa G.PolygonClip
     @test ct("+proj=imoll_o") isa G.PolygonClip      # oceanic interrupted Mollweide
     @test ct("+proj=bertin1953") isa G.ObliqueAntimeridianClip   # rotated Hammer, native Option B
+    @test ct("+proj=tmerc") isa G.CircleClip                 # transverse Mercator: zone cap (Bucket D)
+    @test ct("+proj=omerc +lat_1=45 +lat_2=55") isa G.CircleClip
+    @test ct("+proj=tpeqd +lat_1=60 +lat_2=65") isa G.NoClip # continuous whole-globe: no seam
+    @test ct("+proj=chamb +lat_1=10 +lon_1=30 +lon_2=40") isa G.NoClip
     @test ct("+proj=longlat +over") isa G.NoClip
+end
+
+# Bucket D (narrow): the transverse/oblique Mercator zone cap must give a NON-degenerate spine (the
+# default AntimeridianClip collapsed x to ~0 and blanked the panel), and tpeqd/chamb must not be torn.
+@testset "transverse/oblique Mercator non-blank (Bucket D)" begin
+    for dest in ["+proj=tmerc", "+proj=omerc +lat_1=45 +lat_2=55"]
+        b = filter(p -> isfinite(p[1]) && isfinite(p[2]), G.boundary_points(dest))
+        @test length(b) > 50
+        xspan = maximum(p[1] for p in b) - minimum(p[1] for p in b)
+        yspan = maximum(p[2] for p in b) - minimum(p[2] for p in b)
+        @test xspan > 0.1 * yspan && yspan > 0.1 * xspan    # neither axis collapsed → not blank
+    end
 end
 
 @testset "great-circle intersect (d3 oracle)" begin

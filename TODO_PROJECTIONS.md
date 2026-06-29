@@ -3,8 +3,8 @@
 Working tracker for the visual problems in the `projections.md` gallery. Delete before the PR
 merges. Issues are grouped by **root cause** (not by projection) so each fix lands once across all
 the projections it affects. Buckets A, B, C, F and H (spine crop, pole smoothness, azimuthal/globular
-clip-vs-spine, antimeridian graticule overdraw, polar tick labels) are done and have been removed;
-what remains is the narrow slice of D and the deferred work.
+clip-vs-spine, antimeridian graticule overdraw, polar tick labels) are done and have been removed,
+and the narrow slice of D (`tmerc`/`omerc`/`tpeqd`/`chamb`); what remains is the deferred work.
 
 ## How the rendering works (the three knobs every issue touches)
 
@@ -30,24 +30,21 @@ projections have a seam/domain that is **not** the geographic ±180° meridian, 
 to the default `AntimeridianClip(lon0)`. This is the deferred "oblique family" work (see
 `dev/general_splitting_plan.md` step 5).
 
-**Affected:** Oblique Mercator (`omerc`, **blank**), Transverse Mercator (`tmerc`, **blank**),
-Space Oblique / Landsat (`lsat`), Chamberlin Trimetric (`chamb`), Two-Point Equidistant (`tpeqd`),
-Bipolar Conic (`bipc`), International Map of the World Polyconic (`imw_p`), Icosahedral Snyder
-(`isea`), Guyou (`guyou`, no spine — inverse unavailable, falls to ProjectedClip), Tobler–Mercator
-(pole smear), Oblated Equal-Area (slight top smear).
+**Narrow slice — DONE** (in `clip_strategy`):
+- `tmerc`/`etmerc`/`omerc` were **blank**: their antimeridian seam is the back of the central axis,
+  which collapses to x≈0 (degenerate spine → blanked panel), and `tmerc` also blows up to ∞ at the
+  zone singularity (lon_0±90°, 0). Routed to a `CircleClip` ~85° cap around (lon_0, lat_0), which
+  excludes the singularity and frames the usable zone. (A general `omerc` centred away from
+  (lon_0, lat_0) would need its true centre; the gallery's prime-meridian aspect is centred there.)
+- `tpeqd`/`chamb` drew the **antimeridian through the interior**: they are continuous whole-globe
+  (periodic, f(-180)≡f(180)), so they're routed to `NoClip` — no seam, no tear.
 
-**Hypothesis / sub-cases:**
-- **Blank** (`omerc`, `tmerc`): boundary_points returns empty or all geometry is clipped to the
-  wrong side; the antimeridian seam is in the wrong frame for a transverse/oblique aspect.
-- **Antimeridian-through-interior** (`tpeqd`, `chamb`): the ±180° meridian is *interior* for these
-  full-globe-ish layouts, so drawing it as the seam tears the map.
-- **No native frame** (`lsat`, `bipc`, `imw_p`, `isea`): need a rotated/native working frame or a
-  per-projection domain; genuinely hard.
-
-**Fix approach (this slice, narrow):** special-case `tmerc`/`omerc` first since "blank" is the worst
-look, and stop `tpeqd`/`chamb` drawing the antimeridian through the interior (even if not
-pixel-perfect). The exotics (`bipc`, `imw_p`, `isea`, `lsat`) stay deferred / known-issues.
-**Priority: medium for `tmerc`/`omerc`/`tpeqd`; low for the exotics.**
+**Still deferred (exotics):** Space Oblique / Landsat (`lsat`), Bipolar Conic (`bipc`), International
+Map of the World Polyconic (`imw_p`), Icosahedral Snyder (`isea`) — these have ∞ on the graticule and
+**no native working frame**; they need a rotated/native frame or a per-projection domain (genuinely
+hard). Also minor: Tobler–Mercator (`tobmerc`, pole smear), Oblated Equal-Area (`oea`, slight top
+smear), Guyou (no spine — inverse unavailable, falls to ProjectedClip). **Priority: low.** Document
+as known-imperfect rather than block the PR.
 
 ## Bucket E — square-boundary projections show rounded corners
 
@@ -74,13 +71,11 @@ the convex hull). **Priority: low** (cosmetic, exotic).
 
 ## Suggested plan / order of attack
 
-1. **Medium slice (next up):**
-   - Bucket D, narrow — make `tmerc`/`omerc` non-blank and stop `tpeqd`/`chamb` drawing the
-     antimeridian through the interior (even if not pixel-perfect).
-2. **Deferred / known-issues:**
-   - Bucket D, exotics (`bipc`, `imw_p`, `isea`, `lsat`) and Bucket E (square corners) — document as
-     known imperfect in a short note on the page rather than block the PR.
-   - Bucket G — verify `ocea` orientation.
+The medium slice is done (Bucket F; Bucket D narrow). What remains is all deferred / known-issues:
+
+- Bucket D exotics (`bipc`, `imw_p`, `isea`, `lsat`; minor `tobmerc`/`oea`/`guyou`) and Bucket E
+  (square corners) — document as known-imperfect in a short note on the page rather than block the PR.
+- Bucket G — verify `ocea` orientation.
 
 Re-render the gallery after each slice (`julia --project=docs docs/make.jl`, or the standalone
 generator for structure) and eyeball the panels — per project convention, the figures are reviewed
