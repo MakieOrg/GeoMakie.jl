@@ -1689,14 +1689,17 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
         return _proj_ring(ring, project)
     end
     if clip isa CircleClip
-        # An azimuthal/perspective horizon is an exact circle in projected space, so build the spine
-        # as one rather than great-circle-resampling the geographic horizon ring. For a near-antipode
-        # radius (179.5°, used by aeqd/laea/stere) that ring hugs the geographic antipode, where the
-        # projection is numerically unstable — ellipsoidal `aeqd` flips the projected bearing across
-        # lat≈0, so consecutive horizon points jump to opposite sides of the rim and the left/right
-        # caps get chorded off the disk. Centre the circle at the projected projection-centre and
-        # take the radius from the (stable) projected horizon distance: the unstable points keep the
-        # correct radius (only their angle is wrong), so the max over the sampled ring is robust.
+        # Most CircleClip limbs (azimuthal/perspective horizons, and the hemisphere-clipped globulars)
+        # are an exact circle in projected space. Build that circle directly rather than great-circle-
+        # resampling the geographic horizon ring: for a near-antipode radius (179.5°, aeqd/laea/stere)
+        # the ring hugs the geographic antipode where the projection is numerically unstable —
+        # ellipsoidal `aeqd` flips the projected bearing across lat≈0, so consecutive horizon points
+        # jump to opposite sides of the rim and resampling chords the left/right caps off the disk.
+        # Centre the circle at the projected projection-centre, radius = max projected horizon distance
+        # (the unstable points keep the correct radius, only their angle is wrong, so the max is
+        # robust). A NON-circular limb is left to the generic trace below — e.g. `adams_hemi` maps the
+        # hemisphere into a square, whose diamond spine must not be circularised — detected by a wide
+        # spread of horizon radii.
         _, inv = _rotation(clip)
         project = _projector(ftf)
         c = project(clip.lon0, clip.lat0)
@@ -1708,9 +1711,10 @@ function boundary_points(dest, source = "+proj=longlat +datum=WGS84")
             xy = project(_unrotate(inv, q[1], q[2], false)...)
             _isfinitexy(xy) && push!(radii, hypot(xy[1] - cx, xy[2] - cy))
         end
-        isempty(radii) && return Point2d[]
-        ρ = maximum(radii); n = 720
-        return Point2d[Point2d(cx + ρ * cos(2π * i / n), cy + ρ * sin(2π * i / n)) for i in 0:n]
+        if !isempty(radii) && minimum(radii) >= 0.8 * maximum(radii)   # ~circular limb
+            ρ = maximum(radii); n = 720
+            return Point2d[Point2d(cx + ρ * cos(2π * i / n), cy + ρ * sin(2π * i / n)) for i in 0:n]
+        end
     end
     fwd, inv = _rotation(clip)
     raw = _Pt[]

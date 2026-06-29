@@ -81,15 +81,31 @@ end
         diam = 2 * maximum(hypot(p[1], p[2]) for p in sp)
         maxchord = maximum(hypot(sp[i][1] - sp[i - 1][1], sp[i][2] - sp[i - 1][2]) for i in 2:length(sp))
         @test maxchord < 0.05 * diam                      # no antipode-cap chord (was ~1.0)
-        cx = sum(p -> p[1], sp) / length(sp); cy = sum(p -> p[2], sp) / length(sp)
-        ρ = maximum(hypot(p[1] - cx, p[2] - cy) for p in sp)
-        landmax = 0.0
-        for poly in G.split_geometry(GeoMakie.land(), t), q in GeometryBasics.coordinates(poly.exterior)
-            xy = proj(q[1], q[2])
-            (isfinite(xy[1]) && isfinite(xy[2])) && (landmax = max(landmax, hypot(xy[1] - cx, xy[2] - cy)))
+        # the clipped land does not spill past the spine (was ~26% of vertices for nicol on the
+        # wrong antimeridian-oval spine; rim-hugging land within chord sagitta is the only residual)
+        ring = [(p[1], p[2]) for p in sp]; nr = length(ring)
+        function inpoly(x, y)
+            c = false; j = nr
+            for i in 1:nr
+                xi, yi = ring[i]; xj, yj = ring[j]
+                ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi) && (c = !c)
+                j = i
+            end
+            return c
         end
-        @test landmax <= ρ * 1.001                        # clipped land stays inside the limb
+        out = 0; tot = 0
+        for poly in G.split_geometry(GeoMakie.land(), t), q in GeometryBasics.coordinates(poly.exterior)
+            xy = proj(q[1], q[2]); (isfinite(xy[1]) && isfinite(xy[2])) || continue
+            tot += 1; inpoly(xy[1], xy[2]) || (out += 1)
+        end
+        @test out < 0.10 * tot                            # rim-hugging only (~4%); the bug was ~26%
     end
+    # ...but a non-azimuthal CircleClip limb must NOT be circularised: adams_hemi maps the hemisphere
+    # into a square, so its spine is a diamond (the perfect-circle build is gated to near-180° radii).
+    sp = filter(p -> isfinite(p[1]) && isfinite(p[2]), G.boundary_points("+proj=adams_hemi"))
+    cx = sum(p -> p[1], sp) / length(sp); cy = sum(p -> p[2], sp) / length(sp)
+    rr = [hypot(p[1] - cx, p[2] - cy) for p in sp]
+    @test maximum(rr) / minimum(rr) > 1.2                  # diamond corners vs edge midpoints
 end
 
 @testset "GeoAxis recipe overrides render" begin
