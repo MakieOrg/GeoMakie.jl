@@ -3,11 +3,12 @@
 Working tracker for the visual problems in the `projections.md` gallery. Delete before the PR
 merges. Issues are grouped by **root cause** (not by projection) so each fix lands once across all
 the projections it affects. Buckets A, B, C, F and H (spine crop, pole smoothness, azimuthal/globular
-clip-vs-spine, antimeridian graticule overdraw, polar tick labels) and the narrow slice of D
-(`tmerc`/`omerc`/`tpeqd`/`chamb`) are done and have been removed. Bucket G (`ocea` "upside-down") was
-verified as **correct PROJ output** — north-down is PROJ's bare-`+proj=ocea` oblique aspect,
-reproduced to 0 m and not mirrored, so do **not** add a flip. What remains is the deferred work:
-Bucket D exotics and Bucket E.
+clip-vs-spine, antimeridian graticule overdraw, polar tick labels) are done and have been removed.
+Most of Bucket D is now fixed too — `tmerc`/`etmerc`/`omerc`/`tpeqd`/`chamb`/`lsat`/`isea`/`tobmerc`
+(see below); only the genuinely-hard exotics remain. Bucket G (`ocea` "upside-down") was verified as
+**correct PROJ output** — north-down is PROJ's bare-`+proj=ocea` oblique aspect, reproduced to 0 m and
+not mirrored, so do **not** add a flip. What remains is the deferred work: the Bucket D exotics
+(`bipc`/`imw_p`/`guyou`, minor `oea`) and Bucket E.
 
 ## How the rendering works (the three knobs every issue touches)
 
@@ -28,26 +29,32 @@ Bucket D exotics and Bucket E.
 ## Bucket D — gross smearing + wrong spine (oblique / multi-point family routed to AntimeridianClip)
 
 **Symptom:** land polygons smear toward a single point outside the frame, half the map is missing,
-and the spine is in the wrong place or runs along the antimeridian through the map interior. These
-projections have a seam/domain that is **not** the geographic ±180° meridian, but they fall through
-to the default `AntimeridianClip(lon0)`. This is the deferred "oblique family" work (see
-`dev/general_splitting_plan.md` step 5).
+and the spine is in the wrong place or runs along the antimeridian through the map interior. The
+shared *trigger* is falling through to the default `AntimeridianClip(lon0)`, but the underlying causes
+turned out to be **several distinct issues**, each with its own remedy (in `clip_strategy`):
 
-**Narrow slice — DONE** (in `clip_strategy`):
-- `tmerc`/`etmerc`/`omerc` were **blank**: their antimeridian seam is the back of the central axis,
-  which collapses to x≈0 (degenerate spine → blanked panel), and `tmerc` also blows up to ∞ at the
-  zone singularity (lon_0±90°, 0). Routed to a `CircleClip` ~85° cap around (lon_0, lat_0), which
-  excludes the singularity and frames the usable zone. (A general `omerc` centred away from
-  (lon_0, lat_0) would need its true centre; the gallery's prime-meridian aspect is centred there.)
-- `tpeqd`/`chamb` drew the **antimeridian through the interior**: they are continuous whole-globe
-  (periodic, f(-180)≡f(180)), so they're routed to `NoClip` — no seam, no tear.
+**DONE:**
+- **Degenerate spine + ∞ zone singularity → CircleClip ~85° cap.** `tmerc`/`etmerc`/`omerc` were
+  **blank**: their "antimeridian" is the back of the central axis (collapses to x≈0 → degenerate
+  spine), and `tmerc` blows to ∞ at (lon_0±90°, 0). The cap around (lon_0, lat_0) excludes the
+  singularity and frames the usable zone. (A general `omerc` centred away from (lon_0, lat_0) would
+  need its true centre; the gallery's prime-meridian aspect is centred there.)
+- **Continuous, no real seam → NoClip.** `tpeqd`/`chamb` (compromise globes), `lsat` (space-oblique
+  track), `isea` (icosahedral net) are continuous across ±180° (periodic, f(-180)≡f(180); a
+  dateline step ≈ a mid-map step), so AntimeridianClip only *tears* an interior line. (For `isea` the
+  NoClip spine is the projected lon/lat frame — an approximation of the true icosahedron-net outline.)
+- **Correct seam, just unbounded poles → ±lat clamp.** `tobmerc`'s antimeridian already maps to the
+  left/right edges; it only had the Mercator "pole smear" (y→∞), fixed by the same ±85° clamp as
+  `merc`.
 
-**Still deferred (exotics):** Space Oblique / Landsat (`lsat`), Bipolar Conic (`bipc`), International
-Map of the World Polyconic (`imw_p`), Icosahedral Snyder (`isea`) — these have ∞ on the graticule and
-**no native working frame**; they need a rotated/native frame or a per-projection domain (genuinely
-hard). Also minor: Tobler–Mercator (`tobmerc`, pole smear), Oblated Equal-Area (`oea`, slight top
-smear), Guyou (no spine — inverse unavailable, falls to ProjectedClip). **Priority: low.** Document
-as known-imperfect rather than block the PR.
+**Still deferred — genuinely hard:**
+- **∞ on the graticule, no native frame:** Bipolar Conic (`bipc`, two cones), International Map of the
+  World Polyconic (`imw_p`, blows up across a lat band) — need per-cone / banded domains.
+- **No PROJ inverse → no spine:** Guyou (`guyou`) falls to `ProjectedClip`; land draws but there is no
+  analytic boundary (needs a native square frame).
+- **Minor/cosmetic:** Oblated Equal-Area (`oea`, already `PolygonClip`, slight top smear).
+
+**Priority: low.** Document as known-imperfect rather than block the PR.
 
 ## Bucket E — square-boundary projections show rounded corners
 
@@ -69,11 +76,13 @@ the convex hull). **Priority: low** (cosmetic, exotic).
 
 ## Suggested plan / order of attack
 
-The medium slice is done (Bucket F; Bucket D narrow) and Bucket G is verified. What remains is all
+The medium slice is done (Bucket F; Bucket D narrow), most of Bucket D's exotics are fixed
+(`lsat`/`isea`→NoClip, `tobmerc`→pole clamp), and Bucket G is verified. What remains is all
 deferred / known-issues:
 
-- Bucket D exotics (`bipc`, `imw_p`, `isea`, `lsat`; minor `tobmerc`/`oea`/`guyou`) and Bucket E
-  (square corners) — document as known-imperfect in a short note on the page rather than block the PR.
+- Bucket D — genuinely hard: `bipc`/`imw_p` (∞ on the graticule, no native frame), `guyou` (no PROJ
+  inverse → no spine); minor `oea` (already PolygonClip, slight top smear). And Bucket E (square
+  corners) — document as known-imperfect in a short note on the page rather than block the PR.
 
 Re-render the gallery after each slice (`julia --project=docs docs/make.jl`, or the standalone
 generator for structure) and eyeball the panels — per project convention, the figures are reviewed

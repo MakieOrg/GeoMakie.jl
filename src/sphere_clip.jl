@@ -1820,11 +1820,14 @@ function clip_strategy(t::Proj.Transformation)
         # so the ±π seam doesn't collapse (which smeared Antarctica when unrotating through PROJ).
         fwd, inv = _bertin_rotation()
         return ObliqueAntimeridianClip(fwd, inv, _NativeCentred(_bertin_centred))
-    elseif name in ("tpeqd", "chamb")
-        # Whole-globe compromise projections (two-point equidistant, Chamberlin trimetric) with NO
-        # antimeridian seam: they are continuous across ±180° (the forward is periodic, f(-180)≡f(180)
-        # to <3 m), so the geographic ±180° meridian is just an interior graticule line. Routing them
-        # through the default AntimeridianClip tears the map along that interior line; clip nothing.
+    elseif name in ("tpeqd", "chamb", "lsat", "isea")
+        # Whole-globe projections with NO antimeridian seam — continuous across ±180° (the forward is
+        # periodic, f(-180)≡f(180), and a dateline-straddling step is no bigger than a mid-map one), so
+        # the geographic ±180° meridian is just an interior graticule line. The default AntimeridianClip
+        # tears the map along that interior line, so clip nothing. Covers the two-point equidistant
+        # (`tpeqd`) and Chamberlin trimetric (`chamb`) compromises, the space-oblique/Landsat track
+        # (`lsat`), and the icosahedral Snyder net (`isea`). (For `isea` the NoClip spine is the
+        # projected lon/lat frame, an approximation of the true icosahedron-net outline.)
         return NoClip()
     elseif name in ("tmerc", "etmerc", "utm", "omerc")
         # Transverse/oblique Mercator are ZONE projections: x → ∞ at the two points 90° from the
@@ -1858,9 +1861,11 @@ function clip_strategy(t::Proj.Transformation)
         # oceanic interrupted Goode/Mollweide: same ocean-centred lobe layout, different raw.
         bnd = get!(() -> _interrupted_boundary(_IGH_O_LOBES, lon0), _BOUNDARY_CACHE, def)
         return PolygonClip(bnd)
-    elseif name in ("merc", "webmerc")
-        # normal Mercator: antimeridian seam PLUS a ±lat clamp; y→±∞ at the poles, so without
-        # this Antarctica/Greenland and the spine's ±90 blow the y-limits ~12× past the useful map.
+    elseif name in ("merc", "webmerc", "tobmerc")
+        # Mercator and its Tobler variant: the antimeridian seam is already correct (it maps to the
+        # left/right map edges), but y → ±∞ at the poles, so without a ±lat clamp Antarctica/Greenland
+        # and the spine's ±90° blow the y-limits far past the useful map (the "pole smear"). Clamp to
+        # ±85° as normal Mercator does.
         return AntimeridianClip(lon0, 85.0)
     end
     return AntimeridianClip(lon0)

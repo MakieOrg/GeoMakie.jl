@@ -25,13 +25,19 @@ _t(d) = G.create_transform(d, _LL)
     @test ct("+proj=omerc +lat_1=45 +lat_2=55") isa G.CircleClip
     @test ct("+proj=tpeqd +lat_1=60 +lat_2=65") isa G.NoClip # continuous whole-globe: no seam
     @test ct("+proj=chamb +lat_1=10 +lon_1=30 +lon_2=40") isa G.NoClip
+    @test ct("+proj=lsat +ellps=GRS80 +lat_1=-60 +lat_2=60 +lsat=2 +path=2") isa G.NoClip  # continuous track
+    @test ct("+proj=isea") isa G.NoClip                     # icosahedral net: continuous, no seam
+    @test ct("+proj=tobmerc").lat_max < 90                  # Tobler–Mercator pole clamp (like merc)
     @test ct("+proj=longlat +over") isa G.NoClip
 end
 
-# Bucket D (narrow): the transverse/oblique Mercator zone cap must give a NON-degenerate spine (the
-# default AntimeridianClip collapsed x to ~0 and blanked the panel), and tpeqd/chamb must not be torn.
-@testset "transverse/oblique Mercator non-blank (Bucket D)" begin
-    for dest in ["+proj=tmerc", "+proj=omerc +lat_1=45 +lat_2=55"]
+# Bucket D: the oblique/multi-point family no longer blanks or tears. Each needs a different remedy
+# (CircleClip zone cap for tmerc/omerc; NoClip for the seamless lsat/isea; merc-style pole clamp for
+# tobmerc), but all must yield a finite, non-degenerate spine so the panel frames instead of blanking.
+@testset "oblique/multi-point family non-blank (Bucket D)" begin
+    for dest in ["+proj=tmerc", "+proj=omerc +lat_1=45 +lat_2=55",
+                 "+proj=lsat +ellps=GRS80 +lat_1=-60 +lat_2=60 +lsat=2 +path=2",
+                 "+proj=isea", "+proj=tobmerc"]
         b = filter(p -> isfinite(p[1]) && isfinite(p[2]), G.boundary_points(dest))
         @test length(b) > 50
         xspan = maximum(p[1] for p in b) - minimum(p[1] for p in b)
