@@ -266,6 +266,10 @@ function transformed_limits(scenelike, exclude=(p) -> false)
     return bb_ref[]
 end
 
+# When auto-fit data reaches within this fraction of the projection domain (spine) on an edge, the
+# limit snaps out to the spine so the full boundary is framed instead of cropped a few degrees short.
+const _SPINE_SNAP = 0.1
+
 function Makie.getlimits(la::GeoAxis, dim)
     # find all plots that don't have exclusion attributes set
     # for this dimension
@@ -274,7 +278,7 @@ function Makie.getlimits(la::GeoAxis, dim)
     end
     axis_plots = Set(values(la.elements))
     function exclude(plot)
-        # dont use axis decorations!
+        # dont use axis decorations (grid, ticklabels, AND the spine; see the domain clamp below)!
         plot in axis_plots && return true
         # only use plots with autolimits = true
         to_value(get(plot, dim == 1 ? :xautolimits : :yautolimits, true)) || return true
@@ -283,14 +287,33 @@ function Makie.getlimits(la::GeoAxis, dim)
         # only use visible plots for limits
         return !to_value(get(plot, :visible, true))
     end
-    # get all data limits, minus the excluded plots
-    boundingbox = Makie.boundingbox(la.scene, exclude)
-    # if there are no bboxes remaining, `nothing` signals that no limits could be determined
-    Makie.isfinite_rect(boundingbox) || return nothing
-
-    # otherwise start with the first box
-    mini, maxi = minimum(boundingbox), maximum(boundingbox)
-    return (mini[dim], maxi[dim])
+    # Fit to the DATA, then clamp to the projection's finite domain: exactly cartopy's
+    # `GeoAxes.autoscale_view` (matplotlib autoscale, then bound to `projection.x_limits`/
+    # `y_limits`). The domain here is the spine outline (finite via the conic cutoff cone). The
+    # clamp (a) bounds data that runs to a projection singularity (a pole on a conic) to the map
+    # instead of zooming out to a speck, and (b) frames an empty axis to the full projection.
+    data_bb = Makie.boundingbox(la.scene, exclude)
+    mn = minimum(data_bb)[dim]; mx = maximum(data_bb)[dim]
+    lo = isfinite(mn) ? mn : -Inf
+    hi = isfinite(mx) ? mx : Inf
+    spine = get(la.elements, :spine, nothing)
+    if spine !== nothing
+        dom = Makie.data_limits(spine)
+        dlo = minimum(dom)[dim]; dhi = maximum(dom)[dim]
+        if isfinite(dlo) && isfinite(dhi) && dhi > dlo
+            # When the data already reaches close to a spine edge, snap that edge out to the spine
+            # so the projection boundary shows in full (world land falls a few degrees short of the
+            # pole, but the gallery should frame the whole projection). Otherwise clamp the data
+            # within the domain, so a regional plot stays zoomed to its data. Data running to a
+            # singularity (a pole projecting to ∞ on a conic) is non-finite, so it snaps too.
+            tol = _SPINE_SNAP * (dhi - dlo)
+            lo = (lo - dlo) <= tol ? dlo : max(lo, dlo)
+            hi = (dhi - hi) <= tol ? dhi : min(hi, dhi)
+        end
+    end
+    # if no finite window could be determined, `nothing` signals "leave the limits alone"
+    (isfinite(lo) && isfinite(hi) && hi > lo) || return nothing
+    return (lo, hi)
 end
 
 getxlimits(la::GeoAxis) = getlimits(la, 1)

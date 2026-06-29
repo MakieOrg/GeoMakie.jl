@@ -6,9 +6,27 @@ import GLMakie, CairoMakie
 # some strategic imports to avoid world age issues
 using FHist
 
+# Pre-load Oceananigans (used by the `tripolar` example) up front, swallowing a benign
+# init-time warning: TaylorSeries (pulled in via CubedSphere) carries a stale `Requires`
+# hook whose IntervalArithmetic integration references `IntervalBox`, removed in recent
+# IntervalArithmetic. Loading it here under a `NullLogger` keeps that warning out of the
+# rendered `@example` output; the example's own `using Oceananigans` is then a no-op.
+using Logging
+Logging.with_logger(Logging.NullLogger()) do
+    @eval import Oceananigans
+end
+
 # Set some global settings
 # Good quality CairoMakie with PNG
 CairoMakie.activate!(px_per_unit = 2, type = :png)
+
+# DocumenterVitepress picks the highest-`mime_priority` MIME a figure is showable in, and
+# its default table ranks JPEG (6) above PNG (4) and SVG (3). Every GLMakie (raster) figure
+# advertises JPEG, so any page rendered while GLMakie is the active backend gets saved as
+# lossy, blurry JPEG. Demote JPEG below SVG/PNG so figures render as crisp SVG (CairoMakie
+# vector pages) or lossless PNG (GLMakie pages) instead. (Method override on a build-time
+# helper, intentional, scoped to this docs build.)
+DocumenterVitepress.mime_priority(::MIME"image/jpeg") = 2.5
 # Rasters should download into the artifacts folder (so they can be cached :D)
 raster_data_sources_path = joinpath(first(Base.DEPOT_PATH), "artifacts")
 if haskey(ENV, "CI")
@@ -24,6 +42,12 @@ GeoMakie.earth();
 
 using Literate
 
+# Regenerate the projection gallery page (docs/src/projections.md) from its data-driven source of
+# truth, so every panel shows a self-contained, copy-pasteable code cell. Edit
+# docs/generate_projections.jl, never the generated markdown.
+include(joinpath(@__DIR__, "generate_projections.jl"))
+generate_projections(joinpath(@__DIR__, "src", "projections.md"))
+
 examples = String[
     "basic.jl",
     # "new.jl",
@@ -34,6 +58,7 @@ examples = String[
     "world_population.jl",
     "graph_on_usa.jl",
     "orthographic.jl",
+    "polar_stereo.jl",
     "geostationary_image.jl",
     # "multiple_crs.jl",
     "rasters.jl",
@@ -49,6 +74,7 @@ examples = String[
     joinpath("gmt", "antioquia.jl"),
     "german_lakes.jl",
     "field_and_countries.jl",
+    "tripolar.jl",
     "meshimage.jl",
     # "projections.jl",
     "tissot.jl",
@@ -79,6 +105,7 @@ doc = Documenter.makedocs(;
     pages=[
         "Introduction" => "introduction.md",
         "Gallery" => "examples.md",
+        "Projections" => "projections.md",
         "Data" => "data.md",
         "Developer documentation" => [
             "Nonlinear transforms" => "nonlinear_transforms.md",
@@ -92,7 +119,9 @@ doc = Documenter.makedocs(;
     authors="Anshul Singhvi and the Makie.jl contributors",
     doctest=false,
     warnonly = true,
-    draft = false,
+    # DRAFT=true skips @example/@repl/@setup/@eval evaluation → fast markdown-only build (no code
+    # cells run), for iterating on page structure/prose. Default (DRAFT unset) runs everything.
+    draft = get(ENV, "DRAFT", "false") == "true",
     plugins = [OhMyCards.ExampleConfig(; dot_slash = true),],
     pagesonly = !(get(ENV, "CI", "false") == "true"),
     debug = true,

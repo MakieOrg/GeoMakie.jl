@@ -90,3 +90,21 @@ end
 
     @test a1.scene.viewport[] == a2.scene.viewport[]
 end
+@testset "antimeridian graticule dedup (Bucket F)" begin
+    # The graticule drops the +180° meridian only when it projects onto the -180° one. Oblique /
+    # azimuthal frames drawn with the full transform collapse the two (overdraw → darker seam);
+    # pseudocylindrical and interrupted frames place them on opposite edges and keep both.
+    function coincides(dest)
+        ll = "+proj=longlat +datum=WGS84"
+        t = GeoMakie.create_transform(dest, ll)
+        rotated = GeoMakie.clip_strategy(t) isa GeoMakie.AntimeridianClip
+        gp = GeoMakie._projector(rotated ? GeoMakie.create_transform(GeoMakie._centred_dest(dest), ll) : t)
+        return GeoMakie._antimeridian_coincides(gp, -90.0, 90.0)
+    end
+    @test coincides("+proj=bertin1953")
+    @test coincides("+proj=spilhaus")
+    @test coincides("+proj=aeqd")
+    @test !coincides("+proj=moll")
+    @test !coincides("+proj=igh")
+    @test !coincides("+proj=eqc")
+end
