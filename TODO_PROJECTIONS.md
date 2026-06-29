@@ -62,10 +62,16 @@ they hit the default AntimeridianClip and get neither a square clip nor a square
 with the correct square frame; for `spilhaus` build the boundary from the analytic square rather than
 the convex hull). **Priority: low** (cosmetic, exotic).
 
-## Bucket G — orientation / sanity checks
+## Bucket G — orientation / sanity checks — VERIFIED, no code fix
 
-- **Oblique Cylindrical Equal-Area (`ocea`)** looks upside-down — confirm against PROJ/d3 whether
-  that's the correct orientation before "fixing" it. **Priority: low (verify only).**
+- **Oblique Cylindrical Equal-Area (`ocea`)** — the north-at-bottom look is **PROJ's own output, not a
+  GeoMakie bug.** Verified: (1) GeoMakie's projector equals a raw `Proj.Transformation` for `ocea` to
+  **0 m** (no flip injected); (2) the GeoAxis pipeline has no global flip (`eqc` is north-up, 90°E at
+  right); (3) `ocea` is **orientation-preserving** (signed-area sign matches `eqc`/`cea`, so it is
+  *not* mirrored — continents aren't backwards). PROJ's `ocea` places the N pole at y=−R, S pole at
+  y=+R for the gallery's **bare `+proj=ocea`** (an unparameterized/degenerate oblique aspect — no
+  `lonc`/`alpha`/`lat_1`…). Do **not** add a flip (it would diverge from PROJ). *Optional gallery
+  tweak (not a fix):* give the panel explicit oblique params for a more conventional look.
 
 ---
 
@@ -75,7 +81,7 @@ The medium slice is done (Bucket F; Bucket D narrow). What remains is all deferr
 
 - Bucket D exotics (`bipc`, `imw_p`, `isea`, `lsat`; minor `tobmerc`/`oea`/`guyou`) and Bucket E
   (square corners) — document as known-imperfect in a short note on the page rather than block the PR.
-- Bucket G — verify `ocea` orientation.
+- Bucket G — DONE (verified `ocea` is correct PROJ output, not a bug; see above).
 
 Re-render the gallery after each slice (`julia --project=docs docs/make.jl`, or the standalone
 generator for structure) and eyeball the panels — per project convention, the figures are reviewed
