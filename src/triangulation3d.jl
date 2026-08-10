@@ -111,7 +111,7 @@ function extract_three_unique_and_independent_points(points::Vector{Vector{PT}})
         if length(points[1]) <= 3
             error("Polygon has only three points and they are all collinear, we can't triangulate this!")
         end
-        new_point_idx = findfirst(p -> _collinear(Makie.to_ndim(Point3d, p1, 0.0), Makie.to_ndim(Point3d, p2, 0.0), Makie.to_ndim(Point3d, p), 0.0) != 0, points[1])
+        new_point_idx = findfirst(p -> _collinear(Makie.to_ndim(Point3d, p1, 0.0), Makie.to_ndim(Point3d, p2, 0.0), Makie.to_ndim(Point3d, p, 0.0)) != 0, points[1])
         if isnothing(new_point_idx)
             error("All points in the polygon are collinear, we can't triangulate this!")
         end
