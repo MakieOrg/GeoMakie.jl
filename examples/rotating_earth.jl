@@ -23,7 +23,6 @@ ga = GeoAxis(
     dest = destnode,
 )
 surface!(ga, -180 .. 180, -90 .. 90, zeros(128, 128); color=rotr90(GeoMakie.earth()), interpolate = false, shading = NoShading)
-xlims!(ga, -89, 89) # TODO: FIXME
 fig
 # Now that the figure is set up, we can record an animation.
 record(fig, "rotating_earth_ortho.mp4"; framerate=30) do io

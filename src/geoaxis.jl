@@ -4,6 +4,20 @@
 
 const Rect2d = Rect2{Float64}
 
+# Do lon = -180° and lon = +180° project to the same curve under `gridproj`? They are one physical
+# meridian: pseudocylindrical/interrupted frames place them on opposite map edges (distinct), while
+# oblique/azimuthal frames drawn with the full transform collapse them onto each other (the forward
+# is 360°-periodic). Sampled at the first visible latitude where both project finite.
+function _antimeridian_coincides(gridproj, ylo, yhi)
+    for φ in (35.0, -35.0, 55.0, -55.0, 10.0)
+        (φ < ylo || φ > yhi) && continue
+        a = gridproj(-180.0, φ); b = gridproj(180.0, φ)
+        (all(isfinite, a) && all(isfinite, b)) || continue
+        return hypot(a[1] - b[1], a[2] - b[2]) < 1.0    # coincident to < 1 m ⇒ the same curve
+    end
+    return false
+end
+
 Makie.@Block GeoAxis <: Makie.AbstractAxis begin
     scene::Scene
     targetlimits::Observable{Rect2d}
@@ -191,9 +205,9 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         "The width of the y grid lines."
         ygridwidth::Float64 = 1f0
         "The color of the x grid lines."
-        xgridcolor::RGBAf = RGBAf(0, 0, 0, 0.5)
+        xgridcolor::RGBAf = RGBAf(0, 0, 0, 0.12)   # match Makie's default Axis gridline
         "The color of the y grid lines."
-        ygridcolor::RGBAf = RGBAf(0.0, 0, 0, 0.5)
+        ygridcolor::RGBAf = RGBAf(0.0, 0, 0, 0.12)
         "The linestyle of the x grid lines."
         xgridstyle = nothing
         "The linestyle of the y grid lines."
@@ -238,11 +252,12 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         xminorgridstyle = nothing
         "The linestyle of the y minor grid lines."
         yminorgridstyle = nothing
-        # "Controls if the axis spine is visible."
-        # spinevisible::Bool = true
-        # "The color of the axis spine."
-        # spinecolor::RGBAf = :black
-        # spinetype::Symbol = :geospine
+        "Controls if the projection-boundary spine is visible."
+        spinevisible::Bool = true
+        "The width of the projection-boundary spine."
+        spinewidth::Float64 = 1f0
+        "The color of the projection-boundary spine."
+        spinecolor::RGBAf = RGBAf(0, 0, 0, 1)   # match Makie's default Axis spine
         "The button for panning."
         panbutton::Makie.Mouse.Button = Makie.Mouse.right
         "The key for limiting panning to the x direction."
@@ -594,15 +609,44 @@ function Makie.initialize_block!(axis::GeoAxis)
 
         spines = spines_obs[]
         foreach(empty!, [spines.left, spines.right, spines.bottom, spines.top])
+
+        # Grid line geometry goes through the same sphere-clip dispatch as everything else, so
+        # meridians/parallels break at the projection's discontinuity instead of smearing across
+        # it (antimeridian uses the centred frame, Option B). project_tick_points! is still used
+        # for the spine/tick-label anchors at the limit-rect edges.
+        clip = clip_strategy(trans)
+        rotated = clip isa AntimeridianClip
+        gridproj = _projector(rotated ?
+            create_transform(_centred_dest(to_value(axis.dest)), "+proj=longlat +datum=WGS84") : trans)
+        gridscale = resample_scale(gridproj)
+        function _gridline!(out, pts)
+            for p in split_resample_line(pts, trans; project = gridproj, scale = gridscale, rotated = rotated)
+                push!(out, isnan(p[1]) ? Point2d(NaN, NaN) : Point2d(gridproj(p[1], p[2])...))
+            end
+            push!(out, Point2d(NaN, NaN))
+        end
+
+        # The antimeridian is one physical meridian, but it appears as a tick at both -180° and
+        # +180°. Pseudocylindrical/interrupted frames map those to distinct map edges (draw both);
+        # oblique/azimuthal frames drawn with the full transform map them to the SAME curve
+        # (`f(-180)≡f(180)`, e.g. bertin/aeqd/spilhaus), where drawing both overdraws the seam. Drop
+        # the +180° duplicate only when it actually coincides with -180° (sampled at a visible lat).
+        skip180 = let lo = yticks[1], hi = yticks[end]
+            any(t -> isapprox(t, -180.0; atol = 1.0e-6), xticks) &&
+                any(t -> isapprox(t, 180.0; atol = 1.0e-6), xticks) &&
+                _antimeridian_coincides(gridproj, lo, hi)
+        end
         for lon in xticks
+            (skip180 && isapprox(lon, 180.0; atol = 1.0e-6)) && continue
             range = LinRange(yticks[1], yticks[end], 100)
-            project_tick_points!(lon_transformed, trans, trans_inverse, range, lon, 1, limit_rect, spines.bottom, spines.top)
+            project_tick_points!(Point2d[], trans, trans_inverse, range, lon, 1, limit_rect, spines.bottom, spines.top)
+            _gridline!(lon_transformed, Point2d[Point2d(lon, lat) for lat in range])
         end
 
         for lat in yticks
             range = LinRange(xticks[1], xticks[end], 100)
-            project_tick_points!(lat_transformed, trans, trans_inverse, range, lat, 2, limit_rect,
-                                 spines.left, spines.right)
+            project_tick_points!(Point2d[], trans, trans_inverse, range, lat, 2, limit_rect, spines.left, spines.right)
+            _gridline!(lat_transformed, Point2d[Point2d(lon, lat) for lon in range])
         end
         lonticks_line_obs[] = lon_transformed
         latticks_line_obs[] = lat_transformed
@@ -617,6 +661,19 @@ function Makie.initialize_block!(axis::GeoAxis)
         visible=axis.ygridvisible, linestyle=axis.ygridstyle, transparency=true, inspectable=false)
     translate!(latgridplot, 0, 0, 100)
 
+    # Projection-domain outline (the d3 `.sphere()` boundary of the active clip), drawn as the
+    # axis spine: limb circle for azimuthal horizons, ellipse/rectangle for cylindricals.
+    boundary_obs = lift(axis.dest, axis.source) do dest, src
+        try
+            boundary_points(dest, src)
+        catch
+            Point2d[]
+        end
+    end
+    spineplot = lines!(scene, boundary_obs; color=axis.spinecolor, linewidth=axis.spinewidth,
+        visible=axis.spinevisible, transparency=true, inspectable=false)
+    translate!(spineplot, 0, 0, 100)
+
     # This creates the spines and ticklabels plots for the grid.
     cam = scene.camera
     lon_spine = Obs(SpinePoint[])
@@ -627,37 +684,50 @@ function Makie.initialize_block!(axis::GeoAxis)
     lat_text = Obs(String[])
     lat_points_px = Obs(Point2d[])
 
+    # The spine/tick-label positions feed the axis protrusions, which feed the layout, which
+    # changes `cam.projectionview`, re-triggering this very callback *synchronously* on the same
+    # stack. For most projections that settles in 1–2 passes, but some full-disk azimuthal aspects
+    # (e.g. equatorial `+proj=laea`) never converge and recurse until the stack overflows. Cap the
+    # synchronous re-entry depth: converging projections never approach the cap, while a runaway is
+    # bounded to a finite (near-settled) result instead of crashing.
+    spine_reentry = Ref(0)
     onany(scene, spines_obs, cam.projectionview, vp_unchanged) do spines, pv, area
-        poffset = minimum(area)
-        project_px(p) = to_ndim(Point2d, Makie.project(cam, :data, :pixel, p), 0.0f0) .+ poffset
-        project_p(p) = (input=p.input, projected=project_px(p.projected), dir=p.dir, intersect_dir=p.intersect_dir)
+        spine_reentry[] >= 8 && return
+        spine_reentry[] += 1
+        try
+            poffset = minimum(area)
+            project_px(p) = to_ndim(Point2d, Makie.project(cam, :data, :pixel, p), 0.0f0) .+ poffset
+            project_p(p) = (input=p.input, projected=project_px(p.projected), dir=p.dir, intersect_dir=p.intersect_dir)
 
-        left = project_p.(spines.left)
-        right = project_p.(spines.right)
-        bottom = project_p.(spines.bottom)
-        top = project_p.(spines.top)
+            left = project_p.(spines.left)
+            right = project_p.(spines.right)
+            bottom = project_p.(spines.bottom)
+            top = project_p.(spines.top)
 
-        lonspine = choose_side(left, right)
-        latspine = choose_side(bottom, top)
+            lonspine = choose_side(left, right)
+            latspine = choose_side(bottom, top)
 
-        # Filter out ticks that go almost parallel to boundingbox
-        function too_narrow(p)
-            if isfinite(p.intersect_dir)
-                line_dir = p.intersect_dir
-                a = abs(angle_between(p.dir, line_dir))
-                (a < 0.2 || abs(pi - a) < 0.2) && return false
+            # Filter out ticks that go almost parallel to boundingbox
+            function too_narrow(p)
+                if isfinite(p.intersect_dir)
+                    line_dir = p.intersect_dir
+                    a = abs(angle_between(p.dir, line_dir))
+                    (a < 0.2 || abs(pi - a) < 0.2) && return false
+                end
+                return true
             end
-            return true
+
+            filter!(too_narrow, lonspine)
+            filter!(too_narrow, latspine)
+
+            filter!(p -> filter_too_close(p, latspine), lonspine)
+            filter!(p -> filter_too_close(p, lonspine), latspine)
+            lon_spine[] = lonspine
+            lat_spine[] = latspine
+            return
+        finally
+            spine_reentry[] -= 1
         end
-
-        filter!(too_narrow, lonspine)
-        filter!(too_narrow, latspine)
-
-        filter!(p -> filter_too_close(p, latspine), lonspine)
-        filter!(p -> filter_too_close(p, lonspine), latspine)
-        lon_spine[] = lonspine
-        lat_spine[] = latspine
-        return
     end
 
     onany(lat_spine, axis.xlabelpadding, axis.xticklabelsize) do spine, offset, size
@@ -751,6 +821,10 @@ function Makie.initialize_block!(axis::GeoAxis)
     elements[:ygrid] = latgridplot
     elements[:xticklabels] = lontex
     elements[:yticklabels] = lattex
+    # Register the spine as a decoration (excluded from data limits) AND as the projection-domain
+    # outline that `getlimits` clamps the data window to (cartopy's `projection.x_limits`). See
+    # getlimits in makie-axis.jl.
+    elements[:spine] = spineplot
 
     subtitlepos = lift(axis.blockscene, scene.viewport, axis.titlegap, axis.titlealign, axis.xaxisposition;
         ignore_equal_values=true) do a,
@@ -868,9 +942,13 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
 
     # reset limits ONLY IF the user has not said otherwise
     if reset_limits
-        # some area-like plots basically always look better if they cover the whole plot area.
-        # adjust the limit margins in those cases automatically.
-        Makie.needs_tight_limits(plot) && Makie.tightlimits!(axis)
+        # some area-like plots (meshimage/surface) look better covering the whole plot area, so
+        # tighten the margins, but keep a 1% sliver rather than (0,0) so the projection-boundary
+        # spine, drawn at the very edge of the projected domain, isn't half-clipped by the axis.
+        if Makie.needs_tight_limits(plot)
+            axis.xautolimitmargin = (0.01, 0.01)
+            axis.yautolimitmargin = (0.01, 0.01)
+        end
 
         if Makie.is_open_or_any_parent(axis.scene)
             Makie.reset_limits!(axis)

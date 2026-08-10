@@ -52,13 +52,17 @@ include("utils.jl")
 include("geodesy.jl")
 include("geoticks.jl")
 include("projection.jl")
+include("sphere_clip.jl") # sphere-space clipping + adaptive resampling for discontinuities
 
 include("geoaxis.jl")
+include("contoursplitting_geo.jl") # seam-aware filled contours on a GeoAxis
 include("makie-axis.jl")
 
 # some basic recipes
 include("mesh_image.jl")
 include("linesplitting.jl")
+
+include("polar.jl") # GeoPolarAxis: pole-centred azimuthal maps on a Makie PolarAxis
 
 include("sphere/unit_sphere_transforms.jl")
 include("sphere/icosphere.jl")
@@ -72,7 +76,7 @@ export Proj
 
 export FileIO
 
-export GeoAxis, automatic
+export GeoAxis, GeoPolarAxis, automatic
 export datalims, datalims!
 @deprecate datalims Makie.autolimits
 @deprecate datalims! Makie.reset_limits!
