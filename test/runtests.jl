@@ -8,6 +8,7 @@ Makie.set_theme!(Theme(
 ))
 @testset "GeoMakie" begin
     @testset "Basics" include("basics.jl")
+    @testset "PolygonSplitting" include("polygonsplitting.jl")
     @testset "MeshImage" include("meshimage.jl")
     @testset "GeoAxis" include("geoaxis.jl")
     @testset "GlobeAxis" include("globeaxis.jl")

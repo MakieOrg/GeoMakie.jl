@@ -59,6 +59,8 @@ include("makie-axis.jl")
 # some basic recipes
 include("mesh_image.jl")
 include("linesplitting.jl")
+include("polygonsplitting.jl")
+include("contoursplitting_geo.jl")
 
 include("sphere/unit_sphere_transforms.jl")
 include("sphere/icosphere.jl")
@@ -73,6 +75,7 @@ export Proj
 export FileIO
 
 export GeoAxis, automatic
+export add_cyclic_point
 export datalims, datalims!
 @deprecate datalims Makie.autolimits
 @deprecate datalims! Makie.reset_limits!

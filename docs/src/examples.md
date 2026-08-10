@@ -15,6 +15,7 @@ field_and_countries
 rotating_earth
 histogram
 contours
+antimeridian_contours
 rasters
 multiple_crs
 ```
