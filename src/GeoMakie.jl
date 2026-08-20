@@ -52,6 +52,7 @@ include("utils.jl")
 include("geodesy.jl")
 include("geoticks.jl")
 include("projection.jl")
+include("geoticklabelplacement.jl")
 
 include("geoaxis.jl")
 include("makie-axis.jl")

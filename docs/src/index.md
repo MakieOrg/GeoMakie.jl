@@ -52,6 +52,34 @@ GeoMakie provides a `GeoAxis` type which handles CRS and projections, and variou
 The main entry point to GeoMakie is the function `GeoAxis(fig[i, j]; kw_args...)`.  It creates an axis which accepts nonlinear projections, but is otherwise identical in usage to Makie's `Axis`.
 Projections are accepted as [PROJ-strings](https://proj.org/operations/projections/index.html), and can be set through the `source="+proj=latlong +datum=WGS84"` and `dest="+proj=eqearth"` keyword arguments to `GeoAxis`.
 
+### Geographic tick-label placement
+
+`GeoAxis` places tick labels from sampled projected graticules.  By default,
+longitude labels move vertically and latitude labels move horizontally, like a
+regular Cartesian axis:
+
+```julia
+GeoAxis(fig[1, 1];
+    xticklabelplacement = :axis,
+    yticklabelplacement = :axis,
+)
+```
+
+For oblique projections, labels can instead follow the local sampled boundary
+normal.  The modes can be selected independently for each axis:
+
+```julia
+GeoAxis(fig[1, 1];
+    dest = "+proj=ob_tran +o_proj=eqc +o_lat_p=35 +lon_0=20",
+    xticklabelplacement = :normal,
+    yticklabelplacement = :normal,
+)
+```
+
+Both modes operate in pixel space and respect `xticklabelpad`,
+`yticklabelpad`, and tick-label rotation.  Labels at projection poles or corners
+are omitted when their sampled anchors collapse or overlap.
+
 
 ```@example quickstart
 using CairoMakie, GeoMakie
@@ -135,4 +163,3 @@ See the documentation for examples and basic usage!
 ```@raw html
 </div>
 ```
-
