@@ -133,72 +133,8 @@ function project_to_pixelspace(scene, points::AbstractVector{Point{N, T}}) where
     )
 end
 
-function text_bbox(textstring::AbstractString, fontsize::Union{AbstractVector, Number}, font, fonts, align, rotation, justification, lineheight)
-    glyph_collection = Makie.layout_text(
-            textstring, fontsize,
-            string(font), fonts, align, rotation, justification, lineheight,
-            RGBAf(0,0,0,0), RGBAf(0,0,0,0), 0f0, 0f0
-        )
-
-    return Rect2f(Makie.boundingbox(glyph_collection, Point3f(0), Makie.to_rotation(rotation)))
-end
-
-function find_outvec(scene, tickcoord_in_inputspace, tickcoord_in_dataspace, Δs)
-end
-
 function rotmat(θ)
     return Mat{2, 2}(cos(θ), sin(θ), -sin(θ), cos(θ))
-end
-# Direction finder - find how to displace the tick so that it is out of the axis
-function directional_pad(scene, limits, tickcoord_in_inputspace, ticklabel::AbstractString, tickpad, ticksize, tickfont, tickrotation; ds = 0.01)
-    # Define shorthand functions for dev purposes - these can be removed before release
-    tfunc = x -> Makie.apply_transform(scene.transformation.transform_func[], x)
-    inv_tfunc = x -> Makie.apply_transform(Makie.inverse_transform(scene.transformation.transform_func[]), x)
-    # convert tick coordinate to dataspace
-    tickcoord_in_dataspace = tfunc(tickcoord_in_inputspace)
-    # determine direction to go in order to stay inbounds.
-    xdir = tickcoord_in_inputspace[1] < 0 ? +1 : -1
-    ydir = tickcoord_in_inputspace[2] < 0 ? +1 : -1
-    Δs = iszero(sum(tickpad)) ? Vec2f(0) : Vec2f(xdir, ydir) .* tickpad ./ (sum(tickpad)) * ds
-
-    # find the x and y directions
-    # multiply by the sign in order to have them going outwards at any point
-    Σp = sign(sum(Δs)) * inv_tfunc(tickcoord_in_dataspace + Δs)
-    # project back to pixel space
-    pixel_Δx, pixel_Δy = project_to_pixelspace(scene, Σp) - project_to_pixelspace(scene, tickcoord_in_inputspace)
-    # invert direction - the vectors were previously facing the inside,
-    # now they will face outside .
-    dx = -pixel_Δx
-    dy = -pixel_Δy
-
-    # Correct the angle of displacement
-    θ = atan(dy/dx)
-    # if θ ∈ 0..π && tickpad[1] < tickpad[2]
-    #     dy = -dy
-    #     dx = -dx
-    # elseif θ ∈ -0.5π..0.5π && tickpad[1] > tickpad[2]
-    #     dy = -dy
-    #     dx = -dx
-    # end
-
-    # The vector which is normal to the plot in pixel-space.
-    normal_vec = Vec2f((dx, dy)./sqrt(dx^2 + dy^2))
-
-    # We have computed the normal vector - now we have to get tick extents
-    fonts = theme(scene, :fonts)
-    extents = text_bbox(
-        ticklabel, ticksize,
-        tickfont, fonts, Vec2f(0), tickrotation,
-        0.0, # Makie.to_value(Makie.theme(scene, :justification)),
-        0.0, # Makie.to_value(Makie.theme(scene, :lineheight))
-    )
-
-    padding_vec = normal_vec .* (extents.widths/2) - tickpad
-
-    # println("$ticklabel ($(tickpad)) $(rad2deg(θ)) ⟹ $(_sprinti(normal_vec)) ⟹ $(_sprinti(padding_vec)); $(_sprinti(extents.widths)), $(Σp)")
-
-
-    return padding_vec
 end
 
 """

@@ -96,6 +96,54 @@ ax = GeoAxis(fig[1,1]; dest = "+proj=eqearth +lon_0=180")
 
 _or_ (2), circshift your data appropriately so that the central longitude you want coincides with the center of the longitude dimension of the data.
 
+### Tick label placement
+
+`GeoAxis` reads its tick labels off the projected graticule, so where a label
+goes depends on the shape of the map and not only on the value of the tick.  Two
+placement rules are available, independently per axis.  `:axis`, the default,
+keeps a longitude label directly below its meridian and a latitude label
+directly beside its parallel, the way a Cartesian `Axis` does.  `:normal`
+instead moves each label straight out of the map along the local boundary
+normal, which follows a curved or oblique map outline rather than cutting across
+it.
+
+```@example MAIN
+using GeoMakie, CairoMakie
+
+fig = Figure(size = (900, 340))
+for (i, placement) in enumerate((:axis, :normal))
+    ax = GeoAxis(fig[1, i];
+        dest = "+proj=robin",
+        xticks = -180:60:180, yticks = -60:30:60,
+        xticklabelplacement = placement, yticklabelplacement = placement,
+        title = ":$placement",
+    )
+    lines!(ax, GeoMakie.coastlines(); color = :gray50, linewidth = 0.5)
+end
+fig
+```
+
+Both rules work in pixel space and honour `xticklabelpad`, `yticklabelpad`, and
+tick-label rotation, and both clear the map boundary by the requested padding.
+Where a boundary is too steep for `:axis` placement to reach it without sending
+the label a long way down the page, the direction rotates towards the normal for
+that one label rather than the label being dropped.
+
+A label that could be placed is then left out in two cases.  The first is a
+collision: two labels whose glyph boxes would touch cannot both be drawn, and
+the one nearer the middle of its side wins.  The second is a shared anchor:
+where a meridian and a parallel end on the same pixel -- a corner of the frame,
+or a pole where every meridian converges -- neither label says which of the two
+it names, so both go, unless that would leave the axis with no labels at all.
+
+A graticule that does not reach the map boundary carries no label in the first
+place.  That covers a meridian ending at the pole of a polar projection, in the
+middle of the map; the parallels of the same projection, which are closed
+circles with no endpoint at all; and the meridians of a full orthographic, whose
+limb is not a graticule and so gives them no boundary direction to clear.
+Labelling a closed parallel would need radial placement, which `GeoAxis` does
+not do.
+
 ### Countries loaded with GeoJSON
 ```@example MAIN
 using GeoMakie, CairoMakie

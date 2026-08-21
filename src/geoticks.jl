@@ -55,22 +55,50 @@ The tickfinder has three regimes, defined by the distance between the minimum an
 - ``|vmax - vmin| < threshold``: Use the `alternate_tickfinder` to find ticks.
 - ``!(\\operatorname{isfinite}(vmin) && \\operatorname{isfinite}(vmax))``: `-dvmin:30:dvmax`
 - All other cases: Find ticks in the range `mini:step:maxi`, where `step` is the closest multiple of `(maxi-mini)/multiple` to `dmaxi`.
+
+The result is a `Vector{Float64}` passed through [`snap_tickvalues`](@ref), so
+that tick values are exact enough to compare against and to format.
 """
 function geoticks(dmini, dmaxi, mini, maxi; multiple = 12, threshold = 3, alternate_tickfinder = Makie.WilkinsonTicks(5; k_min = 3))
-    if isfinite(mini) && isfinite(maxi)
+    values = if isfinite(mini) && isfinite(maxi)
             # If the range is sufficiently small, use WilkinsonTicks    
             if abs(maxi - mini) < threshold
-                return Makie.get_tickvalues(alternate_tickfinder, identity, mini, maxi)
+                Makie.get_tickvalues(alternate_tickfinder, identity, mini, maxi)
             else # there's enough space to use a kind of multiples tick
                 mini, maxi = min(maxi, mini), max(maxi, mini)
                 # Find the closest multiple of `(maxi-mini)/multiple` to `dmaxi`.
                 # This is the step size for the ticks.
                 step = max(1, closest_multiple((maxi - mini) / multiple, dmaxi))
-                return dmini:step:dmaxi
+                dmini:step:dmaxi
             end
     else # if the range is infinite, we need to place ticks at all lon/lat combinations.
-        return dmini:30:dmaxi
+        dmini:30:dmaxi
     end
+    return snap_tickvalues(values)
+end
+
+"""
+    snap_tickvalues(values)
+
+Strip floating-point noise from tick values, leaving them exact enough to
+compare against and to format.  A tick finder on an already-zoomed range
+accumulates it: `WilkinsonTicks` over `(-122.6, -122.2)` returns
+`-122.30000000000001`.
+
+Values are rounded two decimal places beyond the smallest gap between them, and
+only if that moves nothing appreciably, so a legitimate value is never altered.
+"""
+function snap_tickvalues(values)
+    result = collect(Float64, values)
+    steps = filter(>(0), abs.(diff(sort(result))))
+    isempty(steps) && return result
+    step = minimum(steps)
+    digits = clamp(-floor(Int, log10(step)) + 2, 0, 12)
+    rounded = round.(result; digits)
+    # Widely spaced ticks imply a coarse precision that a fractional value would
+    # not survive: rounding `[0.5, 1001.0]` to whole degrees loses the `0.5`.
+    maximum(abs, rounded .- result) > 1.0e-6 * step && return result
+    return rounded
 end
 
 """

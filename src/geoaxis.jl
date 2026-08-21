@@ -355,242 +355,346 @@ function clip_segment_to_rect(rect::Rect2, line_start::Point2, line_end::Point2)
 end
 
 """
-    valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n=100)
+    valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n = 100)
 
 Sample a source-space line, project it, and return every connected component
-inside `rect`.  Components are kept in traversal order and their first/last
-rectangle intersection sides are returned alongside them.
+inside `rect`, as `(lines, lines_transformed, intersections, spans)`.
 
-Non-finite projected samples split the input into separate finite runs.  Each
-finite segment is clipped independently, which is important both for
-interrupted projections and for outside-to-outside segments that cross the
-visible rectangle.
+`lines` holds each component's source-space vertices, `lines_transformed` their
+projected counterparts, `intersections` the rectangle edges its two ends were
+clipped against (`nothing` for an end already inside), and `spans` its
+`(first, last)` position along the sampled line, in `[0, 1]`.
+
+The spans are the only ordering that survives the inverse projection, whose
+source coordinates can wrap near an antimeridian.
+
+Non-finite samples and discontinuities break the line into components, and each
+segment is clipped separately so that a segment crossing the rectangle between
+two outside endpoints is still drawn.
 """
-function valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n=100)
-    xrange = LinRange(point_start[1], point_stop[1], n)
-    yrange = LinRange(point_start[2], point_stop[2], n)
+function valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n = 100)
+    # Odd samples are the segment endpoints, even samples their midpoints, which
+    # the continuity test below needs.  One pass projects both.
+    m = 2n - 1
+    xrange = LinRange(point_start[1], point_stop[1], m)
+    yrange = LinRange(point_start[2], point_stop[2], m)
+    sampled = [Point2d(xrange[i], yrange[i]) for i in 1:m]
+    projected = [Point2d(Makie.apply_transform(trans, p)) for p in sampled]
+
+    # Floor the sagitta test at a fraction of the viewport.  Purely relative, it
+    # splits continuous geometry near a projection singularity, where curvature
+    # outruns the chord; a real discontinuity jumps a visible distance.
+    continuity_floor = 1.0e-3 * norm(widths(rect))
+
     lines = Vector{Point2d}[]
     lines_t = Vector{Point2d}[]
-
-    # With non linear transforms, we need to check points inbetween for intersections
-    # So we transform all points first and filter out non finite results
-    was_finite = false
-    for i in 1:n
-        point = Point2d(xrange[i], yrange[i])
-        point_t = Makie.apply_transform(trans, point)
-        if isfinite(point_t)
-            if !was_finite
-                push!(lines, Point2d[])
-                push!(lines_t, Point2d[])
-            end
-            push!(lines[end], point)
-            push!(lines_t[end], point_t)
-            was_finite = true
-        else
-            was_finite = false
-        end
-    end
-
-    lines_inside = Vector{Point2d}[]
-    lines_inside_t = Vector{Point2d}[]
     intersections = Vector{Union{Line{2,Float64},Nothing}}[]
-    for (points, points_t) in zip(lines, lines_t)
-        current_component = 0
-        for (a, b, a_t, b_t) in zip(points[1:end-1], points[2:end], points_t[1:end-1], points_t[2:end])
-            # PROJ's interrupted projections can jump between two finite
-            # coordinates.  A midpoint transformed far away from the chord's
-            # midpoint identifies that discontinuity without using a
-            # projection-specific distance threshold.
-            source_midpoint = Point2d((a + b) / 2)
-            projected_midpoint = Makie.apply_transform(trans, source_midpoint)
-            chord_midpoint = Point2d((a_t + b_t) / 2)
-            chord_length = norm(b_t - a_t)
-            midpoint_error = norm(projected_midpoint - chord_midpoint)
-            continuity_scale = max(chord_length, sqrt(eps(Float64)) * norm(widths(rect)))
-            if !isfinite(projected_midpoint) ||
-                    midpoint_error > 0.25 * continuity_scale
-                current_component = 0
-                continue
-            end
+    spans = Tuple{Float64,Float64}[]
 
-            clipped = clip_segment_to_rect(rect, a_t, b_t)
-            if isnothing(clipped)
-                current_component = 0
-                continue
-            end
+    current = 0
+    for i in 1:2:(m - 2)
+        a, b = sampled[i], sampled[i + 2]
+        a_t, b_t = projected[i], projected[i + 2]
+        if !(isfinite(a_t) && isfinite(b_t))
+            current = 0
+            continue
+        end
 
-            clipped_start_t, clipped_stop_t, start_side, stop_side, t_start, t_stop = clipped
-            # A tangent contact is a point, not a drawable connected component.
-            clipped_start_t == clipped_stop_t && continue
+        # PROJ's interrupted projections can jump between two finite
+        # coordinates.  A midpoint transformed far from the chord's midpoint
+        # identifies that without a projection-specific distance threshold.
+        midpoint_t = projected[i + 1]
+        chord = norm(b_t - a_t)
+        sagitta = norm(midpoint_t - Point2d((a_t + b_t) ./ 2))
+        if !isfinite(midpoint_t) || sagitta > 0.25 * max(chord, continuity_floor)
+            current = 0
+            continue
+        end
 
-            clipped_start = if iszero(t_start)
-                a
-            else
-                Makie.apply_transform(trans_rev, clipped_start_t)
-            end
-            clipped_stop = if isone(t_stop)
-                b
-            else
-                Makie.apply_transform(trans_rev, clipped_stop_t)
-            end
+        clipped = clip_segment_to_rect(rect, a_t, b_t)
+        if isnothing(clipped)
+            current = 0
+            continue
+        end
+        clipped_start_t, clipped_stop_t, start_side, stop_side, t_start, t_stop = clipped
+        # A tangent contact is a point, not a drawable connected component.
+        clipped_start_t == clipped_stop_t && continue
 
-            # Consecutive clipped segments share an exact transformed sample.
-            # Otherwise an out-of-bounds gap separates two components.
-            continues_component = current_component > 0 &&
-                lines_inside_t[current_component][end] == clipped_start_t
-            if !continues_component
-                push!(lines_inside, Point2d[])
-                push!(lines_inside_t, Point2d[])
-                push!(intersections, Union{Line{2,Float64},Nothing}[start_side, stop_side])
-                current_component = length(lines_inside)
-                push!(lines_inside[current_component], clipped_start, clipped_stop)
-                push!(lines_inside_t[current_component], clipped_start_t, clipped_stop_t)
-            else
-                push!(lines_inside[current_component], clipped_stop)
-                push!(lines_inside_t[current_component], clipped_stop_t)
-                intersections[current_component][2] = stop_side
-            end
+        clipped_start = iszero(t_start) ? a : Point2d(Makie.apply_transform(trans_rev, clipped_start_t))
+        clipped_stop = isone(t_stop) ? b : Point2d(Makie.apply_transform(trans_rev, clipped_stop_t))
+        span_start = (i - 1 + 2t_start) / (m - 1)
+        span_stop = (i - 1 + 2t_stop) / (m - 1)
+
+        # Consecutive clipped segments share an exact transformed sample.
+        # Otherwise an out-of-bounds gap separates two components.
+        if current > 0 && lines_t[current][end] == clipped_start_t
+            push!(lines[current], clipped_stop)
+            push!(lines_t[current], clipped_stop_t)
+            intersections[current][2] = stop_side
+            spans[current] = (spans[current][1], span_stop)
+        else
+            push!(lines, Point2d[clipped_start, clipped_stop])
+            push!(lines_t, Point2d[clipped_start_t, clipped_stop_t])
+            push!(intersections, Union{Line{2,Float64},Nothing}[start_side, stop_side])
+            push!(spans, (span_start, span_stop))
+            current = length(lines)
         end
     end
-    return lines_inside, lines_inside_t, intersections
+    return lines, lines_t, intersections, spans
 end
 
-function add_to_lines!(result, valid_line, line_transformed, intersections, spine_start, spine_end, dim)
-    varying_dim = dim == 1 ? 2 : 1
-    # Sampling is monotonic in source space.  Reverse whole components when
-    # necessary instead of independently sorting their vertices, which would
-    # destroy path order for interrupted or folded projections.
-    if valid_line[1][varying_dim] > valid_line[end][varying_dim]
-        valid_line = reverse(valid_line)
-        line_transformed = reverse(line_transformed)
-        intersections = reverse(intersections)
-    end
+"""
+    boundary_tangent(trans, point, dim; step = 0.01)
 
+The projected direction of the map's own boundary at a graticule endpoint, in
+degrees-based source coordinates.
+
+Where the viewport did not cut the graticule off, the boundary is the graticule
+of the *other* family through the same point: an extreme parallel closes off a
+meridian, an extreme meridian closes off a parallel.  That is what a tick label
+has to clear.  The graticule's own direction is not -- near a pole it swings
+inward and would drag the label in with it.
+
+The boundary of a projection whose limb is not a graticule, such as an oblique
+orthographic, is only approximated this way.
+
+Returns a zero or nonfinite direction where the boundary itself is degenerate,
+as at a projection pole that is a single point.
+"""
+function boundary_tangent(trans, point, dim; step = 1.0e-2)
+    # Stepping past +/-180 degrees of longitude wraps to the far side of the map,
+    # which would measure the antimeridian instead of the boundary.
+    limit = dim == 1 ? 180.0 : 90.0
+    center = clamp(point[dim], -limit + step, limit - step)
+    at(offset) = Makie.apply_transform(trans, Point2d(
+        dim == 1 ? (center + offset, point[2]) : (point[1], center + offset)))
+    low, high = at(-step), at(step)
+    (isfinite(low) && isfinite(high)) || return Point2d(NaN)
+    return Point2d(high .- low)
+end
+
+function add_to_lines!(result, trans, valid_line, line_transformed, intersections, coordinate, dim,
+                       spine_start, spine_end)
     append!(result, line_transformed)
     push!(result, Point2d(NaN))
 
-    # Add normal vector for ticks
+    # Restore the exact tick coordinate the graticule was traced at.  Inverting a
+    # clipped endpoint through PROJ only recovers it to floating-point accuracy
+    # -- latitude zero comes back as -8.39e-16 -- and a label reports that value.
+    anchor_input(p) = dim == 1 ? Point2d(coordinate, p[2]) : Point2d(p[1], coordinate)
+    # A clipped end lies on a viewport edge, which is the boundary there; an
+    # unclipped one lies on the edge of the map itself.
+    edge(line, p) = isnothing(line) ? boundary_tangent(trans, p, dim) :
+        Point2d(line[1] .- line[2])
     i_start, i_end = intersections
 
     if !isnothing(spine_start)
         v1_t, v2_t = line_transformed[1], line_transformed[2]
-        dir = normalize(v1_t .- v2_t)
-        if !isnothing(i_start)
-            intersect_dir = i_start[1] .- i_start[2]
-        else
-            intersect_dir = Point2d(NaN)
-        end
-        push!(spine_start, (input=valid_line[1], projected=v1_t, dir=dir, intersect_dir=intersect_dir))
+        push!(spine_start, (
+            input = anchor_input(valid_line[1]),
+            projected = v1_t,
+            dir = normalize(v1_t .- v2_t),
+            intersect_dir = edge(i_start, valid_line[1]),
+        ))
     end
 
     if !isnothing(spine_end)
-        s_1_t, s_2_t = line_transformed[end], line_transformed[end-1]
-        dir = normalize(s_1_t .- s_2_t)
-        if !isnothing(i_end)
-            intersect_dir = i_end[1] .- i_end[2]
-        else
-            intersect_dir = Point2d(NaN)
-        end
-        push!(spine_end, (input=valid_line[end], projected=s_1_t, dir=dir, intersect_dir=intersect_dir))
+        s1_t, s2_t = line_transformed[end], line_transformed[end - 1]
+        push!(spine_end, (
+            input = anchor_input(valid_line[end]),
+            projected = s1_t,
+            dir = normalize(s1_t .- s2_t),
+            intersect_dir = edge(i_end, valid_line[end]),
+        ))
     end
+    return
 end
 
-function project_tick_points!(result, trans, trans_inverse, range, coordinate, dim, limit_rect, spine_start, spine_end)
-    # dim == 1, is for longitude ticks
+function project_tick_points!(result, trans, trans_inverse, range, coordinate, dim, limit_rect,
+                              spine_start, spine_end)
+    # dim == 1 traces a meridian at constant longitude, dim == 2 a parallel.
+    point_fun(tick) = dim === 1 ? Point2d(coordinate, tick) : Point2d(tick, coordinate)
 
-    point_fun(tick) = dim === 1 ? Point2(coordinate, tick) : Point2(tick, coordinate)
-
-    start = point_fun(range[1])
-    stop = point_fun(range[end])
-
-    lines, lines_transformed, intersections = valid_line_in_limits(trans, trans_inverse, limit_rect, start, stop)
+    lines, lines_transformed, intersections, spans = valid_line_in_limits(
+        trans, trans_inverse, limit_rect, point_fun(range[1]), point_fun(range[end]))
     valid_components = findall(i -> length(lines[i]) >= 2, eachindex(lines))
     isempty(valid_components) && return
 
-    # A graticule may have several visible components.  The source-space
-    # extrema, which can belong to different components, are its genuine two
-    # endpoints.  Selecting them explicitly prevents a short first component
-    # from donating both tick anchors.
-    varying_dim = dim == 1 ? 2 : 1
-    start_component = argmin(i -> minimum(p[varying_dim] for p in lines[i]), valid_components)
-    end_component = argmax(i -> maximum(p[varying_dim] for p in lines[i]), valid_components)
+    # A graticule may have several visible components.  Take its outer endpoints
+    # from the earliest and latest ones, which the spans identify; a short first
+    # component would otherwise donate both anchors.
+    start_component = argmin(i -> spans[i][1], valid_components)
+    end_component = argmax(i -> spans[i][2], valid_components)
+
+    # A component that comes back to where it started has no endpoint on the map
+    # boundary: every parallel of a polar projection is a circle in the middle of
+    # the map, and anchoring a label where its trace happens to begin would draw
+    # it over the data.  The traced range stops a little short of a full turn, so
+    # the gap is measured against the component's own length rather than against
+    # a fixed distance.  A clipped end is on the viewport edge and always counts.
+    function has_endpoints(i)
+        any(!isnothing, intersections[i]) && return true
+        c = lines_transformed[i]
+        arc = sum(j -> norm(c[j + 1] - c[j]), 1:(length(c) - 1); init = 0.0)
+        return norm(c[end] - c[1]) >= 0.1 * arc
+    end
 
     for i in valid_components
+        ends = has_endpoints(i)
         add_to_lines!(
-            result, lines[i], lines_transformed[i], intersections[i],
-            i == start_component ? spine_start : nothing,
-            i == end_component ? spine_end : nothing,
-            dim,
+            result, trans, lines[i], lines_transformed[i], intersections[i], coordinate, dim,
+            ends && i == start_component ? spine_start : nothing,
+            ends && i == end_component ? spine_end : nothing,
         )
     end
     return
 end
 
-function _geo_ticklabel_strings(formatter, values)
-    if formatter isa Makie.Automatic
-        return geoformat_ticklabels(values)
+"""
+    is_high_side(sample, component, middle)
+
+Whether a projected graticule endpoint belongs to the high side of `component`:
+`:right` for component 1, `:top` for component 2.
+
+The outward direction decides, which survives longitude wrapping, oblique poles,
+and reversed axes.  Where that component is too small to trust, the anchor's
+position relative to the viewport centre `middle` decides instead.  Every anchor
+is classified; one dropped here is a tick label lost.
+"""
+function is_high_side(sample, component, middle)
+    outward = outward_frame(sample)
+    if !isnothing(outward) && abs(outward[component]) > sin(TICKLABEL_TANGENCY)
+        return outward[component] > 0
     end
-    return Makie.get_ticklabels(formatter, values)
+    return sample.projected[component] >= middle[component]
 end
 
-function _geo_ticklabel_candidates(
-        samples, coordinate_dim, side, formatter, font, fontsize, pad, rotation, mode;
-        corner_anchors = SpinePoint[], occupied = Rect2d[], collision_gap = 2.0)
-    mode = _geo_ticklabel_mode(mode)
-    side = _geo_ticklabel_side(side)
-    isempty(samples) && return (Point2d[], Any[], NamedTuple[])
+"""Format `values` with a user formatter, or with GeoMakie's degree formatter."""
+function ticklabel_strings(formatter, values)
+    formatter isa Makie.Automatic && return geoformat_ticklabels(values)
+    labels = Makie.get_ticklabels(formatter, values)
+    length(labels) == length(values) || throw(ArgumentError(
+        "tick formatter returned $(length(labels)) labels for $(length(values)) tick values"))
+    return labels
+end
 
-    values = [round(p.input[coordinate_dim]; sigdigits = 3) for p in samples]
-    labels = _geo_ticklabel_strings(formatter, values)
-    length(labels) == length(samples) || error(
-        "tick formatter returned $(length(labels)) labels for $(length(samples)) ticks")
+"""
+    ticklabel_candidates(samples, tickvalues, labels, dim, side, font, fontsize, fonts,
+                         pad, rotation, mode; corner_anchors, occupied, collision_gap)
 
-    # Prefer labels near the middle of a side.  This makes overlap filtering
-    # stable and keeps the most informative central label when anchors collapse
-    # at a projection pole.
-    tangential_dim = side in (:bottom, :top) ? 1 : 2
-    side_middle = median([p.projected[tangential_dim] for p in samples])
-    priority = sortperm(eachindex(samples); by = i ->
-        abs(samples[i].projected[tangential_dim] - side_middle))
+Place one side's tick labels and drop the ones that collide.
 
-    accepted = NamedTuple[]
-    accepted_indices = Int[]
-    accepted_boxes = Rect2d[occupied...]
+`samples` are that side's projected endpoints, each carrying its exact tick value
+in component `dim`, which indexes into `tickvalues`/`labels`.  Those cover the
+whole tick vector rather than the visible subset, so that a user formatter sees
+the same input however many graticules are on screen.
+
+Returns `(positions, labels, placements, protrusion)`, the first three ordered by
+tick value.
+"""
+function ticklabel_candidates(
+        samples, tickvalues, labels, dim, side, font, fontsize, fonts, pad, rotation, mode;
+        corner_anchors = Point2d[], corner_atol = 0.0, occupied = Rect2{Float64}[],
+        collision_gap = 2.0,
+    )
+    isempty(samples) && return (Point2d[], Any[], NamedTuple[], 0.0f0)
+
+    # Resolve collisions from the centre of the side outward, measured where the
+    # labels are drawn: the central label is the one worth keeping when anchors
+    # crowd at a projection pole, and the order graticules were traced in stops
+    # mattering.  The midpoint of the projected extent, not the median, which
+    # drifts toward wherever anchors bunch up.
+    tangential = side in (:bottom, :top) ? 1 : 2
+    low, high = extrema(p.projected[tangential] for p in samples)
+    middle = (low + high) / 2
+    priority = sortperm(eachindex(samples);
+        by = i -> abs(samples[i].projected[tangential] - middle))
+
+    placements = NamedTuple[]
+    placement_labels = Any[]
+    placement_values = Float64[]
+    corner_fallback = nothing
     for i in priority
         sample = samples[i]
         isfinite(sample.input) || continue
-        _geo_ticklabel_corner_anchor(sample, corner_anchors) && continue
+        tick = findfirst(==(sample.input[dim]), tickvalues)
+        isnothing(tick) && continue
 
-        bb = Makie.text_bb(string(labels[i]), font, fontsize)
-        half_extents = Point2d(widths(bb) ./ 2)
-        placement = _geo_ticklabel_placement(
-            samples, i, side, half_extents, pad; mode, rotation)
+        label = labels[tick]
+        placement = place_ticklabel(
+            sample, side, label_extents(label, font, fontsize, fonts), pad; mode, rotation)
         isnothing(placement) && continue
-        collides = any(accepted_boxes) do other
-            _geo_ticklabel_bboxes_overlap(placement.bbox, other) ||
-                _geo_ticklabel_bbox_gap(placement.bbox, other) < collision_gap
-        end
-        collides && continue
 
-        push!(accepted, placement)
-        push!(accepted_indices, i)
-        push!(accepted_boxes, placement.bbox)
+        if corner_anchor(sample.projected, corner_anchors, corner_atol)
+            # Anchors shared with the orthogonal axis are suppressed.  Dropping
+            # both is right at a rectangular corner, but every meridian of an
+            # elliptical projection ends at a pole, so keep the central one
+            # rather than leaving the axis unlabelled.
+            isnothing(corner_fallback) &&
+                (corner_fallback = (placement, label, sample.input[dim]))
+            continue
+        end
+
+        push!(placements, placement)
+        push!(placement_labels, label)
+        push!(placement_values, sample.input[dim])
+    end
+    if isempty(placements) && !isnothing(corner_fallback)
+        push!(placements, corner_fallback[1])
+        push!(placement_labels, corner_fallback[2])
+        push!(placement_values, corner_fallback[3])
+    end
+    # Reserve space for every candidate, not only the ones surviving the filter
+    # below.  Which labels collide depends on the size of the scene, and this
+    # number decides that size; feeding the filtered set back would let the
+    # layout chase one label in and out of the frame forever.
+    protrusion = ticklabel_protrusion(placements, side)
+
+    accepted = Int[]
+    boxes = copy(occupied)
+    for (i, placement) in enumerate(placements)
+        any(box -> bbox_gap(placement.bbox, box) < collision_gap, boxes) && continue
+        push!(accepted, i)
+        push!(boxes, placement.bbox)
     end
 
-    order = sortperm(accepted_indices)
-    indices = accepted_indices[order]
-    placements = accepted[order]
+    order = accepted[sortperm(placement_values[accepted])]
     return (
-        Point2d[p.center for p in placements],
-        Any[labels[i] for i in indices],
-        placements,
+        Point2d[placements[i].center for i in order],
+        Any[placement_labels[i] for i in order],
+        NamedTuple[placements[i] for i in order],
+        protrusion,
     )
+end
+
+"""
+    ticklabel_protrusion(placements, side)
+
+How far the labels of `side` reach beyond their graticule endpoints, along that
+side's outward axis.
+
+Measured from the anchors rather than from the viewport, so that the layout loop
+`labels -> viewport -> protrusion -> labels` gains no coupling.  An anchor inside
+the viewport therefore over-reserves, which is the safe direction.
+
+Rounded up to whole pixels: reserving space moves the anchors by a fraction of a
+pixel and this reach with them, and without a quantum the layout can chase a
+two-cycle instead of settling.
+"""
+function ticklabel_protrusion(placements, side)
+    isempty(placements) && return 0.0f0
+    outward = axis_direction(side)
+    component = side in (:bottom, :top) ? 2 : 1
+    reach = maximum(placements) do p
+        dot(p.center - p.anchor, outward) + widths(p.bbox)[component] / 2
+    end
+    return Float32(max(0.0, ceil(reach)))
 end
 
 function Makie.initialize_block!(axis::GeoAxis)
 
-    _geo_ticklabel_mode(axis.xticklabelplacement[])
-    _geo_ticklabel_mode(axis.yticklabelplacement[])
+    ticklabel_mode(axis.xticklabelplacement[])
+    ticklabel_mode(axis.yticklabelplacement[])
 
     # Set up transformations first, so that the scene can be set up
     # and linked to those.
@@ -634,6 +738,12 @@ function Makie.initialize_block!(axis::GeoAxis)
     lonticks_line_obs = Obs(Point2d[])
     latticks_line_obs = Obs(Point2d[])
 
+    # The complete tick vectors behind the graticules, so that a user formatter
+    # sees all of them and not just the ones reaching a boundary.  Read
+    # non-reactively below: anything changing them also notifies `spines_obs`.
+    xtickvalues_obs = Observable(Float64[])
+    ytickvalues_obs = Observable(Float64[])
+
     spines_obs = Obs(Spines())
     finallimits = map(identity, scene, axis.finallimits; ignore_equal_values=true)
     vp_unchanged = map(identity, scene, scene.viewport; ignore_equal_values=true)
@@ -644,9 +754,9 @@ function Makie.initialize_block!(axis::GeoAxis)
     # project them.  Those are stored in Observables which are used to produce
     # lineplots later on that form the grid.
     # TODO: implement a minor grid.
-    onany(scene, axis.xticks, axis.yticks, axis.limits,
+    onany(scene, axis.xticks, axis.yticks,
         transform_ticks_obs, finallimits, vp_unchanged;
-        update=true) do user_xticks, user_yticks, user_limits, trans, fl, vp
+        update=true) do user_xticks, user_yticks, trans, fl, vp
 
         lon_transformed = Point2d[]
         lat_transformed = Point2d[]
@@ -657,41 +767,31 @@ function Makie.initialize_block!(axis::GeoAxis)
         xlims = Makie.xlimits(limits_t)
         ylims = Makie.ylimits(limits_t)
 
-        # Inverse projection is ambiguous across a shifted antimeridian.  When
-        # the user supplied source-space limits, retain those as the tracing
-        # range instead of accepting PROJ's normalized longitude branch.
-        requested_xlims, requested_ylims = Makie.convert_limit_attribute(user_limits)
-        trace_xlims = if requested_xlims isa Tuple && all(!isnothing, requested_xlims)
-            extrema(Float64.(requested_xlims))
-        else
-            xlims
-        end
-        trace_ylims = if requested_ylims isa Tuple && all(!isnothing, requested_ylims)
-            extrema(Float64.(requested_ylims))
-        else
-            ylims
-        end
-
-        xticks = user_xticks isa Makie.Automatic ? geoticks(-180, 180, xlims...) : Makie.get_tickvalues(user_xticks, xlims...)
-        yticks = user_yticks isa Makie.Automatic ? geoticks(-90, 90, ylims...) : Makie.get_tickvalues(user_yticks, ylims...)
+        xtickvalues = collect(Float64,
+            user_xticks isa Makie.Automatic ? geoticks(-180, 180, xlims...) :
+                Makie.get_tickvalues(user_xticks, xlims...))
+        ytickvalues = collect(Float64,
+            user_yticks isa Makie.Automatic ? geoticks(-90, 90, ylims...) :
+                Makie.get_tickvalues(user_yticks, ylims...))
 
         spines = spines_obs[]
-        foreach(empty!, [spines.left, spines.right, spines.bottom, spines.top])
-        for lon in xticks
-            # Tick values select graticules; they must not also truncate them.
-            # Trace each one across the complete inverse-transformed view and
-            # let `valid_line_in_limits` clip it in projected space.
-            range = LinRange(trace_ylims..., 100)
-            project_tick_points!(lon_transformed, trans, trans_inverse, range, lon, 1, limit_rect, spines.bottom, spines.top)
+        foreach(empty!, (spines.left, spines.right, spines.bottom, spines.top))
+        # Tick values select graticules; they must not also truncate them.  Trace
+        # each one across the whole inverse-transformed view and let
+        # `valid_line_in_limits` clip it in projected space.
+        for lon in xtickvalues
+            project_tick_points!(lon_transformed, trans, trans_inverse, ylims, lon, 1, limit_rect,
+                                 spines.bottom, spines.top)
         end
-
-        for lat in yticks
-            range = LinRange(trace_xlims..., 100)
-            project_tick_points!(lat_transformed, trans, trans_inverse, range, lat, 2, limit_rect,
+        for lat in ytickvalues
+            project_tick_points!(lat_transformed, trans, trans_inverse, xlims, lat, 2, limit_rect,
                                  spines.left, spines.right)
         end
+
         lonticks_line_obs[] = lon_transformed
         latticks_line_obs[] = lat_transformed
+        xtickvalues_obs[] = xtickvalues
+        ytickvalues_obs[] = ytickvalues
         notify(spines_obs)
         return
     end
@@ -723,17 +823,26 @@ function Makie.initialize_block!(axis::GeoAxis)
             )
         end
 
-        # Longitude wrapping can make the source-low endpoint land on the
-        # visual right and the source-high endpoint land on the visual left.
-        # Classify latitude anchors by their projected outward direction rather
-        # than trusting source-space low/high naming.
-        latitude_anchors = vcat(project_p.(spines.left), project_p.(spines.right))
-        left = sort(filter(p -> isfinite(p.dir) && p.dir[1] < 0, latitude_anchors);
-            by = p -> p.input[2])
-        right = sort(filter(p -> isfinite(p.dir) && p.dir[1] > 0, latitude_anchors);
-            by = p -> p.input[2])
-        bottom = sort(project_p.(spines.bottom); by = p -> p.input[1])
-        top = sort(project_p.(spines.top); by = p -> p.input[1])
+        # Source-space low/high naming does not survive projection: wrapping, an
+        # oblique pole, or a reversed axis can put the low endpoint on the
+        # visually high side.  Reclassify and sort in pixel space, which also
+        # makes "along the side" mean the same here and in
+        # `ticklabel_candidates`.
+        middle = Point2d(minimum(area) .+ widths(area) ./ 2)
+        function split_sides(anchors, component)
+            low, high = SpinePoint[], SpinePoint[]
+            for p in anchors
+                push!(is_high_side(p, component, middle) ? high : low, p)
+            end
+            tangential = component == 1 ? 2 : 1
+            by = p -> p.projected[tangential]
+            return sort!(low; by), sort!(high; by)
+        end
+
+        left, right = split_sides(
+            vcat(project_p.(spines.left), project_p.(spines.right)), 1)
+        bottom, top = split_sides(
+            vcat(project_p.(spines.bottom), project_p.(spines.top)), 2)
         pixel_spines[] = Spines(top, bottom, left, right)
         return
     end
@@ -753,6 +862,14 @@ function Makie.initialize_block!(axis::GeoAxis)
     )
 
     fonts = theme(axis.blockscene, :fonts)
+    # Protrusions come from the placements below, so that the space reserved is
+    # the space the labels need.  Reserving it resizes the scene, which moves the
+    # labels, which changes what they need; `reserved` only ever grows within a
+    # layout pass so that loop terminates.  See `ticklabel_protrusion`.
+    x_protrusion = Obs(0.0f0)
+    y_protrusion = Obs(0.0f0)
+    reserved = Ref((0.0f0, 0.0f0))
+    reserved_for = Ref{Any}(nothing)
     onany(
         scene, pixel_spines, axis.xaxisposition, axis.yaxisposition,
         axis.xtickformat, axis.ytickformat,
@@ -761,75 +878,70 @@ function Makie.initialize_block!(axis::GeoAxis)
         axis.xticklabelpad, axis.yticklabelpad,
         axis.xticklabelrotation, axis.yticklabelrotation,
         axis.xticklabelplacement, axis.yticklabelplacement,
+        axis.xticklabelsvisible, axis.yticklabelsvisible,
     ) do spines, xside, yside, xformat, yformat, xfont, yfont,
-            xsize, ysize, xpad, ypad, xrotation, yrotation, xmode, ymode
+            xsize, ysize, xpad, ypad, xrotation, yrotation, xmode, ymode,
+            xvisible, yvisible
         xside in (:bottom, :top) || throw(ArgumentError(
             "xaxisposition must be :bottom or :top, got $xside"))
         yside in (:left, :right) || throw(ArgumentError(
             "yaxisposition must be :left or :right, got $yside"))
-        _geo_ticklabel_mode(xmode)
-        _geo_ticklabel_mode(ymode)
+        ticklabel_mode(xmode)
+        ticklabel_mode(ymode)
 
-        xsamples = getproperty(spines, xside)
-        ysamples = getproperty(spines, yside)
-        xpositions, xlabels, xplacements = _geo_ticklabel_candidates(
-            xsamples, 1, xside, xformat, Makie.to_font(fonts, xfont),
-            xsize, xpad, xrotation, xmode,
+        xvalues, yvalues = xtickvalues_obs[], ytickvalues_obs[]
+        # Suppress anchors shared by a meridian and a parallel, on both axes:
+        # otherwise whichever axis is resolved first keeps its label.
+        xcorners = Point2d[p.projected for p in vcat(spines.left, spines.right)]
+        ycorners = Point2d[p.projected for p in vcat(spines.bottom, spines.top)]
+        corner_atol = TICKLABEL_COLLAPSE * norm(widths(scene.viewport[]))
+
+        xpositions, xlabels, xplacements, xreach = ticklabel_candidates(
+            getproperty(spines, xside), xvalues, ticklabel_strings(xformat, xvalues),
+            1, xside, Makie.to_font(fonts, xfont), xsize, fonts, xpad, xrotation, xmode;
+            corner_anchors = xcorners, corner_atol,
         )
-        ypositions, ylabels, _ = _geo_ticklabel_candidates(
-            ysamples, 2, yside, yformat, Makie.to_font(fonts, yfont),
-            ysize, ypad, yrotation, ymode;
-            corner_anchors = vcat(spines.bottom, spines.top),
-            occupied = Rect2d[p.bbox for p in xplacements],
+        ypositions, ylabels, yplacements, yreach = ticklabel_candidates(
+            getproperty(spines, yside), yvalues, ticklabel_strings(yformat, yvalues),
+            2, yside, Makie.to_font(fonts, yfont), ysize, fonts, ypad, yrotation, ymode;
+            corner_anchors = ycorners, corner_atol,
+            # Hidden longitude labels occupy no space, so they must not evict
+            # latitude labels either.
+            occupied = xvisible ? Rect2d[p.bbox for p in xplacements] : Rect2d[],
         )
 
         # Keep positions and text lengths synchronized through Makie's compute
         # graph when ticks or limits change interactively.
         Makie.update!(xticklabelplot; arg1=xpositions, text=xlabels)
         Makie.update!(yticklabelplot; arg1=ypositions, text=ylabels)
+        # Never reserve so much that the axis itself disappears.  The suggested
+        # box already has the current reservation taken out of it, so add that
+        # back: a cap that shrank as we reserved would be part of the loop.
+        room = widths(axis.layoutobservables.suggestedbbox[])
+        outer = (room[1] + 2 * y_protrusion[], room[2] + 2 * x_protrusion[])
+        cap = (0.35f0 * outer[2], 0.35f0 * outer[1])
+        request = (
+            xvisible ? min(xreach, cap[1]) : 0.0f0,
+            yvisible ? min(yreach, cap[2]) : 0.0f0,
+        )
+        # Everything the labels depend on except the layout itself.  While it
+        # holds still only growth propagates, which is what converges; when it
+        # changes the reservation starts over.  The cap is applied either way, so
+        # that shrinking the figure gives the space back.
+        settling = (
+            xvalues, yvalues, xside, yside, xformat, yformat, xfont, yfont,
+            xsize, ysize, xpad, ypad, xrotation, yrotation, xmode, ymode,
+            xvisible, yvisible, axis.finallimits[],
+        )
+        if !isequal(reserved_for[], settling)
+            reserved_for[] = settling
+            reserved[] = request
+        else
+            reserved[] = min.(max.(reserved[], request), cap)
+        end
+        x_protrusion[] = reserved[][1]
+        y_protrusion[] = reserved[][2]
         return
-    end
-
-    # Finally calculate protrusions and report all bounding boxes
-    # to the layout system.
-    approx_x_protrusion = map(
-        axis.blockscene, 
-        axis.xticklabelfont, axis.xticklabelsize, axis.xticklabelpad,
-        xticklabelplot.text, axis.xticklabelsvisible,
-        ) do ticklabel_font, ticklabel_size, ticklabel_pad, text, ticklabelsvisible
-        ret = 0.0f0
-
-        if ticklabelsvisible
-            max_height = 0.0
-            for str in text
-                bb = Makie.text_bb(str, Makie.to_font(fonts, ticklabel_font), ticklabel_size)
-                max_height = max(max_height, widths(bb)[2])
-            end
-            ret += max_height + ticklabel_pad
-        end
-
-        return ret
-    end
-
-    approx_y_protrusion = map(
-        axis.blockscene, 
-        axis.yticklabelfont, axis.yticklabelsize, axis.yticklabelpad,
-        yticklabelplot.text, axis.yticklabelsvisible,
-        ) do ticklabel_font, ticklabel_size, ticklabel_pad, text, ticklabelsvisible
-
-        ret = 0.0f0
-
-        if ticklabelsvisible
-            max_width = 0.0
-            for str in text
-                bb = Makie.text_bb(str, Makie.to_font(fonts, ticklabel_font), ticklabel_size)
-                max_width = max(max_width, widths(bb)[1])
-            end
-            ret += max_width + ticklabel_pad
-        end
-
-        return ret
-
     end
 
     elements = Dict{Symbol,Any}()
@@ -882,8 +994,8 @@ function Makie.initialize_block!(axis::GeoAxis)
         markerspace=:data,
         inspectable=false)
 
-    xaxis = (; protrusion=approx_x_protrusion)
-    yaxis = (; protrusion=approx_y_protrusion)
+    xaxis = (; protrusion=x_protrusion)
+    yaxis = (; protrusion=y_protrusion)
     map!(compute_protrusions, axis.blockscene, axis.layoutobservables.protrusions, axis.title, axis.titlesize,
         axis.titlegap, axis.titlevisible,
         xaxis.protrusion, 
