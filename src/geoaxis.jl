@@ -358,15 +358,11 @@ end
     valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n = 100)
 
 Sample a source-space line, project it, and return every connected component
-inside `rect`, as `(lines, lines_transformed, intersections, spans)`.
+inside `rect`, as `(lines, lines_transformed, intersections)`.
 
 `lines` holds each component's source-space vertices, `lines_transformed` their
-projected counterparts, `intersections` the rectangle edges its two ends were
-clipped against (`nothing` for an end already inside), and `spans` its
-`(first, last)` position along the sampled line, in `[0, 1]`.
-
-The spans are the only ordering that survives the inverse projection, whose
-source coordinates can wrap near an antimeridian.
+projected counterparts, and `intersections` the rectangle edges its two ends
+were clipped against, `nothing` for an end that was already inside.
 
 Non-finite samples and discontinuities break the line into components, and each
 segment is clipped separately so that a segment crossing the rectangle between
@@ -376,8 +372,15 @@ function valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n
     # Odd samples are the segment endpoints, even samples their midpoints, which
     # the continuity test below needs.  One pass projects both.
     m = 2n - 1
-    xrange = LinRange(point_start[1], point_stop[1], m)
-    yrange = LinRange(point_start[2], point_stop[2], m)
+    # A graticule is traced at a constant coordinate, and `LinRange(c, c, m)` is
+    # not exactly `c` at every index: its two interpolation weights need not add
+    # up to one.  The last bits that leaves in a parallel's latitude are half a
+    # metre of projected northing at the pole line of a Robinson map, enough to
+    # walk the line out of a viewport whose limits are the map and back, breaking
+    # it into pieces at each step.
+    samples_along(a, b) = a == b ? fill(a, m) : collect(LinRange(a, b, m))
+    xrange = samples_along(point_start[1], point_stop[1])
+    yrange = samples_along(point_start[2], point_stop[2])
     sampled = [Point2d(xrange[i], yrange[i]) for i in 1:m]
     projected = [Point2d(Makie.apply_transform(trans, p)) for p in sampled]
 
@@ -389,7 +392,6 @@ function valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n
     lines = Vector{Point2d}[]
     lines_t = Vector{Point2d}[]
     intersections = Vector{Union{Line{2,Float64},Nothing}}[]
-    spans = Tuple{Float64,Float64}[]
 
     current = 0
     for i in 1:2:(m - 2)
@@ -422,8 +424,6 @@ function valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n
 
         clipped_start = iszero(t_start) ? a : Point2d(Makie.apply_transform(trans_rev, clipped_start_t))
         clipped_stop = isone(t_stop) ? b : Point2d(Makie.apply_transform(trans_rev, clipped_stop_t))
-        span_start = (i - 1 + 2t_start) / (m - 1)
-        span_stop = (i - 1 + 2t_stop) / (m - 1)
 
         # Consecutive clipped segments share an exact transformed sample.
         # Otherwise an out-of-bounds gap separates two components.
@@ -431,49 +431,152 @@ function valid_line_in_limits(trans, trans_rev, rect, point_start, point_stop, n
             push!(lines[current], clipped_stop)
             push!(lines_t[current], clipped_stop_t)
             intersections[current][2] = stop_side
-            spans[current] = (spans[current][1], span_stop)
         else
             push!(lines, Point2d[clipped_start, clipped_stop])
             push!(lines_t, Point2d[clipped_start_t, clipped_stop_t])
             push!(intersections, Union{Line{2,Float64},Nothing}[start_side, stop_side])
-            push!(spans, (span_start, span_stop))
             current = length(lines)
         end
     end
-    return lines, lines_t, intersections, spans
+    return lines, lines_t, intersections
 end
 
 """
-    boundary_tangent(trans, point, dim; step = 0.01)
+    map_membership(trans, trans_inverse, tol)
 
-The projected direction of the map's own boundary at a graticule endpoint, in
-degrees-based source coordinates.
+A closure taking a projected point to its source coordinates, or to `nothing`
+where that point is not on the map.
 
-Where the viewport did not cut the graticule off, the boundary is the graticule
-of the *other* family through the same point: an extreme parallel closes off a
-meridian, an extreme meridian closes off a parallel.  That is what a tick label
-has to clear.  The graticule's own direction is not -- near a pole it swings
-inward and would drag the label in with it.
-
-The boundary of a projection whose limb is not a graticule, such as an oblique
-orthographic, is only approximated this way.
-
-Returns a zero or nonfinite direction where the boundary itself is degenerate,
-as at a projection pole that is a single point.
+PROJ answers outside a projection with a coordinate that is either non-finite or
+one that does not project back: everything past the pole line of a Robinson map
+inverts to infinity, and a longitude past the seam comes back wrapped onto the
+far side of the map.  Round-tripping recognises both, and has to know nothing
+about the projection to do it.  `tol` is how far a point may move on the way
+there and back and still count as being on the map.
 """
-function boundary_tangent(trans, point, dim; step = 1.0e-2)
-    # Stepping past +/-180 degrees of longitude wraps to the far side of the map,
-    # which would measure the antimeridian instead of the boundary.
-    limit = dim == 1 ? 180.0 : 90.0
-    center = clamp(point[dim], -limit + step, limit - step)
-    at(offset) = Makie.apply_transform(trans, Point2d(
-        dim == 1 ? (center + offset, point[2]) : (point[1], center + offset)))
-    low, high = at(-step), at(step)
-    (isfinite(low) && isfinite(high)) || return Point2d(NaN)
-    return Point2d(high .- low)
+function map_membership(trans, trans_inverse, tol)
+    return function (p)
+        q = Point2d(Makie.apply_transform(trans_inverse, p))
+        all(isfinite, q) || return nothing
+        back = Point2d(Makie.apply_transform(trans, q))
+        (all(isfinite, back) && norm(back - Point2d(p)) <= tol) || return nothing
+        return q
+    end
 end
 
-function add_to_lines!(result, trans, valid_line, line_transformed, intersections, coordinate, dim,
+"""
+Round-trip slack, as a fraction of the projected view's diagonal.  A point on
+the map returns to within rounding of itself; one off it returns a visible
+fraction of the view away, if at all.
+"""
+const ROUNDTRIP_TOLERANCE = 1.0e-6
+
+roundtrip_tolerance(rect) = ROUNDTRIP_TOLERANCE * norm(widths(rect))
+
+"""
+Directions sampled around a graticule endpoint when asking whether the map ends
+there.  Fine enough that no projection's outline slips between two of them, and
+coarse enough to cost a fraction of tracing the graticule that produced the
+endpoint.
+"""
+const OUTLINE_SAMPLES = 16
+
+"""
+Bisection steps refining each end of the ring's arc of drawing.  Eight place
+each end within a thousandth of a radian, so the direction they give does not
+step from one ring sample to the next as the map moves.
+"""
+const OUTLINE_BISECTIONS = 8
+
+"""
+How far the ring is thrown around the endpoint, as a fraction of the projected
+view's diagonal.  Far enough out to be nowhere near
+[`ROUNDTRIP_TOLERANCE`](@ref), close enough in that the outline is straight
+across it.
+"""
+const OUTLINE_RADIUS = 2.0e-3
+
+"""Ring shrinks tried where the first radius finds no map at all."""
+const OUTLINE_SHRINKS = 4
+
+"""
+    outline_normal(drawn, point, radius; n = OUTLINE_SAMPLES)
+
+The projected direction out of the drawn region at the graticule endpoint
+`point`, or a non-finite direction where the drawing does not end there.
+
+`drawn` reports whether a projected point is drawn -- on the map, and inside the
+view -- and a ring of them around `point` says which kind of endpoint this is.
+An endpoint on the outline has drawing on one side of it and nothing on the
+other, whether what ends there is the limb of an azimuthal projection, the pole
+line of a pseudocylindrical one, the seam of an interrupted one, or the edge of
+the view.  An endpoint where the graticule merely ran out of the traced range,
+such as the pole of an oblique orthographic, has drawing all the way round; it
+gets no direction and so no tick label, which would otherwise sit in the middle
+of the map against nothing.
+
+Asking about the drawing rather than about the graticule means this does not
+need to know why the trace stopped, that it finds an outline no graticule
+follows, and that the side the label goes on is known rather than guessed from a
+graticule that may be running along the boundary it ends on.  The widest arc of
+drawing around the ring is the inside, its chord is the outline, and its ends are
+bisected out of the ring so that the direction does not jump from one sample to
+the next as the map moves.
+
+Where the first ring finds nothing drawn at all -- the drawing is a sliver at
+this scale -- the radius shrinks and the ring is thrown again.
+"""
+function outline_normal(drawn, point, radius; n = OUTLINE_SAMPLES)
+    step = 2pi / n
+    at(r, angle) = Point2d(point[1] + r * cos(angle), point[2] + r * sin(angle))
+    inside = falses(n)
+    for _ in 1:OUTLINE_SHRINKS
+        inside .= (k -> drawn(at(radius, (k - 1) * step))).(1:n)
+        if !any(inside)
+            radius /= 4
+            continue
+        end
+        all(inside) && return Point2d(NaN)
+
+        # The widest run of drawing around the ring, walked from a sample the
+        # drawing starts at so that runs are contiguous rather than wrapping.
+        origin = findfirst(k -> inside[k] && !inside[mod1(k - 1, n)], 1:n)
+        best_first, best_length, k = origin, 0, 1
+        while k <= n
+            index = mod1(origin + k - 1, n)
+            if !inside[index]
+                k += 1
+                continue
+            end
+            len = 1
+            while k + len <= n && inside[mod1(origin + k + len - 1, n)]
+                len += 1
+            end
+            len > best_length && ((best_first, best_length) = (index, len))
+            k += len
+        end
+
+        function crossing(mapped, empty)
+            for _ in 1:OUTLINE_BISECTIONS
+                middle = (mapped + empty) / 2
+                drawn(at(radius, middle)) ? (mapped = middle) : (empty = middle)
+            end
+            return (mapped + empty) / 2
+        end
+        low = (best_first - 1) * step
+        high = low + (best_length - 1) * step
+        first_end, last_end = crossing(low, low - step), crossing(high, high + step)
+        chord = at(radius, last_end) - at(radius, first_end)
+        normal = Point2d(-chord[2], chord[1])
+        # Away from the middle of the arc, which is the deepest the ring gets
+        # into the drawing.
+        return dot(normal, at(radius, (first_end + last_end) / 2) - Point2d(point)) > 0 ?
+            -normal : normal
+    end
+    return Point2d(NaN)
+end
+
+function add_to_lines!(result, outline, valid_line, line_transformed, intersections, coordinate, dim,
                        spine_start, spine_end)
     append!(result, line_transformed)
     push!(result, Point2d(NaN))
@@ -482,32 +585,102 @@ function add_to_lines!(result, trans, valid_line, line_transformed, intersection
     # clipped endpoint through PROJ only recovers it to floating-point accuracy
     # -- latitude zero comes back as -8.39e-16 -- and a label reports that value.
     anchor_input(p) = dim == 1 ? Point2d(coordinate, p[2]) : Point2d(p[1], coordinate)
-    # A clipped end lies on a viewport edge, which is the boundary there; an
-    # unclipped one lies on the edge of the map itself.
-    edge(line, p) = isnothing(line) ? boundary_tangent(trans, p, dim) :
-        Point2d(line[1] .- line[2])
+    # A clipped end lies on a viewport edge, which is the boundary there, and the
+    # graticule's own direction says which side of it is out.  An unclipped one
+    # has to be asked about: the graticule may have reached the edge of the map,
+    # or only the end of the traced range, in the middle of it.  The answer also
+    # says which side is out, which is worth more than the graticule there --
+    # that can be running along the very boundary it ends on.
+    function frame(line, at, inward)
+        isnothing(line) || return (Point2d(line[1] .- line[2]), normalize(at .- inward))
+        outward = outline(at)
+        isfinite(outward) || return (Point2d(NaN), Point2d(NaN))
+        return (Point2d(outward[2], -outward[1]), outward)
+    end
     i_start, i_end = intersections
 
-    if !isnothing(spine_start)
-        v1_t, v2_t = line_transformed[1], line_transformed[2]
-        push!(spine_start, (
-            input = anchor_input(valid_line[1]),
-            projected = v1_t,
-            dir = normalize(v1_t .- v2_t),
-            intersect_dir = edge(i_start, valid_line[1]),
+    # An end the drawing does not stop at is no anchor, and is left out entirely
+    # rather than pushed with a direction nothing can use: anchors also suppress
+    # the orthogonal axis where the two share a corner, and an end in the middle
+    # of the map should not take another label with it.
+    function anchor!(spine, clipped, source, at, inward)
+        isnothing(spine) && return
+        boundary, outward = frame(clipped, at, inward)
+        isfinite(boundary) && !iszero(boundary) || return
+        push!(spine, (
+            input = anchor_input(source),
+            projected = at,
+            dir = outward,
+            intersect_dir = boundary,
         ))
+        return
     end
 
-    if !isnothing(spine_end)
-        s1_t, s2_t = line_transformed[end], line_transformed[end - 1]
-        push!(spine_end, (
-            input = anchor_input(valid_line[end]),
-            projected = s1_t,
-            dir = normalize(s1_t .- s2_t),
-            intersect_dir = edge(i_end, valid_line[end]),
-        ))
-    end
+    anchor!(spine_start, i_start, valid_line[1], line_transformed[1], line_transformed[2])
+    anchor!(spine_end, i_end, valid_line[end], line_transformed[end], line_transformed[end - 1])
     return
+end
+
+"""
+The gap left between the two ends of a graticule that goes right round the
+world, in degrees.  Traced right up to the cut, both ends would land on it,
+where they are one point and the segment between them runs back across the whole
+map.  A millionth of a degree is a ten-thousandth of a pixel on a world map.
+"""
+const CUT_MARGIN = 1.0e-6
+
+"""Longitudes tried when looking for the map's cut."""
+const CUT_SAMPLES = 24
+
+"""Bisection steps narrowing it down; forty reach double precision."""
+const CUT_BISECTIONS = 40
+
+"""
+    longitude_cut(trans, trans_inverse, longitude, latitude; n = CUT_SAMPLES)
+
+The longitude east of `longitude` that the map is cut at, measured along the
+parallel at `latitude`.
+
+PROJ wraps a longitude more than half a turn from the central meridian back
+round, so a parallel's projection jumps there: the cut is the map's eastern and
+western edges, which are one line on the globe and two on the page.  A graticule
+traced right round the world has to start and stop there, or it stops short of
+one edge by however far the trace is misaligned -- a Robinson map with
+`+lon_0=150` viewed through limits of `-180` to `180` is three degrees out, and
+every parallel then ends in open map and is left unlabelled.
+
+The cut cannot be found by asking PROJ where a longitude went, because its
+inverse wraps every longitude into `[-180, 180]` whether it crossed the cut or
+not.  It shows up only as the jump, which is what the search here looks for: the
+widest step around the parallel, narrowed by keeping whichever half of it still
+holds the jump.  A projection continuous in longitude, such as a polar
+azimuthal, has no jump and no cut, and the arbitrary longitude this returns for
+one is as good as any other: its parallels are closed circles, which come back to
+where they started wherever that is.
+"""
+function longitude_cut(trans, trans_inverse, longitude, latitude; n = CUT_SAMPLES)
+    at(l) = Point2d(Makie.apply_transform(trans, Point2d(l, latitude)))
+    step = 360.0 / n
+    # One turn of samples, the last of which is the first come right round again.
+    points = [at(longitude + k * step) for k in 0:n]
+    gap(a, b) = all(isfinite, a) && all(isfinite, b) ? norm(b - a) : -Inf
+    steps = [gap(points[k], points[k + 1]) for k in 1:n]
+    widest = argmax(steps)
+    isfinite(steps[widest]) || return longitude + 180.0
+
+    low, high = longitude + (widest - 1) * step, longitude + widest * step
+    at_low, at_high = points[widest], points[widest + 1]
+    for _ in 1:CUT_BISECTIONS
+        middle = (low + high) / 2
+        at_middle = at(middle)
+        all(isfinite, at_middle) || break
+        if gap(at_low, at_middle) >= gap(at_middle, at_high)
+            high, at_high = middle, at_middle
+        else
+            low, at_low = middle, at_middle
+        end
+    end
+    return high
 end
 
 """
@@ -530,26 +703,18 @@ instead of `(-30, 330)`.
 So samples are kept only when they project back onto themselves, which drops the
 ones outside the projection, and longitudes are unwrapped along each row of
 samples, which puts the seam at the ends of the extent where it belongs.  A view
-that wraps right round is recognised separately and re-centred, since it has no
-longitude extremes to find.
+that wraps right round is recognised separately and laid against the map's cut,
+since it has no longitude extremes to find.
 
 `n` is the sampling density per side.  The interior is sampled, not just the
 boundary: the pole of a polar view is in the middle of it, and so is the highest
-latitude the view reaches.
+latitude the view reaches.  A pole is still only one point, small enough for a
+grid to step over, so each of the two is asked about by name as well.
 """
 function source_extent(trans, trans_inverse, rect; n = 65)
     mini, maxi = extrema(rect)
     span = maxi .- mini
-    # A sample projects back onto itself to within rounding; one that is outside
-    # the projection comes back a visible fraction of the view away, if at all.
-    tol = 1.0e-6 * max(span[1], span[2])
-    function inverse(p)
-        q = Point2d(Makie.apply_transform(trans_inverse, p))
-        all(isfinite, q) || return nothing
-        back = Point2d(Makie.apply_transform(trans, q))
-        (all(isfinite, back) && norm(back - p) <= tol) || return nothing
-        return q
-    end
+    inverse = map_membership(trans, trans_inverse, roundtrip_tolerance(rect))
 
     # Rows are unwrapped onto the same turn as the centre of the view.  A polar
     # projection crosses the branch cut at a different sample on every row, and
@@ -596,17 +761,27 @@ function source_extent(trans, trans_inverse, rect; n = 65)
     end
     (all(isfinite, low) && all(isfinite, high)) || return nothing
 
-    # A view that wraps right round has no meaningful longitude extremes: every
-    # row crosses the branch cut somewhere else, so their union lands on whatever
-    # turn the unwrapping happened to pick.  A polar view reports -268 to 90,
-    # which traces the same graticule as -180 to 180 but samples it from a
-    # stranger place.  Re-centre on the middle of the view, keeping the width:
-    # widening to a full turn would put both ends on the seam, where they are one
-    # point and the graticule between them is a jump across the whole map.
+    # A pole is one point, and a grid of samples can miss it even with the whole
+    # world in view: an oblique projection puts the geographic poles in the
+    # middle of the map, where nothing marks them out.  Asking about them
+    # directly is cheap, and a graticule traced to a degree short of one stops in
+    # open map, where it gets no tick label.
+    drawn_pole(lat) = let p = Point2d(Makie.apply_transform(trans, Point2d(reference, lat)))
+        all(mini .<= p .<= maxi) && !isnothing(inverse(p))
+    end
+    drawn_pole(90.0) && (high = Point2d(high[1], 90.0))
+    drawn_pole(-90.0) && (low = Point2d(low[1], -90.0))
+
+    # A view that wraps right round has no longitude extremes to find: every row
+    # crosses the branch cut somewhere else, so their union lands on whatever
+    # turn the unwrapping happened to pick, and the sampling stops a fraction of
+    # a degree short either side.  A polar view reports -268 to 90.  A whole turn
+    # is what the graticule needs, laid against the map's own cut so that it ends
+    # on the map's edges rather than somewhere in the middle of it.
     if all(slices)
-        half = min(180.0, (high[1] - low[1]) / 2)
-        low = Point2d(reference - half, low[2])
-        high = Point2d(reference + half, high[2])
+        cut = longitude_cut(trans, trans_inverse, reference, (low[2] + high[2]) / 2)
+        low = Point2d(cut - 360.0 + CUT_MARGIN, low[2])
+        high = Point2d(cut - CUT_MARGIN, high[2])
     elseif high[1] - low[1] > 360.0
         # Tracing more than one turn redraws the same graticule over itself.
         middle = (low[1] + high[1]) / 2
@@ -621,37 +796,26 @@ function project_tick_points!(result, trans, trans_inverse, range, coordinate, d
     # dim == 1 traces a meridian at constant longitude, dim == 2 a parallel.
     point_fun(tick) = dim === 1 ? Point2d(coordinate, tick) : Point2d(tick, coordinate)
 
-    lines, lines_transformed, intersections, spans = valid_line_in_limits(
+    # What is drawn is the map clipped to the view, and a tick label belongs
+    # outside whichever of the two ends the graticule it labels.
+    on_map = map_membership(trans, trans_inverse, roundtrip_tolerance(limit_rect))
+    mini, maxi = extrema(limit_rect)
+    drawn(p) = all(mini .<= p .<= maxi) && !isnothing(on_map(p))
+    radius = OUTLINE_RADIUS * norm(widths(limit_rect))
+    outline(p_t) = outline_normal(drawn, p_t, radius)
+
+    lines, lines_transformed, intersections = valid_line_in_limits(
         trans, trans_inverse, limit_rect, point_fun(range[1]), point_fun(range[end]))
-    valid_components = findall(i -> length(lines[i]) >= 2, eachindex(lines))
-    isempty(valid_components) && return
-
-    # A graticule may have several visible components.  Take its outer endpoints
-    # from the earliest and latest ones, which the spans identify; a short first
-    # component would otherwise donate both anchors.
-    start_component = argmin(i -> spans[i][1], valid_components)
-    end_component = argmax(i -> spans[i][2], valid_components)
-
-    # A component that comes back to where it started has no endpoint on the map
-    # boundary: every parallel of a polar projection is a circle in the middle of
-    # the map, and anchoring a label where its trace happens to begin would draw
-    # it over the data.  The traced range stops a little short of a full turn, so
-    # the gap is measured against the component's own length rather than against
-    # a fixed distance.  A clipped end is on the viewport edge and always counts.
-    function has_endpoints(i)
-        any(!isnothing, intersections[i]) && return true
-        c = lines_transformed[i]
-        arc = sum(j -> norm(c[j + 1] - c[j]), 1:(length(c) - 1); init = 0.0)
-        return norm(c[end] - c[1]) >= 0.1 * arc
-    end
-
-    for i in valid_components
-        ends = has_endpoints(i)
-        add_to_lines!(
-            result, trans, lines[i], lines_transformed[i], intersections[i], coordinate, dim,
-            ends && i == start_component ? spine_start : nothing,
-            ends && i == end_component ? spine_end : nothing,
-        )
+    # Every component offers both of its ends and `add_to_lines!` keeps the ones
+    # the drawing really stops at.  Which component holds a graticule's boundary
+    # ends cannot be told from the trace: a parallel of an oblique orthographic
+    # is traced from the middle of the map, round the back of the globe, and back
+    # to where it started, so it is the inner ends of its two components that
+    # reach the limb and the outer ones that stop in open map.
+    for i in eachindex(lines)
+        length(lines[i]) >= 2 || continue
+        add_to_lines!(result, outline, lines[i], lines_transformed[i], intersections[i],
+                      coordinate, dim, spine_start, spine_end)
     end
     return
 end
@@ -719,12 +883,17 @@ function ticklabel_candidates(
     placements = NamedTuple[]
     placement_labels = Any[]
     placement_values = Float64[]
+    placed = Set{Int}()
     corner_fallback = nothing
     for i in priority
         sample = samples[i]
         isfinite(sample.input) || continue
         tick = findfirst(==(sample.input[dim]), tickvalues)
         isnothing(tick) && continue
+        # A graticule can reach one side more than once: an equator clipped by
+        # each edge of a polar view in turn, or a parallel arriving at a limb in
+        # two components.  The label belongs at one of those, the most central.
+        tick in placed && continue
 
         label = labels[tick]
         placement = place_ticklabel(
@@ -744,6 +913,7 @@ function ticklabel_candidates(
         push!(placements, placement)
         push!(placement_labels, label)
         push!(placement_values, sample.input[dim])
+        push!(placed, tick)
     end
     if isempty(placements) && !isnothing(corner_fallback)
         push!(placements, corner_fallback[1])

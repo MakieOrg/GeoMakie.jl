@@ -119,16 +119,16 @@ end
 @testset "Clipped graticule components" begin
     # A segment whose sampled endpoints are both outside still crosses the
     # viewport and must yield one genuine component, not a fake entry component.
-    lines, transformed, intersections, spans = GeoMakie.valid_line_in_limits(
+    lines, transformed, intersections = GeoMakie.valid_line_in_limits(
         identity, identity, UNIT_RECT, Point2d(-2, 0), Point2d(2, 0), 2)
-    @test length(lines) == length(transformed) == length(intersections) == length(spans) == 1
+    @test length(lines) == length(transformed) == length(intersections) == 1
     @test first(only(transformed)) ≈ Point2d(-1, 0)
     @test last(only(transformed)) ≈ Point2d(1, 0)
     @test all(p -> p in UNIT_RECT, only(transformed))
 
     # Regression for outside -> inside -> outside.  An earlier state machine
     # made a two-point entry component followed by the actual one.
-    lines, transformed, intersections, spans = GeoMakie.valid_line_in_limits(
+    lines, transformed, intersections = GeoMakie.valid_line_in_limits(
         identity, identity, UNIT_RECT, Point2d(-2, 0.25), Point2d(2, 0.25), 9)
     @test length(lines) == length(transformed) == 1
     component = only(transformed)
@@ -136,20 +136,33 @@ end
     @test last(component) ≈ Point2d(1, 0.25)
     @test all(p -> p in UNIT_RECT, component)
     @test all(!iszero, norm.(diff(component)))
-    @test only(spans)[1] < only(spans)[2]
+
+    # A graticule traced along a viewport edge stays in one piece.  Its constant
+    # coordinate has to be exactly constant for that: `LinRange(90, 90, 199)` is
+    # not, because its two interpolation weights need not add up to one, and the
+    # ulps that leaves lift the line off the edge and drop it back, breaking it
+    # into pieces that each look as though the drawing ended there.
+    @test any(!=(90.0), LinRange(90.0, 90.0, 199))
+    world = Rect2d(-180, -90, 360, 180)
+    for edge in (90.0, -90.0)
+        lines, transformed, _ = GeoMakie.valid_line_in_limits(
+            identity, identity, world, Point2d(-180, edge), Point2d(180, edge))
+        @test length(lines) == 1
+        @test all(p -> p[2] == edge, only(transformed))
+    end
 
     # The continuity heuristic.  A transform with a jump in the middle must
     # split; a strongly curved but continuous one must not.  Passing `identity`
     # leaves the heuristic untested, because its sagitta is identically zero.
     jump = Makie.PointTrans{2}(p -> Point2d(p[1] + (p[1] > 0 ? 1.4 : 0.0), p[2]))
     unjump = Makie.PointTrans{2}(p -> Point2d(p[1] - (p[1] > 1.4 ? 1.4 : 0.0), p[2]))
-    lines, _, _, _ = GeoMakie.valid_line_in_limits(
+    lines, _, _ = GeoMakie.valid_line_in_limits(
         jump, unjump, Rect2d(-2, -1, 4, 2), Point2d(-1, 0), Point2d(1, 0), 51)
     @test length(lines) == 2
 
     bend = Makie.PointTrans{2}(p -> Point2d(p[1], 0.9 * cos(p[1] * pi / 2)))
     unbend = Makie.PointTrans{2}(p -> Point2d(p[1], 0.0))
-    lines, _, _, _ = GeoMakie.valid_line_in_limits(
+    lines, _, _ = GeoMakie.valid_line_in_limits(
         bend, unbend, Rect2d(-2, -2, 4, 4), Point2d(-1, 0), Point2d(1, 0), 51)
     @test length(lines) == 1
 end
@@ -430,8 +443,9 @@ end
     rect = ax.finallimits[]
     equator = argmin(c -> abs(sum(p[2] for p in c) / length(c)),
         line_components(ax.elements[:ygrid]))
-    @test minimum(p[1] for p in equator) ≈ minimum(rect)[1] atol = 1e-6
-    @test maximum(p[1] for p in equator) ≈ maximum(rect)[1] atol = 1e-6
+    # In projected metres, of which the view is 34 million across in 660 pixels.
+    @test minimum(p[1] for p in equator) ≈ minimum(rect)[1] atol = 1.0
+    @test maximum(p[1] for p in equator) ≈ maximum(rect)[1] atol = 1.0
     assert_labels(ax)
 end
 
@@ -487,8 +501,9 @@ end
     rect = ax.finallimits[]
     equator = argmin(c -> abs(sum(p[2] for p in c) / length(c)),
         line_components(ax.elements[:ygrid]))
-    @test minimum(p[1] for p in equator) ≈ minimum(rect)[1] atol = 1e-6
-    @test maximum(p[1] for p in equator) ≈ maximum(rect)[1] atol = 1e-6
+    # In projected metres, of which the view is 34 million across in 660 pixels.
+    @test minimum(p[1] for p in equator) ≈ minimum(rect)[1] atol = 1.0
+    @test maximum(p[1] for p in equator) ≈ maximum(rect)[1] atol = 1.0
 
     # Every label clears the western limb by the padding and no more.  The
     # anchors used to sit a few tens of degrees east of the central meridian, and
@@ -498,6 +513,80 @@ end
     limb_x(lat) = pixel_point(ax, (-30 + δ, lat))[1]
     for (box, value) in zip(boxes, values)
         @test limb_x(value) - maximum(box)[1] ≈ ax.yticklabelpad[] atol = 0.5
+    end
+end
+
+@testset "Where the drawing ends" begin
+    radius = 0.05
+    probe(drawn, point) = GeoMakie.outline_normal(drawn, Point2d(point), radius)
+
+    # A straight edge: the outward direction is the one with nothing beyond it,
+    # whichever way round the drawing lies.
+    for angle in range(0, 2pi; length = 17)[1:(end - 1)]
+        outward = Vec2d(cos(angle), sin(angle))
+        half_plane = p -> dot(Vec2d(p), outward) <= 0
+        found = probe(half_plane, Point2d(0, 0))
+        @test all(isfinite, found)
+        @test normalize(Vec2d(found)) ≈ outward atol = 1e-3
+    end
+
+    # Nothing ends anywhere near a point with drawing all round it, however far
+    # from the middle of it the point is.
+    disc = p -> norm(Vec2d(p)) <= 1
+    @test !all(isfinite, probe(disc, Point2d(0, 0)))
+    @test !all(isfinite, probe(disc, Point2d(0.9, 0)))
+    # ... but on the edge of that same drawing, the outward direction is radial.
+    for angle in range(0, 2pi; length = 9)[1:(end - 1)]
+        at = Point2d(cos(angle), sin(angle))
+        found = probe(disc, at)
+        @test all(isfinite, found)
+        @test normalize(Vec2d(found)) ≈ Vec2d(at) atol = 1e-2
+    end
+
+    # Drawing far smaller than the ring is found by throwing a smaller one; the
+    # first ring here lies entirely outside it.
+    speck = p -> norm(Vec2d(p)) <= radius / 10
+    at = Point2d(radius / 10, 0)
+    @test !any(k -> speck(at + radius * Point2d(cospi(k / 8), sinpi(k / 8))), 0:15)
+    found = probe(speck, at)
+    @test all(isfinite, found)
+    @test dot(normalize(Vec2d(found)), Vec2d(1, 0)) > 0.5
+
+    # Nothing drawn at all, at any radius.
+    @test !all(isfinite, probe(p -> false, Point2d(0, 0)))
+end
+
+@testset "A graticule that stops in open map is not labelled" begin
+    # The visible half of an oblique orthographic reaches over the pole, so a
+    # meridian on the far side is traced from the limb to the pole and stops
+    # there, in the middle of the map.  Approximating the boundary with the
+    # orthogonal graticule made that pole look like one, and the meridian was
+    # labelled over Scandinavia.
+    dest = "+proj=ortho +lat_0=30 +lon_0=20"
+    _, ax = realize_geoaxis(; dest, limits = ((-180, 180), (-90, 90)),
+        xticklabelplacement = :normal, yticklabelplacement = :normal)
+    assert_labels(ax; min_count = 4)
+
+    trans = GeoMakie.create_transform(dest, "+proj=longlat +datum=WGS84")
+    inverse = GeoMakie.create_transform("+proj=longlat +datum=WGS84", dest)
+    rect = ax.finallimits[]
+    on_map = GeoMakie.map_membership(trans, inverse, GeoMakie.roundtrip_tolerance(rect))
+    mini, maxi = extrema(rect)
+    drawn(p) = all(mini .<= p .<= maxi) && !isnothing(on_map(p))
+    # Three times the probe's own reach, so that a label merely up against the
+    # limb still counts as outside it.
+    reach = 3 * GeoMakie.OUTLINE_RADIUS * norm(widths(rect))
+    camera = ax.scene.camera
+    function in_data(pixel)
+        return Point2d(Makie.project(
+            camera, :pixel, :data, Point2d(pixel) .- minimum(ax.scene.viewport[])))
+    end
+
+    for which in (:x, :y)
+        for position in label_positions(ax.elements[Symbol(which, :ticklabels)])
+            at = in_data(position)
+            @test !all(k -> drawn(at + reach * Point2d(cospi(k / 8), sinpi(k / 8))), 0:15)
+        end
     end
 end
 
@@ -544,13 +633,17 @@ end
     # counts are how many of them reach a boundary and survive collision.
     cases = [
         ("+proj=robin", ((-180, 180), (-90, 90)), :axis, 5, 5),
-        ("+proj=ob_tran +o_proj=eqc +o_lat_p=35 +o_lon_p=0 +lon_0=20", ((-180, 180), (-90, 90)), :normal, 3, 3),
+        # Every meridian of this oblique view meets the map's edge at the south
+        # pole and nowhere else, two great circles crossing at one visible point,
+        # so the two edges of the map carry one meridian label each.
+        ("+proj=ob_tran +o_proj=eqc +o_lat_p=35 +o_lon_p=0 +lon_0=20", ((-180, 180), (-90, 90)), :normal, 2, 3),
         ("+proj=merc", ((-125, -55), (5, 65)), :axis, 2, 2),
         ("+proj=robin +lon_0=150", ((-180, 180), (-90, 90)), :axis, 5, 5),
         ("+proj=moll", ((-150, 80), (-70, 70)), :axis, 5, 5),
-        # Every meridian of a full orthographic ends on the limb, which is not a
-        # graticule, so none of them gets a boundary direction.  See below.
-        ("+proj=ortho", ((-180, 180), (-90, 90)), :normal, 0, 5),
+        # Every meridian of a full orthographic ends at a pole, both poles are on
+        # the limb, and the labels pile onto those two points.  The bottom of the
+        # axis keeps one of them.
+        ("+proj=ortho", ((-180, 180), (-90, 90)), :normal, 1, 5),
         # A polar projection labels its meridians, but its parallels are closed
         # circles with no endpoint on an edge; only the clipped equator is left.
         ("+proj=laea +lat_0=90 +lon_0=0", ((-180, 180), (20, 90)), :normal, 3, 1),
@@ -569,10 +662,10 @@ end
         save(joinpath(images, "ticklabels_$(name)_$(mode).png"), fig)
     end
 
-    # Known gap: a full orthographic labels no meridian, because
-    # `boundary_tangent` approximates the map boundary with the orthogonal
-    # graticule and the limb is not one.
+    # A full orthographic used to label no meridian at all: the boundary a
+    # meridian ends on is the limb, which is not a graticule, and approximating
+    # it with the parallel through the pole gave a direction of zero length.
     _, ortho = realize_geoaxis(; dest = "+proj=ortho", limits = ((-180, 180), (-90, 90)),
         xticks = collect(-120.0:60.0:120.0), xticklabelplacement = :normal)
-    @test_broken !isempty(label_strings(ortho.elements[:xticklabels]))
+    @test !isempty(label_strings(ortho.elements[:xticklabels]))
 end
