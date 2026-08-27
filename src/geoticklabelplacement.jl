@@ -158,12 +158,19 @@ corner_anchor(anchor, orthogonal_anchors, atol) =
 
 Place one tick label against the graticule endpoint `sample`, in pixel space.
 
-Both modes leave exactly `pad` pixels between the glyph box and the endpoint.
-`:normal` moves the label along the outward boundary normal.  `:axis` moves it
-along the side's own axis instead, so that longitude labels get no horizontal
-drift and latitude labels no vertical drift.
+Both modes leave exactly `pad` pixels between the glyph box and the endpoint,
+measured along the direction the label was moved.  `:normal` moves the label
+along the outward boundary normal.  `:axis` moves it along the side's own axis
+instead, so that longitude labels get no horizontal drift and latitude labels no
+vertical drift.
 
-The axis-constrained shift diverges as the boundary turns parallel to the axis,
+Measuring the clearance along the *normal* in both modes would leave the gap the
+reader actually sees -- the one along the axis -- inflated by 1/cos of the
+incidence.  A column of latitude labels down a curved limb would step further and
+further out as the limb tilts away: on a full-world Robinson map, 5 pixels of
+padding at the equator becomes 19 at 60 degrees.
+
+Moving along the axis does not clear a boundary that is turning parallel to it,
 so below an incidence of `min_axis_dot` the direction rotates onto the normal,
 reaching it at zero incidence.  The label degrades instead of disappearing, and
 the shift stays continuous -- an anchor at the threshold would otherwise flip
@@ -183,14 +190,17 @@ function place_ticklabel(
     normal = outward_frame(sample)
     isnothing(normal) && return nothing
 
-    support = glyph_support(half_extents, normal; rotation)
     outward = axis_direction(side)
     axis_dot = dot(normal, outward)
     blend = mode === :axis ? clamp((min_axis_dot - axis_dot) / min_axis_dot, 0, 1) : 1.0
     direction = iszero(blend) ? outward :
         normalize((1 - blend) * outward + blend * normal)
-    # Divide out the component along the normal to keep the clearance at `pad`.
-    shift = (pad + support) / dot(normal, direction)
+    # Both the glyph's reach and the padding are measured along the direction the
+    # label travels, so the gap is `pad` whatever the boundary's incidence.  In
+    # `:normal` mode `direction` is `normal` and this is the clearance from the
+    # boundary itself; in `:axis` mode it is the clearance the reader sees.
+    support = glyph_support(half_extents, direction; rotation)
+    shift = pad + support
     placed = iszero(blend) ? :axis : :normal
 
     center = anchor + direction * shift

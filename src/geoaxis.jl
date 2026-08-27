@@ -510,6 +510,112 @@ function add_to_lines!(result, trans, valid_line, line_transformed, intersection
     return
 end
 
+"""
+    source_extent(trans, trans_inverse, rect; n = 65)
+
+The source-space extent of the projected view `rect`, as `(xlims, ylims)`, or
+`nothing` when no sample of `rect` lies inside the projection.
+
+Inverse-projecting the corners of `rect` is not enough, for two reasons.  A
+corner can be outside the projection: the top corners of a full-world Robinson
+view are past the ends of the pole line, which is 0.53 as wide as the equator,
+and PROJ answers there with a finite coordinate that does not project back.  And
+longitudes come back wrapped into `[-180, 180]`, so on a map whose central
+meridian is not zero the two vertical edges of the view -- one map seam, reached
+from either side -- inverse-project to nearly the same longitude.  Their bounding
+box is then a sliver, and it is centred on the seam rather than on the map.  A
+world map with `+lon_0=150` reports a longitude extent of about `(-176, 177)`
+instead of `(-30, 330)`.
+
+So samples are kept only when they project back onto themselves, which drops the
+ones outside the projection, and longitudes are unwrapped along each row of
+samples, which puts the seam at the ends of the extent where it belongs.  A view
+that wraps right round is recognised separately and re-centred, since it has no
+longitude extremes to find.
+
+`n` is the sampling density per side.  The interior is sampled, not just the
+boundary: the pole of a polar view is in the middle of it, and so is the highest
+latitude the view reaches.
+"""
+function source_extent(trans, trans_inverse, rect; n = 65)
+    mini, maxi = extrema(rect)
+    span = maxi .- mini
+    # A sample projects back onto itself to within rounding; one that is outside
+    # the projection comes back a visible fraction of the view away, if at all.
+    tol = 1.0e-6 * max(span[1], span[2])
+    function inverse(p)
+        q = Point2d(Makie.apply_transform(trans_inverse, p))
+        all(isfinite, q) || return nothing
+        back = Point2d(Makie.apply_transform(trans, q))
+        (all(isfinite, back) && norm(back - p) <= tol) || return nothing
+        return q
+    end
+
+    # Rows are unwrapped onto the same turn as the centre of the view.  A polar
+    # projection crosses the branch cut at a different sample on every row, and
+    # without a shared reference two rows can land a turn apart.
+    center = inverse(Point2d((mini .+ maxi) ./ 2))
+    reference = isnothing(center) ? 0.0 : center[1]
+
+    # Which fifteen-degree slices of longitude the view lands in.  Rows of a
+    # polar projection each cross the branch cut somewhere else, so this, and not
+    # the unwrapped extremes, is what recognises a view that wraps right round.
+    slices = falses(24)
+    slice_width = 360.0 / length(slices)
+
+    low = Point2d(Inf, Inf)
+    high = Point2d(-Inf, -Inf)
+    for j in 1:n
+        y = mini[2] + span[2] * (j - 1) / (n - 1)
+        # Unwrapping needs samples that are continuous in longitude, so the
+        # offset restarts on every row and after every gap in one.
+        longitudes = Float64[]
+        previous = NaN
+        offset = 0.0
+        for i in 1:n
+            q = inverse(Point2d(mini[1] + span[1] * (i - 1) / (n - 1), y))
+            if isnothing(q)
+                previous = NaN
+                continue
+            end
+            # A step of more than half a turn between neighbouring samples is the
+            # seam, not motion across the map.
+            isfinite(previous) &&
+                (offset -= 360.0 * round((q[1] + offset - previous) / 360.0))
+            previous = q[1] + offset
+            push!(longitudes, previous)
+            slices[mod(floor(Int, q[1] / slice_width), length(slices)) + 1] = true
+            low = Point2d(low[1], min(low[2], q[2]))
+            high = Point2d(high[1], max(high[2], q[2]))
+        end
+        isempty(longitudes) && continue
+        row_low, row_high = extrema(longitudes)
+        shift = 360.0 * round((reference - (row_low + row_high) / 2) / 360.0)
+        low = Point2d(min(low[1], row_low + shift), low[2])
+        high = Point2d(max(high[1], row_high + shift), high[2])
+    end
+    (all(isfinite, low) && all(isfinite, high)) || return nothing
+
+    # A view that wraps right round has no meaningful longitude extremes: every
+    # row crosses the branch cut somewhere else, so their union lands on whatever
+    # turn the unwrapping happened to pick.  A polar view reports -268 to 90,
+    # which traces the same graticule as -180 to 180 but samples it from a
+    # stranger place.  Re-centre on the middle of the view, keeping the width:
+    # widening to a full turn would put both ends on the seam, where they are one
+    # point and the graticule between them is a jump across the whole map.
+    if all(slices)
+        half = min(180.0, (high[1] - low[1]) / 2)
+        low = Point2d(reference - half, low[2])
+        high = Point2d(reference + half, high[2])
+    elseif high[1] - low[1] > 360.0
+        # Tracing more than one turn redraws the same graticule over itself.
+        middle = (low[1] + high[1]) / 2
+        low = Point2d(middle - 180.0, low[2])
+        high = Point2d(middle + 180.0, high[2])
+    end
+    return ((low[1], high[1]), (low[2], high[2]))
+end
+
 function project_tick_points!(result, trans, trans_inverse, range, coordinate, dim, limit_rect,
                               spine_start, spine_end)
     # dim == 1 traces a meridian at constant longitude, dim == 2 a parallel.
@@ -763,9 +869,14 @@ function Makie.initialize_block!(axis::GeoAxis)
         limit_rect = Makie.to_value(axis.finallimits)
         trans_inverse = Makie.to_value(transform_ticks_inv_obs)
 
-        limits_t = Makie.apply_transform(trans_inverse, limit_rect)
-        xlims = Makie.xlimits(limits_t)
-        ylims = Makie.ylimits(limits_t)
+        # Fall back to the inverse-projected bounding box only where nothing of
+        # the view is inside the projection and there is nothing to trace anyway.
+        extent = source_extent(trans, trans_inverse, limit_rect)
+        if isnothing(extent)
+            limits_t = Makie.apply_transform(trans_inverse, limit_rect)
+            extent = (Makie.xlimits(limits_t), Makie.ylimits(limits_t))
+        end
+        xlims, ylims = extent
 
         xtickvalues = collect(Float64,
             user_xticks isa Makie.Automatic ? geoticks(-180, 180, xlims...) :

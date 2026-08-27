@@ -46,6 +46,13 @@ end
 
 parse_labels(plot) = [parse(Float64, chop(s)) for s in label_strings(plot)]
 
+"""A source-space point in the pixel space the tick labels are placed in."""
+function pixel_point(ax, lonlat)
+    projected = Point2d(Makie.apply_transform(Makie.transform_func(ax), Point2d(lonlat)))
+    return Point2d(Makie.project(ax.scene.camera, :data, :pixel, projected)) .+
+        minimum(ax.scene.viewport[])
+end
+
 function line_components(plot)
     components = Vector{Point2d}[]
     component = Point2d[]
@@ -200,15 +207,30 @@ end
     @test dot(displacement, p.normal) -
           GeoMakie.glyph_support(half_extents, p.normal) ≈ pad
 
-    # Both modes leave exactly `pad` between glyph and anchor, at any incidence.
+    # Both modes leave exactly `pad` between glyph and anchor, at any incidence,
+    # measured along the direction the label was moved.
     for angle in range(0.05, pi - 0.05; length = 25), mode in (:axis, :normal)
         normal = Vec2d(cos(angle), -sin(angle))
         sample = spine_point(projected = (0, 0), dir = Point2d(normal),
                              intersect_dir = Point2d(-normal[2], normal[1]))
         p = GeoMakie.place_ticklabel(sample, :bottom, half_extents, pad; mode)
         @test p.normal ≈ normal
-        @test dot(p.center - p.anchor, p.normal) -
-              GeoMakie.glyph_support(half_extents, p.normal) ≈ pad
+        @test dot(p.center - p.anchor, p.direction) -
+              GeoMakie.glyph_support(half_extents, p.direction) ≈ pad
+    end
+
+    # The gap a reader sees is the one along the axis, and it does not grow as
+    # the boundary tilts away.  Measuring the clearance along the normal used to
+    # inflate it by 1/cos of the incidence, stepping the labels of a curved limb
+    # further out the further they were from the widest point.
+    for angle in range(0.0, acos(0.5) - 1e-6; length = 12)
+        normal = Vec2d(-cos(angle), sin(angle))
+        sample = spine_point(projected = (0, 0), dir = Point2d(normal),
+                             intersect_dir = Point2d(-normal[2], normal[1]))
+        p = GeoMakie.place_ticklabel(sample, :left, half_extents, pad)
+        @test p.mode === :axis
+        @test p.center[2] ≈ 0 atol = 1e-9         # no drift along the side
+        @test p.center[1] ≈ -(pad + half_extents[1])
     end
 
     # A boundary too steep for its axis rotates onto the normal instead of being
@@ -411,6 +433,72 @@ end
     @test minimum(p[1] for p in equator) ≈ minimum(rect)[1] atol = 1e-6
     @test maximum(p[1] for p in equator) ≈ maximum(rect)[1] atol = 1e-6
     assert_labels(ax)
+end
+
+@testset "Source extent of a shifted world map" begin
+    # The view's own corners are past the ends of the pole line, and both of its
+    # vertical edges are the one seam, so inverse-projecting the bounding box
+    # reports a sliver near the central meridian instead of the whole world.
+    # `trans` projects, `trans_inv` inverts, matching `project_tick_points!`.
+    trans = GeoMakie.create_transform("+proj=robin +lon_0=150", "+proj=longlat +datum=WGS84")
+    trans_inv = GeoMakie.create_transform("+proj=longlat +datum=WGS84", "+proj=robin +lon_0=150")
+    δ = 1.0e-6
+    rect = Makie.apply_transform(trans, Rect2d(-30 + δ, -90, 360 - 2δ, 180))
+
+    naive = Makie.xlimits(Makie.apply_transform(trans_inv, rect))
+    @test naive[2] - naive[1] < 359                  # the whole world, short of a turn
+    # Both reported ends are interior points, tens of degrees from the seam.
+    @test abs(Makie.apply_transform(trans, Point2d(naive[1], 0))[1]) < 0.5 * maximum(rect)[1]
+    @test abs(Makie.apply_transform(trans, Point2d(naive[2], 0))[1]) < 0.5 * maximum(rect)[1]
+
+    xlims, ylims = GeoMakie.source_extent(trans, trans_inv, rect)
+    @test xlims[1] ≈ -30 atol = 1
+    @test xlims[2] ≈ 330 atol = 1
+    @test ylims[1] ≈ -90 atol = 1
+    @test ylims[2] ≈ 90 atol = 1
+
+    # A zoomed view keeps its own extent rather than being widened to a turn.
+    # The projected bounding box is a little wider than the requested longitudes
+    # -- Robinson's meridians converge, so the box's width is set at its lowest
+    # latitude -- and the extent covers the box, not the request.
+    zoomed = Makie.apply_transform(trans, Rect2d(100, 10, 40, 30))
+    zx, zy = GeoMakie.source_extent(trans, trans_inv, zoomed)
+    @test 90 < zx[1] <= 100
+    @test 140 <= zx[2] < 150
+    @test zy[1] ≈ 10 atol = 1
+    @test zy[2] ≈ 40 atol = 1
+end
+
+@testset "A shifted world map labels its limb, not its middle" begin
+    # The parallels used to be traced over a longitude range that stopped short
+    # of the seam, leaving both of their endpoints -- and so both latitude
+    # labels -- a few tens of degrees either side of the central meridian, drawn
+    # over the map instead of beside it.
+    δ = 1.0e-6
+    _, ax = realize_geoaxis(; dest = "+proj=robin +lon_0=150",
+        limits = ((-30 + δ, 330 - δ), (-90, 90)),
+        xticks = collect(-30.0:30.0:300.0), yticks = collect(-90.0:30.0:90.0))
+    boxes = label_boxes(ax, :y)
+    values = parse_labels(ax.elements[:yticklabels])
+    @test length(boxes) >= 5
+
+    # The equator spans the full width of the view: its graticule reaches the
+    # seam at both ends.
+    rect = ax.finallimits[]
+    equator = argmin(c -> abs(sum(p[2] for p in c) / length(c)),
+        line_components(ax.elements[:ygrid]))
+    @test minimum(p[1] for p in equator) ≈ minimum(rect)[1] atol = 1e-6
+    @test maximum(p[1] for p in equator) ≈ maximum(rect)[1] atol = 1e-6
+
+    # Every label clears the western limb by the padding and no more.  The
+    # anchors used to sit a few tens of degrees east of the central meridian, and
+    # measuring the padding along the boundary normal used to push the labels
+    # near the poles progressively further out: 5 pixels at the equator became
+    # 19 at 60 degrees.
+    limb_x(lat) = pixel_point(ax, (-30 + δ, lat))[1]
+    for (box, value) in zip(boxes, values)
+        @test limb_x(value) - maximum(box)[1] ≈ ax.yticklabelpad[] atol = 0.5
+    end
 end
 
 @testset "Poles and corners" begin
