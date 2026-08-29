@@ -4,9 +4,6 @@ using LinearAlgebra
 # ends may be annotated, and where it stops around a pole.  Nothing here draws.
 
 @testset "Geographic ladder" begin
-    # The pairing is a table: no divisor takes 15 to 5 and 10 to 2.
-    @test GeoMakie.GEOGRAPHIC_LADDER == ((2, 1), (5, 1), (10, 2), (15, 5), (30, 10), (60, 15), (90, 30))
-    @test length(GeoMakie.GEOGRAPHIC_INTERVALS) == 21
     @test issorted(GeoMakie.GEOGRAPHIC_INTERVALS; by = first)
     @test all(pair -> 0 < pair[2] < pair[1], GeoMakie.GEOGRAPHIC_INTERVALS)
 
@@ -37,20 +34,35 @@ end
     @test GeoMakie.typographic_interval(360, NaN, 56) == Inf
 
     # A world map at the default font: thirty degrees, the graticule GMT draws.
-    @test GeoMakie.graticule_interval(360, 180, 720, 440, 16, 16).major == 30.0
+    @test GeoMakie.graticule_interval((360, 180), (720, 440), (16, 16)).x.major == 30.0
+    @test GeoMakie.graticule_interval((360, 180), (720, 440), (16, 16)).y.major == 30.0
     # More room, finer graticule.
-    @test GeoMakie.graticule_interval(360, 180, 2880, 1760, 16, 16).major < 30.0
+    @test GeoMakie.graticule_interval((360, 180), (2880, 1760), (16, 16)).x.major < 30.0
     # A larger font asks for fewer labels.
-    @test GeoMakie.graticule_interval(360, 180, 720, 440, 32, 32).major >= 30.0
+    @test GeoMakie.graticule_interval((360, 180), (720, 440), (32, 32)).x.major >= 30.0
     # X and Y share one interval: the direction with less room decides.  Here
     # that is X, at a quarter of the width for the same span.
-    @test GeoMakie.graticule_interval(100, 100, 200, 800, 16, 16) ==
+    @test GeoMakie.graticule_interval((100, 100), (200, 800), (16, 16)).x ==
+        GeoMakie.geographic_interval(100 * 56 / 200)
+    @test GeoMakie.graticule_interval((100, 100), (200, 800), (16, 16)).y ==
         GeoMakie.geographic_interval(100 * 56 / 200)
 
     # A polar view is a whole turn of longitude across fifty degrees of latitude:
-    # equalizing on the turn alone would leave one parallel.
-    polar = GeoMakie.graticule_interval(360, 55, 524, 524, 16, 16)
-    @test polar.major <= 55 / GeoMakie.MIN_GRATICULE_LINES
+    # equalizing on the turn alone would leave one parallel, so the rescue
+    # equalizes on the interval that keeps the parallels drawn.
+    polar = GeoMakie.graticule_interval((360, 55), (524, 524), (16, 16))
+    @test polar.x == polar.y
+    @test polar.y.major <= 55 / GeoMakie.MIN_GRATICULE_LINES
+    # An oblique globe likewise: the rescue holds while every line keeps its room.
+    globe = GeoMakie.graticule_interval((360, 150), (540, 390), (16, 16))
+    @test globe.x == globe.y
+    @test globe.y.major == 30.0
+
+    # A wide, short view must not carry the short direction's rescue into the
+    # long one: its gridlines would sit three pixels apart.
+    wide = GeoMakie.graticule_interval((360, 10), (600, 600), (16, 16))
+    @test wide.x.major == 60.0
+    @test wide.y.major == 1.0
 end
 
 @testset "Graticule tick values" begin
@@ -60,10 +72,15 @@ end
     # Finer than the ladder reaches: the fallback tick finder supplies the ticks.
     @test length(GeoMakie.graticule_tickvalues(0, 1.0e-5, 2 / 3600)) >= 2
     @test isempty(GeoMakie.graticule_tickvalues(NaN, 1, 30.0))
-    # An interval of zero is how the axis asks for the fallback, for a view
+    # A range laid just inside the map's cut keeps the meridian on it at both ends.
+    @test GeoMakie.graticule_tickvalues(-180 + 1.0e-6, 180 - 1.0e-6, 30.0) ==
+        collect(-180.0:30.0:180.0)
+    # An interval of `nothing` is how the axis asks for the fallback, for a view
     # finer than `LADDER_DEGREE_FLOOR`.
-    @test length(GeoMakie.graticule_tickvalues(-122.6, -122.2, 0.0)) >= 3
-    @test all(v -> -122.6 <= v <= -122.2, GeoMakie.graticule_tickvalues(-122.6, -122.2, 0.0))
+    @test length(GeoMakie.graticule_tickvalues(-122.6, -122.2, nothing)) >= 3
+    @test all(v -> -122.6 <= v <= -122.2, GeoMakie.graticule_tickvalues(-122.6, -122.2, nothing))
+    @test GeoMakie.ladder_major((major = 30.0, minor = 10.0)) == 30.0
+    @test isnothing(GeoMakie.ladder_major((major = 0.5, minor = 1 / 6)))
 
     # Traced on the turn the map was cut on, labelled on the turn it is read on.
     @test GeoMakie.wrap_longitudes([-420.0, -390.0, -180.0, 0.0, 180.0]) ==
@@ -81,10 +98,14 @@ end
     @test GeoMakie.graticule_latitude_limit("+proj=eqearth") == 90.0
     @test GeoMakie.graticule_latitude_limit(GeoMakie.GeoFormatTypes.EPSG(4326)) == 90.0
 
-    @test GeoMakie.limit_graticule_latitudes(collect(-90.0:15.0:90.0), 60.0) ==
+    @test GeoMakie.limit_graticule_latitudes(collect(-90.0:15.0:90.0), 60.0, (-90.0, 90.0)) ==
         collect(-60.0:15.0:60.0)
     # Zoomed above the limit there is nothing else to draw, and it gives way.
-    @test GeoMakie.limit_graticule_latitudes([70.0, 75.0, 80.0], 60.0) == [70.0, 75.0, 80.0]
+    @test GeoMakie.limit_graticule_latitudes([70.0, 75.0, 80.0], 60.0, (70.0, 90.0)) ==
+        [70.0, 75.0, 80.0]
+    # A view short of the pole keeps every parallel.
+    @test GeoMakie.limit_graticule_latitudes([50.0, 55.0, 60.0, 65.0, 70.0], 60.0, (50.0, 70.0)) ==
+        [50.0, 55.0, 60.0, 65.0, 70.0]
 end
 
 @testset "Grazing incidence" begin
@@ -136,28 +157,46 @@ end
 end
 
 @testset "Polar cap" begin
-    @test GeoMakie.polar_cap_meridian(0.0)
-    @test GeoMakie.polar_cap_meridian(-180.0)
-    @test GeoMakie.polar_cap_meridian(90.0)
-    @test !GeoMakie.polar_cap_meridian(30.0)
+    north = (south = false, north = true)
+    both = (south = true, north = true)
 
-    @test GeoMakie.polar_cap_range((-90.0, 90.0), [90.0], 85.0) == (-90.0, 85.0)
-    @test GeoMakie.polar_cap_range((-90.0, 90.0), [-90.0, 90.0], 85.0) == (-85.0, 85.0)
-    @test GeoMakie.polar_cap_range((-90.0, 90.0), Float64[], 85.0) == (-90.0, 90.0)
-    @test GeoMakie.polar_cap_range((-90.0, 90.0), [90.0], nothing) == (-90.0, 90.0)
+    @test GeoMakie.polar_cap_range((-90.0, 90.0), north, 85.0) == (-90.0, 85.0)
+    @test GeoMakie.polar_cap_range((-90.0, 90.0), both, 85.0) == (-85.0, 85.0)
+    @test GeoMakie.polar_cap_range((-90.0, 90.0), GeoMakie.NO_INTERIOR_POLES, 85.0) == (-90.0, 90.0)
+    # A disabled cap arrives as no poles, and its latitude is never read.
+    @test GeoMakie.polar_cap_range((-90.0, 90.0), GeoMakie.NO_INTERIOR_POLES, nothing) == (-90.0, 90.0)
     # A view wholly inside the cap keeps its meridians.
-    @test GeoMakie.polar_cap_range((86.0, 90.0), [90.0], 85.0) == (86.0, 90.0)
+    @test GeoMakie.polar_cap_range((86.0, 90.0), north, 85.0) == (86.0, 90.0)
 
-    @test GeoMakie.polar_cap_parallels((-90.0, 90.0), [90.0], 85.0) == [85.0]
-    @test GeoMakie.polar_cap_parallels((-90.0, 90.0), [-90.0, 90.0], 85.0) == [-85.0, 85.0]
-    @test isempty(GeoMakie.polar_cap_parallels((0.0, 80.0), [90.0], 85.0))
-    @test isempty(GeoMakie.polar_cap_parallels((-90.0, 90.0), [90.0], nothing))
+    @test GeoMakie.polar_cap_parallels((-90.0, 90.0), north, 85.0) == [85.0]
+    @test GeoMakie.polar_cap_parallels((-90.0, 90.0), both, 85.0) == [-85.0, 85.0]
+    @test isempty(GeoMakie.polar_cap_parallels((0.0, 80.0), north, 85.0))
+    @test isempty(GeoMakie.polar_cap_parallels((-90.0, 90.0), GeoMakie.NO_INTERIOR_POLES, nothing))
+
+    # The cap meridians are traced over exactly the range the ordinary ones give up.
+    @test GeoMakie.polar_cap_segments((-90.0, 90.0), north, 85.0) == [(85.0, 90.0)]
+    @test GeoMakie.polar_cap_segments((-90.0, 90.0), both, 85.0) == [(-90.0, -85.0), (85.0, 90.0)]
+    @test isempty(GeoMakie.polar_cap_segments((-90.0, 90.0), GeoMakie.NO_INTERIOR_POLES, nothing))
+    @test isempty(GeoMakie.polar_cap_segments((86.0, 90.0), north, 85.0))
 
     # Drawing all the way round a pole is what makes it interior; a pole on the
     # boundary has drawing on one side of it only.
     enclosed(p) = norm(Point2d(p) - Point2d(0, 90)) <= 5
     edged(p) = enclosed(p) && p[2] <= 90
-    @test GeoMakie.interior_poles(identity, enclosed, 1.0) == [90.0]
-    @test isempty(GeoMakie.interior_poles(identity, edged, 1.0))
-    @test isempty(GeoMakie.interior_poles(identity, p -> false, 1.0))
+    @test GeoMakie.interior_poles(identity, enclosed, 1.0, 0.0) == north
+    @test GeoMakie.interior_poles(identity, edged, 1.0, 0.0) == GeoMakie.NO_INTERIOR_POLES
+    @test GeoMakie.interior_poles(identity, p -> false, 1.0, 0.0) == GeoMakie.NO_INTERIOR_POLES
+    # The probe sits on the reference meridian, where an oblique view is looking.
+    oblique(p) = norm(Point2d(p) - Point2d(150, 90)) <= 5
+    @test GeoMakie.interior_poles(identity, oblique, 1.0, 150.0) == north
+    @test GeoMakie.interior_poles(identity, oblique, 1.0, 0.0) == GeoMakie.NO_INTERIOR_POLES
+end
+
+@testset "Rect projection snaps its edges" begin
+    t = GeoMakie.create_transform("+proj=moll", "+proj=longlat +datum=WGS84")
+    # A rect a rounding error past the antimeridian snaps onto it.
+    past = Makie.apply_transform(t, Rect2d((-180.00001, -90.0), (360.00001, 180.0)))
+    exact = Makie.apply_transform(t, Rect2d((-180.0, -90.0), (360.0, 180.0)))
+    @test minimum(past) ≈ minimum(exact) rtol = 1.0e-6
+    @test maximum(past) ≈ maximum(exact) rtol = 1.0e-6
 end

@@ -807,10 +807,11 @@ function source_extent(trans, trans_inverse, rect; n = 65)
     # does not project back; rejecting it there would stop every meridian short
     # of a pole that is plainly drawn.
     function drawn_pole(lat)
-        at(l) = Point2d(Makie.apply_transform(trans, Point2d(reference, l)))
-        p = at(lat)
+        project(q) = Point2d(Makie.apply_transform(trans, q))
+        p = project(Point2d(reference, lat))
         (all(isfinite, p) && all(mini .<= p .<= maxi)) || return false
-        return !isnothing(inverse(p)) || !isnothing(inverse(at(lat - sign(lat) * POLE_PROBE)))
+        return !isnothing(inverse(p)) ||
+            !isnothing(inverse(project(pole_probe_point(reference, lat))))
     end
     drawn_pole(90.0) && (high = Point2d(high[1], 90.0))
     drawn_pole(-90.0) && (low = Point2d(low[1], -90.0))
@@ -834,15 +835,13 @@ function source_extent(trans, trans_inverse, rect; n = 65)
     return ((low[1], high[1]), (low[2], high[2]))
 end
 
-function project_tick_points!(result, trans, trans_inverse, range, coordinate, dim, limit_rect,
-                              spine_start, spine_end)
+function project_tick_points!(result, trans, trans_inverse, drawn, radius, range, coordinate,
+                              dim, limit_rect, spine_start, spine_end)
     # dim == 1 traces a meridian at constant longitude, dim == 2 a parallel.
     point_fun(tick) = dim === 1 ? Point2d(coordinate, tick) : Point2d(tick, coordinate)
 
     # What is drawn is the map clipped to the view, and a tick label belongs
     # outside whichever of the two ends the graticule it labels.
-    drawn = drawn_predicate(trans, trans_inverse, limit_rect)
-    radius = OUTLINE_RADIUS * norm(widths(limit_rect))
     outline(p_t) = outline_normal(drawn, p_t, radius)
 
     lines, lines_transformed, intersections = valid_line_in_limits(
@@ -1151,6 +1150,9 @@ function Makie.initialize_block!(axis::GeoAxis)
     spines_obs = Obs(Spines())
     finallimits = map(identity, scene, axis.finallimits; ignore_equal_values=true)
     vp_unchanged = map(identity, scene, scene.viewport; ignore_equal_values=true)
+    # Derived rather than `axis.dest` itself: the transform observables above
+    # already carry a destination change here, and this one rarely moves with it.
+    latitude_limit_obs = map(graticule_latitude_limit, scene, axis.dest; ignore_equal_values=true)
     # This is kind of the main redrawing loop for the axis.  This should really be
     # factored out into a sync and async function, so that zooming is fluid, but
     # we can figure that out later.
@@ -1160,9 +1162,9 @@ function Makie.initialize_block!(axis::GeoAxis)
     # TODO: implement a minor grid.
     onany(scene, axis.xticks, axis.yticks,
         transform_ticks_obs, finallimits, vp_unchanged,
-        axis.xticklabelsize, axis.yticklabelsize, axis.dest, axis.polarcap;
+        axis.xticklabelsize, axis.yticklabelsize, latitude_limit_obs, axis.polarcap;
         update=true) do user_xticks, user_yticks, trans, fl, vp,
-            xlabelsize, ylabelsize, dest, polarcap
+            xlabelsize, ylabelsize, latitude_limit, polarcap
 
         lon_transformed = Point2d[]
         lat_transformed = Point2d[]
@@ -1178,28 +1180,29 @@ function Makie.initialize_block!(axis::GeoAxis)
         end
         xlims, ylims = extent
 
-        # One interval serves both directions, chosen from the room a label needs
-        # against the room the axis has.  `interval.minor` waits on a minor grid;
-        # anything finer than `LADDER_DEGREE_FLOOR` waits on a formatter, and
-        # `graticule_tickvalues` falls back to its tick finder for it.
+        # An interval per direction, chosen from the room a label needs against
+        # the room the axis has.  The minors wait on a minor grid; anything finer
+        # than `LADDER_DEGREE_FLOOR` waits on a formatter, and `ladder_major`
+        # asks `graticule_tickvalues` for its fallback tick finder instead.
         interval = graticule_interval(
-            xlims[2] - xlims[1], ylims[2] - ylims[1], widths(vp)..., xlabelsize, ylabelsize)
-        major = interval.major < LADDER_DEGREE_FLOOR ? 0.0 : interval.major
+            (xlims[2] - xlims[1], ylims[2] - ylims[1]), widths(vp), (xlabelsize, ylabelsize))
         xtickvalues = collect(Float64,
-            user_xticks isa Makie.Automatic ? graticule_tickvalues(xlims..., major) :
+            user_xticks isa Makie.Automatic ?
+                graticule_tickvalues(xlims..., ladder_major(interval.x)) :
                 Makie.get_tickvalues(user_xticks, xlims...))
         ytickvalues = collect(Float64,
             user_yticks isa Makie.Automatic ?
                 limit_graticule_latitudes(
-                    graticule_tickvalues(ylims..., major),
-                    graticule_latitude_limit(dest)) :
+                    graticule_tickvalues(ylims..., ladder_major(interval.y)),
+                    latitude_limit, ylims) :
                 Makie.get_tickvalues(user_yticks, ylims...))
 
+        drawn = drawn_predicate(trans, trans_inverse, limit_rect)
+        radius = OUTLINE_RADIUS * norm(widths(limit_rect))
         # Poles the map closes around, where the meridians would otherwise fan
         # into a rosette in the last few degrees.
-        poles = isnothing(polarcap) ? Float64[] : interior_poles(
-            trans, drawn_predicate(trans, trans_inverse, limit_rect),
-            OUTLINE_RADIUS * norm(widths(limit_rect)))
+        poles = isnothing(polarcap) ? NO_INTERIOR_POLES :
+            interior_poles(trans, drawn, radius, (xlims[1] + xlims[2]) / 2)
         capped_ylims = polar_cap_range(ylims, poles, polarcap)
 
         spines = spines_obs[]
@@ -1208,20 +1211,27 @@ function Makie.initialize_block!(axis::GeoAxis)
         # each one across the whole inverse-transformed view and let
         # `valid_line_in_limits` clip it in projected space.
         for lon in xtickvalues
-            project_tick_points!(lon_transformed, trans, trans_inverse,
-                                 polar_cap_meridian(lon) ? ylims : capped_ylims,
-                                 lon, 1, limit_rect, spines.bottom, spines.top)
+            project_tick_points!(lon_transformed, trans, trans_inverse, drawn, radius,
+                                 capped_ylims, lon, 1, limit_rect, spines.bottom, spines.top)
+        end
+        # Cap meridians are generated, not filtered from the ticks: the cap
+        # promises one every `POLAR_CAP_MERIDIAN_INTERVAL` degrees whatever
+        # interval the axis chose.  Unlabelled, like the cap parallel below.
+        for range in polar_cap_segments(ylims, poles, polarcap),
+                lon in interval_multiples(xlims[1], xlims[2], POLAR_CAP_MERIDIAN_INTERVAL)
+            project_tick_points!(lon_transformed, trans, trans_inverse, drawn, radius,
+                                 range, lon, 1, limit_rect, nothing, nothing)
         end
         for lat in ytickvalues
-            project_tick_points!(lat_transformed, trans, trans_inverse, xlims, lat, 2, limit_rect,
-                                 spines.left, spines.right)
+            project_tick_points!(lat_transformed, trans, trans_inverse, drawn, radius,
+                                 xlims, lat, 2, limit_rect, spines.left, spines.right)
         end
         # The parallel closing a cap is a gridline and not a tick: it is drawn
         # wherever the cap falls, which is not a value the tick finder chose, and
         # labelling it would put a latitude on the axis that no other line shares.
         for lat in polar_cap_parallels(ylims, poles, polarcap)
-            project_tick_points!(lat_transformed, trans, trans_inverse, xlims, lat, 2, limit_rect,
-                                 nothing, nothing)
+            project_tick_points!(lat_transformed, trans, trans_inverse, drawn, radius,
+                                 xlims, lat, 2, limit_rect, nothing, nothing)
         end
 
         lonticks_line_obs[] = lon_transformed

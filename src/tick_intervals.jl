@@ -101,62 +101,122 @@ end
 """
 The fewest lines a graticule is drawn with in either direction.
 
-Equalizing on the coarser interval leaves the shorter direction too few, or none:
-a polar view is a whole turn of longitude across fifty degrees of latitude, and
-the turn asks for an interval the fifty degrees have no room to repeat.  Three
-lines is the fewest that reads as a grid rather than as an accident.
+Equalizing on the coarser interval can leave the shorter direction too few, or
+none: a polar view is a whole turn of longitude across fifty degrees of latitude,
+and the turn asks for an interval the fifty degrees have no room to repeat.
+Three lines is the fewest that reads as a grid rather than as an accident.
 """
 const MIN_GRATICULE_LINES = 3
 
 """
-    graticule_interval(xspan, yspan, width, height, xfontsize, yfontsize)
-
-The `(; major, minor)` interval in degrees for both directions of a graticule,
-given its spans in degrees, the pixels it is drawn across, and the tick label
-font sizes.
-
-One interval serves both: a graticule reads as a grid only when its two spacings
-agree, and the coarser of the two is the one that fits.  See
-[`TICKLABEL_WIDTH_EM`](@ref) and [`TICKLABEL_HEIGHT_EM`](@ref) for the label size
-the fit is measured against, and [`MIN_GRATICULE_LINES`](@ref) for the floor that
-keeps the shorter direction drawn.
+The fewest pixels between two gridlines, in em of the tick label font, for the
+[`MIN_GRATICULE_LINES`](@ref) rescue to hold in a direction.  An unlabelled line
+needs less room than a label, and below this the rescue trades a starved
+direction for a flooded one.
 """
-function graticule_interval(xspan, yspan, width, height, xfontsize, yfontsize)
-    fits = geographic_interval(max(
-        typographic_interval(xspan, width, TICKLABEL_WIDTH_EM * xfontsize),
-        typographic_interval(yspan, height, TICKLABEL_HEIGHT_EM * yfontsize),
-    ))
-    shortest = min(abs(xspan), abs(yspan))
-    isfinite(shortest) || return fits
-    keeps_lines = geographic_interval_below(shortest / MIN_GRATICULE_LINES)
-    return fits.major <= keeps_lines.major ? fits : keeps_lines
+const MIN_GRATICULE_SPACING_EM = 0.5
+
+"""
+    graticule_interval(spans, size, fontsizes)
+
+The `(; x, y)` intervals of a graticule, each a `(; major, minor)` pair in
+degrees, given its spans in degrees, the pixels it is drawn across, and the tick
+label font sizes -- longitude in the first component of each, latitude in the
+second.
+
+One interval serves both directions where it can: a graticule reads as a grid
+when its two spacings agree.  The shared interval is the coarser typographic
+fit, unless that starves the shorter direction of its
+[`MIN_GRATICULE_LINES`](@ref), in which case it is the interval that keeps them
+-- provided every gridline still gets its [`MIN_GRATICULE_SPACING_EM`](@ref) of
+room.  Only where no one interval serves does each direction take its own
+typographic fit, the shorter one floored so that it stays drawn.  See
+[`TICKLABEL_WIDTH_EM`](@ref) and [`TICKLABEL_HEIGHT_EM`](@ref) for the label
+size the fit is measured against.
+"""
+function graticule_interval(spans, size, fontsizes)
+    xfit = geographic_interval(typographic_interval(spans[1], size[1], TICKLABEL_WIDTH_EM * fontsizes[1]))
+    yfit = geographic_interval(typographic_interval(spans[2], size[2], TICKLABEL_HEIGHT_EM * fontsizes[2]))
+    shared = xfit.major >= yfit.major ? xfit : yfit
+    shortest = min(abs(spans[1]), abs(spans[2]))
+    isfinite(shortest) || return (; x = shared, y = shared)
+    keeps = geographic_interval_below(shortest / MIN_GRATICULE_LINES)
+    shared.major <= keeps.major && return (; x = shared, y = shared)
+    spacing(i) = size[i] * keeps.major / abs(spans[i])
+    if all(i -> spacing(i) >= MIN_GRATICULE_SPACING_EM * fontsizes[i], (1, 2))
+        return (; x = keeps, y = keeps)
+    end
+    shorter = abs(spans[1]) <= abs(spans[2]) ? 1 : 2
+    fits = (xfit, yfit)
+    rescued(i) = i == shorter && fits[i].major > keeps.major ? keeps : fits[i]
+    return (; x = rescued(1), y = rescued(2))
 end
 
 """
-Slack, in multiples of the interval, when looking for the first tick in range.
-`-122.6 / 0.1` is `-1225.9999999999998`, and a bare `ceil` of it skips the tick at
-`-122.6` -- the left edge of the view, where a label is most wanted.
+Slack, in multiples of the interval, when matching a coordinate against a
+multiple of that interval.  `-122.6 / 0.1` is `-1225.9999999999998`, and a bare
+`ceil` of it skips the tick at `-122.6` -- the left edge of the view, where a
+label is most wanted.
 """
 const TICK_MULTIPLE_EPS = 1.0e-9
 
 """
+    interval_multiples(lo, hi, interval)
+
+Every multiple of the positive `interval` in `[lo, hi]`, with slack at both ends:
+[`TICK_MULTIPLE_EPS`](@ref) relative to the multiple, and no less than
+[`CUT_MARGIN`](@ref) of coordinate, so a range laid `CUT_MARGIN` inside the
+map's cut keeps the tick sitting exactly on it.
+"""
+function interval_multiples(lo, hi, interval)
+    slack(q) = max(TICK_MULTIPLE_EPS * max(1.0, abs(q)), CUT_MARGIN / interval)
+    qlo, qhi = lo / interval, hi / interval
+    start = ceil(qlo - slack(qlo))
+    stop = floor(qhi + slack(qhi))
+    return Float64[k * interval for k in start:stop]
+end
+
+"""
+    snap_tickvalues(values)
+
+Strip floating-point noise from tick values, leaving them exact enough to
+compare against and to format.  A tick finder on an already-zoomed range
+accumulates it: `WilkinsonTicks` over `(-122.6, -122.2)` returns
+`-122.30000000000001`.
+
+Values are rounded two decimal places beyond the smallest gap between them, and
+only if that moves nothing appreciably, so a legitimate value is never altered.
+"""
+function snap_tickvalues(values)
+    result = collect(Float64, values)
+    steps = filter(>(0), abs.(diff(sort(result))))
+    isempty(steps) && return result
+    step = minimum(steps)
+    digits = clamp(-floor(Int, log10(step)) + 2, 0, 12)
+    rounded = round.(result; digits)
+    # Widely spaced ticks imply a coarse precision that a fractional value would
+    # not survive: rounding `[0.5, 1001.0]` to whole degrees loses the `0.5`.
+    maximum(abs, rounded .- result) > 1.0e-6 * step && return result
+    return rounded
+end
+
+"""
     graticule_tickvalues(lo, hi, interval; fallback = Makie.WilkinsonTicks(5; k_min = 3))
 
-Every multiple of `interval` between `lo` and `hi`, snapped by
-[`snap_tickvalues`](@ref).
+Every multiple of `interval` between `lo` and `hi`, by
+[`interval_multiples`](@ref) and snapped by [`snap_tickvalues`](@ref).
 
 `fallback`, any Makie tick finder, takes over in two cases: an `interval` that
-places fewer than two ticks in the view, and an `interval` of zero -- which is
-how a view finer than [`LADDER_DEGREE_FLOOR`](@ref) is drawn.
+places fewer than two ticks in the view, and an `interval` of `nothing` -- which
+is how [`ladder_major`](@ref) asks for the fallback below
+[`LADDER_DEGREE_FLOOR`](@ref).
 """
 function graticule_tickvalues(lo, hi, interval; fallback = Makie.WilkinsonTicks(5; k_min = 3))
     (isfinite(lo) && isfinite(hi)) || return Float64[]
     lo, hi = min(lo, hi), max(lo, hi)
     values = Float64[]
-    if isfinite(interval) && interval > 0
-        quotient = lo / interval
-        start = ceil(quotient - TICK_MULTIPLE_EPS * max(1.0, abs(quotient)))
-        values = collect(Float64, (start * interval):interval:hi)
+    if !isnothing(interval) && isfinite(interval) && interval > 0
+        values = interval_multiples(lo, hi, interval)
     end
     length(values) >= 2 && return snap_tickvalues(values)
     return snap_tickvalues(Makie.get_tickvalues(fallback, identity, lo, hi))
@@ -172,6 +232,14 @@ that fine is left to the fallback tick finder, whose decimal degrees the
 formatter does render.
 """
 const LADDER_DEGREE_FLOOR = 1.0
+
+"""
+    ladder_major(interval)
+
+`interval.major`, or `nothing` where it lies under [`LADDER_DEGREE_FLOOR`](@ref)
+and the fallback tick finder serves the view instead.
+"""
+ladder_major(interval) = interval.major < LADDER_DEGREE_FLOOR ? nothing : interval.major
 
 """
     wrap_longitudes(values)
@@ -208,7 +276,6 @@ const DEGENERATE_POLE_LATITUDE = 60.0
 
 The `+proj=` name of a CRS, or `""` where there is none to read.
 """
-proj_name(crs) = ""
 function proj_name(crs::AbstractString)
     matched = match(r"\+proj=([A-Za-z0-9_]+)", crs)
     return isnothing(matched) ? "" : String(matched[1])
@@ -226,15 +293,19 @@ graticule_latitude_limit(dest) =
     proj_name(dest) in POINT_POLE_PROJECTIONS ? DEGENERATE_POLE_LATITUDE : 90.0
 
 """
-    limit_graticule_latitudes(values, limit)
+    limit_graticule_latitudes(values, limit, ylims)
 
-`values` without the parallels above `limit`.
+`values` without the parallels beyond `limit`, on the side of a pole the view
+`ylims` reaches.  A view stopping short of a pole keeps every parallel: the
+parallels crowd only where they degenerate onto the pole itself.
 
 The limit gives way where honouring it would leave a single parallel or none:
 zoomed into the polar region there is nothing else to draw, and an unlabelled
 axis is worse than a crowded one.
 """
-function limit_graticule_latitudes(values, limit)
-    kept = filter(v -> abs(v) <= limit, values)
+function limit_graticule_latitudes(values, limit, ylims)
+    hi_capped = max(ylims...) >= 90 - POLE_PROBE
+    lo_capped = min(ylims...) <= -90 + POLE_PROBE
+    kept = filter(v -> (v <= limit || !hi_capped) && (v >= -limit || !lo_capped), values)
     return length(kept) >= 2 ? kept : values
 end
