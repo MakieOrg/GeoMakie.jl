@@ -1,4 +1,6 @@
-# 0.7.17 (unreleased)
+# Unreleased
+
+# 0.7.17 - 2026-08-29
 - `geo2basic` converts any GeoInterface geometry: it decomposes the input to geometries and hands each to `GeoInterface.convert`.
 - `GlobeAxis` lights the globe automatically.
 - `GlobeAxis` accepts spherical projections and a wider range of ellipsoid specifications.
