@@ -57,8 +57,7 @@ end
     @test GeoMakie.graticule_tickvalues(-180, 180, 30.0) == collect(-180.0:30.0:180.0)
     @test GeoMakie.graticule_tickvalues(180, -180, 30.0) == collect(-180.0:30.0:180.0)
     @test GeoMakie.graticule_tickvalues(-122.6, -122.2, 0.1) ≈ collect(-122.6:0.1:-122.2)
-    # Finer than the ladder reaches: a tick finder takes over rather than
-    # leaving the axis with one tick.
+    # Finer than the ladder reaches: the fallback tick finder supplies the ticks.
     @test length(GeoMakie.graticule_tickvalues(0, 1.0e-5, 2 / 3600)) >= 2
     @test isempty(GeoMakie.graticule_tickvalues(NaN, 1, 30.0))
     # An interval of zero is how the axis asks for the fallback, for a view

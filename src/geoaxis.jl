@@ -894,8 +894,8 @@ const NO_TICKLABELS_DROPPED = (crowding = 0, grazing = 0)
 
 """
 Why a tick label is dropped, in the wording of the report, with the attribute
-that controls it.  Dropping quietly is what made GeoMakie issues #134 and #317
-look like bugs in the projection.
+that controls it.  A named reason reads as a choice the axis made, and points at
+the attribute that reverses it; a silent drop reads as a bug in the projection.
 """
 const TICKLABEL_SUPPRESSION_REASONS = (
     crowding = ("crowding", :ticklabelmingap),

@@ -39,8 +39,9 @@ const GEOGRAPHIC_INTERVALS = sort!(
 """
     geographic_interval(target)
 
-The finest interval of [`GEOGRAPHIC_INTERVALS`](@ref) at least as coarse as
-`target` degrees, as a `(; major, minor)` pair, also in degrees.
+`target` degrees rounded up to [`GEOGRAPHIC_INTERVALS`](@ref) -- the first
+interval on the ladder that reaches it -- as a `(; major, minor)` pair, also in
+degrees.
 
 A `target` past either end of the ladder gets the end it passed.  A nonfinite one
 gets the coarse end: a broken layout then draws a graticule of a few lines rather
@@ -57,9 +58,9 @@ end
 """
     geographic_interval_below(limit)
 
-The coarsest interval of [`GEOGRAPHIC_INTERVALS`](@ref) no coarser than `limit`
-degrees, as a `(; major, minor)` pair; the finest interval there is where `limit`
-falls below the ladder.
+`limit` degrees rounded down to [`GEOGRAPHIC_INTERVALS`](@ref) -- the last
+interval on the ladder that stays within it -- as a `(; major, minor)` pair.  A
+`limit` under the whole ladder gets the finest interval there is.
 """
 function geographic_interval_below(limit::Real)
     finest = GEOGRAPHIC_INTERVALS[1]
@@ -144,10 +145,9 @@ const TICK_MULTIPLE_EPS = 1.0e-9
 Every multiple of `interval` between `lo` and `hi`, snapped by
 [`snap_tickvalues`](@ref).
 
-An `interval` that places fewer than two ticks in the view hands over to
-`fallback`, any Makie tick finder, rather than leaving the axis with a single
-tick or none.  An interval of zero asks for the fallback outright, which is how
-a view finer than [`LADDER_DEGREE_FLOOR`](@ref) is drawn.
+`fallback`, any Makie tick finder, takes over in two cases: an `interval` that
+places fewer than two ticks in the view, and an `interval` of zero -- which is
+how a view finer than [`LADDER_DEGREE_FLOOR`](@ref) is drawn.
 """
 function graticule_tickvalues(lo, hi, interval; fallback = Makie.WilkinsonTicks(5; k_min = 3))
     (isfinite(lo) && isfinite(hi)) || return Float64[]
