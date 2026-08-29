@@ -8,89 +8,34 @@ using GeoInterface
 using GeometryBasics
 
 
-# The entry point - takes in any datatype, and gets its GeoInterface trait type
-# then, specializes based on trait type to produce a GeometryBasics object
+# The entry point - decomposes whatever it is handed down to geometries,
+# then hands each one to GeoInterface.convert
 
 """
     geo2basic(input)
 
-Takes any GeoInterface-compatible structure, and returns its equivalent in the GeometryBasics.jl package, which Makie is built on.
+Takes any GeoInterface-compatible object -- a geometry, feature, feature collection,
+table with a geometry column, or any (nested) iterable of those -- and returns the
+equivalent GeometryBasics.jl geometry, or vector of geometries, which is what Makie
+is built on.
 
-Currently works for the following traits:
-
-    - PointTrait
-    - LineTrait
-    - LineStringTrait
-    - PolygonTrait
-    - MultiPolygonTrait
+Feature collections, features and tables are decomposed to their geometries first;
+each geometry is then converted wholesale by `GeoInterface.convert`.
 """
 function geo2basic(input)
-
-    # makew sure that what is passed in is a GeoInterface geometry/feature/featurecollection
-
-    if GeoInterface.isgeometry(input)
-        return geo2basic(GeoInterface.geomtrait(input), input)
-    elseif GeoInterface.isfeature(input)
-        return geo2basic(GeoInterface.getgeom(input))
-    elseif GeoInterface.isfeaturecollection(input)
-    elseif input isa AbstractArray && GeoInterface.isgeometry(eltype(input))
-        return geo2basic.(input)
-    else
-        @error("Input of type $(typeof(input)) does not support GeoInterface!")
-    end
+    return GO.apply(_geometrybasics_geom, GO.TraitTarget{GI.AbstractGeometryTrait}(), GO.get_geometries(input))
 end
 
-function geo2basic(::GeoInterface.PolygonTrait, poly)
-    polygon_coordinates = GeoInterface.coordinates(poly)
-    linestrings = map(x-> to_point2.(x), polygon_coordinates)
-    return GeometryBasics.Polygon(linestrings[1], linestrings[2:end])
-end
-
-function geo2basic(vector::AbstractVector{<:AbstractVector})
-    if isempty(vector)
-        return Point{2, Float64}[]
-    else
-        # GeoJSON strips the eltype so we need to inspect the elements
-        x = first(vector)
-        if x isa AbstractVector && length(x) == 2 && x[1] isa Real
-            return to_point2.(vector)
-        elseif x isa AbstractVector && eltype(x) <: Union{AbstractVector, Tuple}
-            linestrings = map(x-> to_point2.(x), vector)
-            return GeometryBasics.Polygon(linestrings[1], linestrings[2:end])
-        else
-            error("Unsupported eltype: $(x)")
-        end
-    end
-end
-
-# TODO: get this to be general across 3d points as well.
-function geo2basic(::GeoInterface.PointTrait, point)
-    return to_point2(GeoInterface.coordinates(point))
-end
-
-function geo2basic(::GeoInterface.LineTrait, line)
-    return GeometryBasics.Line(geo2basic(GeoInterface.coordinates(line))...)
-end
-
-function geo2basic(::GeoInterface.LineStringTrait, linestring)
-    return GeometryBasics.LineString(geo2basic(GeoInterface.coordinates(linestring)))
-end
-
-function geo2basic(::GeoInterface.MultiLineStringTrait, multilinestring)
-    return GeometryBasics.MultiLineString(
-            GeometryBasics.LineString.(
-                    map.(
-                            to_point2,
-                            GeoInterface.coordinates(multilinestring)
-                    )
-            )
-    )
-end
-
-function geo2basic(::GeoInterface.MultiPolygonTrait, multipoly)
-    polygons = GeoInterface.coordinates(multipoly)
-    return to_multipoly(geo2basic.(polygons))
-end
+# `GeoInterface.convert` handles every trait that GeometryBasics has a type for.
+_geometrybasics_geom(geom) = _geometrybasics_geom(GI.trait(geom), geom)
+_geometrybasics_geom(::GI.AbstractGeometryTrait, geom) = GI.convert(GeometryBasics, geom)
+# The two exceptions are linear rings and geometry collections, which GeometryBasics
+# has no equivalent type for.  Rings become (closed) linestrings, and collections stay
+# GeoInterface geometry collections whose members are GeometryBasics geometries.
+_geometrybasics_geom(::GI.LinearRingTrait, geom) =
+    GI.convert(GeometryBasics, GI.LineString(collect(GI.getpoint(geom)); extent = GI.extent(geom), crs = GI.crs(geom)))
+_geometrybasics_geom(::GI.GeometryCollectionTrait, geom) =
+    GI.GeometryCollection(map(_geometrybasics_geom, collect(GI.getgeom(geom))); extent = GI.extent(geom), crs = GI.crs(geom))
 
 
 
@@ -102,7 +47,7 @@ geometry into a `GeometryBasics.MultiPolygon`. `GeometryCollection`s are handled
 extracting their polygon and multipolygon members and unioning them.
 """
 to_multipoly(poly::GeometryBasics.Polygon) = GeometryBasics.MultiPolygon([poly])
-to_multipoly(poly::Vector{GeometryBasics.Polygon}) = GeometryBasics.MultiPolygon(poly)
+to_multipoly(polys::AbstractVector{<:GeometryBasics.Polygon}) = GeometryBasics.MultiPolygon(polys)
 to_multipoly(mp::GeometryBasics.MultiPolygon) = mp
 to_multipoly(geom) = to_multipoly(GeoInterface.trait(geom), geom)
 to_multipoly(geom::AbstractVector) = to_multipoly.(GeoInterface.trait.(geom), geom)
@@ -115,27 +60,18 @@ function to_multipoly(::GeoInterface.GeometryCollectionTrait, geom)
     if isempty(poly_and_multipoly_s) # geometry is effectively empty
         return GeometryBasics.MultiPolygon([GeometryBasics.Polygon(Point{2 + GeoInterface.hasz(geom) + GeoInterface.hasm(geom), Float64}[])])
     else # effectively "unary union" the geometry collection
-        final_multipoly = reduce((x, y) -> GeometryOps.union(x, y; target = GeoInterface.MultiPolygonTrait()), poly_and_multipoly_s)
+        final_multipoly = reduce((x, y) -> GO.union(x, y; target = GeoInterface.MultiPolygonTrait()), poly_and_multipoly_s)
         return to_multipoly(final_multipoly)
     end
 end
 
 to_multilinestring(poly::GeometryBasics.LineString) = GeometryBasics.MultiLineString([poly])
-to_multilinestring(poly::Vector{GeometryBasics.Polygon}) = GeometryBasics.MultiLineString(poly)
+to_multilinestring(ls::AbstractVector{<:GeometryBasics.LineString}) = GeometryBasics.MultiLineString(ls)
 to_multilinestring(mp::GeometryBasics.MultiLineString) = mp
 to_multilinestring(geom) = to_multilinestring(GeoInterface.trait(geom), geom)
 to_multilinestring(geom::AbstractVector) = to_multilinestring.(GeoInterface.trait.(geom), geom)
 to_multilinestring(::GeoInterface.LineStringTrait, geom) = GeometryBasics.MultiLineString([GeoInterface.convert(GeometryBasics, geom)])
 to_multilinestring(::GeoInterface.MultiLineStringTrait, geom) = GeoInterface.convert(GeometryBasics, geom)
-
-
-# GeoJSON-specific overrides for clarity
-# Only converts polygons and multipolygons
-function geo2basic(fc::GeoJSON.FeatureCollection)
-    return map(geo2basic, fc)
-end
-
-geo2basic(feature::GeoJSON.Feature) = geo2basic(GeoInterface.geometry(feature))
 
 function _mls2ls(mls::GeometryBasics.MultiLineString{N, T}) where {N, T}
     points = Vector{Point{N, T}}()
