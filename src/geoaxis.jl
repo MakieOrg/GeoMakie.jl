@@ -166,6 +166,8 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         ticklabelmingap::Float64 = 2f0
         "Report tick labels dropped for crowding or grazing incidence at `@info` level. They are reported at `@debug` level either way."
         verbose::Bool = false
+        "The latitude a polar cap begins at, where the map closes around a pole. Meridians stop there, except one every `POLAR_CAP_MERIDIAN_INTERVAL` degrees, and a parallel is drawn to close them. `nothing` draws every meridian to the pole. GMT's `MAP_POLAR_CAP`."
+        polarcap::Union{Nothing,Float64} = 85.0
         "The horizontal and vertical alignment of the xticklabels."
         xticklabelalign::Union{Makie.Automatic, Tuple{Symbol, Symbol}} = Makie.automatic
         "The horizontal and vertical alignment of the yticklabels."
@@ -474,10 +476,26 @@ end
 Round-trip slack, as a fraction of the projected view's diagonal.  A point on
 the map returns to within rounding of itself; one off it returns a visible
 fraction of the view away, if at all.
+
+Relative to the view and never a distance in projected units: those run from
+radians to metres depending on the projection, and a fixed slack in them is
+either everything or nothing.
 """
 const ROUNDTRIP_TOLERANCE = 1.0e-6
 
 roundtrip_tolerance(rect) = ROUNDTRIP_TOLERANCE * norm(widths(rect))
+
+"""
+    drawn_predicate(trans, trans_inverse, rect)
+
+A closure reporting whether a projected point is drawn: on the map, and inside
+the view `rect`.
+"""
+function drawn_predicate(trans, trans_inverse, rect)
+    on_map = map_membership(trans, trans_inverse, roundtrip_tolerance(rect))
+    mini, maxi = extrema(rect)
+    return p -> all(mini .<= p .<= maxi) && !isnothing(on_map(p))
+end
 
 """
 Directions sampled around a graticule endpoint when asking whether the map ends
@@ -635,6 +653,16 @@ map.  A millionth of a degree is a ten-thousandth of a pixel on a world map.
 """
 const CUT_MARGIN = 1.0e-6
 
+"""
+How far short of a pole the map is asked about, in degrees.
+
+Far enough in to be a graticule point and not the singularity itself -- PROJ's
+orthographic inverts everything within a millionth of a degree of a pole to
+infinity -- and near enough to answer for it: a thousandth of a degree is a
+hundred metres, a hundred-thousandth of a pixel on a world map.
+"""
+const POLE_PROBE = 1.0e-3
+
 """Longitudes tried when looking for the map's cut."""
 const CUT_SAMPLES = 24
 
@@ -772,8 +800,17 @@ function source_extent(trans, trans_inverse, rect; n = 65)
     # middle of the map, where nothing marks them out.  Asking about them
     # directly is cheap, and a graticule traced to a degree short of one stops in
     # open map, where it gets no tick label.
-    drawn_pole(lat) = let p = Point2d(Makie.apply_transform(trans, Point2d(reference, lat)))
-        all(mini .<= p .<= maxi) && !isnothing(inverse(p))
+    #
+    # The pole is asked about on the graticule just short of itself as well as at
+    # itself.  On most projections the pole is a point of the map's own edge,
+    # where the inverse is ill-conditioned and can answer with a coordinate that
+    # does not project back; rejecting it there would stop every meridian short
+    # of a pole that is plainly drawn.
+    function drawn_pole(lat)
+        at(l) = Point2d(Makie.apply_transform(trans, Point2d(reference, l)))
+        p = at(lat)
+        (all(isfinite, p) && all(mini .<= p .<= maxi)) || return false
+        return !isnothing(inverse(p)) || !isnothing(inverse(at(lat - sign(lat) * POLE_PROBE)))
     end
     drawn_pole(90.0) && (high = Point2d(high[1], 90.0))
     drawn_pole(-90.0) && (low = Point2d(low[1], -90.0))
@@ -804,9 +841,7 @@ function project_tick_points!(result, trans, trans_inverse, range, coordinate, d
 
     # What is drawn is the map clipped to the view, and a tick label belongs
     # outside whichever of the two ends the graticule it labels.
-    on_map = map_membership(trans, trans_inverse, roundtrip_tolerance(limit_rect))
-    mini, maxi = extrema(limit_rect)
-    drawn(p) = all(mini .<= p .<= maxi) && !isnothing(on_map(p))
+    drawn = drawn_predicate(trans, trans_inverse, limit_rect)
     radius = OUTLINE_RADIUS * norm(widths(limit_rect))
     outline(p_t) = outline_normal(drawn, p_t, radius)
 
@@ -1113,9 +1148,9 @@ function Makie.initialize_block!(axis::GeoAxis)
     # TODO: implement a minor grid.
     onany(scene, axis.xticks, axis.yticks,
         transform_ticks_obs, finallimits, vp_unchanged,
-        axis.xticklabelsize, axis.yticklabelsize, axis.dest;
+        axis.xticklabelsize, axis.yticklabelsize, axis.dest, axis.polarcap;
         update=true) do user_xticks, user_yticks, trans, fl, vp,
-            xlabelsize, ylabelsize, dest
+            xlabelsize, ylabelsize, dest, polarcap
 
         lon_transformed = Point2d[]
         lat_transformed = Point2d[]
@@ -1148,18 +1183,33 @@ function Makie.initialize_block!(axis::GeoAxis)
                     graticule_latitude_limit(dest)) :
                 Makie.get_tickvalues(user_yticks, ylims...))
 
+        # Poles the map closes around, where the meridians would otherwise fan
+        # into a rosette in the last few degrees.
+        poles = isnothing(polarcap) ? Float64[] : interior_poles(
+            trans, drawn_predicate(trans, trans_inverse, limit_rect),
+            OUTLINE_RADIUS * norm(widths(limit_rect)))
+        capped_ylims = polar_cap_range(ylims, poles, polarcap)
+
         spines = spines_obs[]
         foreach(empty!, (spines.left, spines.right, spines.bottom, spines.top))
         # Tick values select graticules; they must not also truncate them.  Trace
         # each one across the whole inverse-transformed view and let
         # `valid_line_in_limits` clip it in projected space.
         for lon in xtickvalues
-            project_tick_points!(lon_transformed, trans, trans_inverse, ylims, lon, 1, limit_rect,
-                                 spines.bottom, spines.top)
+            project_tick_points!(lon_transformed, trans, trans_inverse,
+                                 polar_cap_meridian(lon) ? ylims : capped_ylims,
+                                 lon, 1, limit_rect, spines.bottom, spines.top)
         end
         for lat in ytickvalues
             project_tick_points!(lat_transformed, trans, trans_inverse, xlims, lat, 2, limit_rect,
                                  spines.left, spines.right)
+        end
+        # The parallel closing a cap is a gridline and not a tick: it is drawn
+        # wherever the cap falls, which is not a value the tick finder chose, and
+        # labelling it would put a latitude on the axis that no other line shares.
+        for lat in polar_cap_parallels(ylims, poles, polarcap)
+            project_tick_points!(lat_transformed, trans, trans_inverse, xlims, lat, 2, limit_rect,
+                                 nothing, nothing)
         end
 
         lonticks_line_obs[] = lon_transformed

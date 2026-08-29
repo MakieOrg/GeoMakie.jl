@@ -135,3 +135,30 @@ end
     GeoMakie.report_ticklabel_suppression!(reported, nothing, false)
     @test isnothing(reported[])
 end
+
+@testset "Polar cap" begin
+    @test GeoMakie.polar_cap_meridian(0.0)
+    @test GeoMakie.polar_cap_meridian(-180.0)
+    @test GeoMakie.polar_cap_meridian(90.0)
+    @test !GeoMakie.polar_cap_meridian(30.0)
+
+    @test GeoMakie.polar_cap_range((-90.0, 90.0), [90.0], 85.0) == (-90.0, 85.0)
+    @test GeoMakie.polar_cap_range((-90.0, 90.0), [-90.0, 90.0], 85.0) == (-85.0, 85.0)
+    @test GeoMakie.polar_cap_range((-90.0, 90.0), Float64[], 85.0) == (-90.0, 90.0)
+    @test GeoMakie.polar_cap_range((-90.0, 90.0), [90.0], nothing) == (-90.0, 90.0)
+    # A view wholly inside the cap keeps its meridians.
+    @test GeoMakie.polar_cap_range((86.0, 90.0), [90.0], 85.0) == (86.0, 90.0)
+
+    @test GeoMakie.polar_cap_parallels((-90.0, 90.0), [90.0], 85.0) == [85.0]
+    @test GeoMakie.polar_cap_parallels((-90.0, 90.0), [-90.0, 90.0], 85.0) == [-85.0, 85.0]
+    @test isempty(GeoMakie.polar_cap_parallels((0.0, 80.0), [90.0], 85.0))
+    @test isempty(GeoMakie.polar_cap_parallels((-90.0, 90.0), [90.0], nothing))
+
+    # Drawing all the way round a pole is what makes it interior; a pole on the
+    # boundary has drawing on one side of it only.
+    enclosed(p) = norm(Point2d(p) - Point2d(0, 90)) <= 5
+    edged(p) = enclosed(p) && p[2] <= 90
+    @test GeoMakie.interior_poles(identity, enclosed, 1.0) == [90.0]
+    @test isempty(GeoMakie.interior_poles(identity, edged, 1.0))
+    @test isempty(GeoMakie.interior_poles(identity, p -> false, 1.0))
+end

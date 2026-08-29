@@ -53,6 +53,7 @@ include("geodesy.jl")
 include("geoticks.jl")
 include("projection.jl")
 include("tick_intervals.jl")
+include("polar_cap.jl")
 include("geoticklabelplacement.jl")
 
 include("geoaxis.jl")

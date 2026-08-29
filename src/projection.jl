@@ -54,7 +54,7 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     xmax, ymax = maximum(r)
 
     if isapprox(xmin, -180, rtol = 1e-4)
-        xmin - -180e0
+        xmin = -180e0
     end
     if isapprox(xmax, 180; rtol = 1e-4)
         xmax = 180e0
