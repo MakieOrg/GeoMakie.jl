@@ -1031,8 +1031,10 @@ function Makie.initialize_block!(axis::GeoAxis)
     # lineplots later on that form the grid.
     # TODO: implement a minor grid.
     onany(scene, axis.xticks, axis.yticks,
-        transform_ticks_obs, finallimits, vp_unchanged;
-        update=true) do user_xticks, user_yticks, trans, fl, vp
+        transform_ticks_obs, finallimits, vp_unchanged,
+        axis.xticklabelsize, axis.yticklabelsize, axis.dest;
+        update=true) do user_xticks, user_yticks, trans, fl, vp,
+            xlabelsize, ylabelsize, dest
 
         lon_transformed = Point2d[]
         lat_transformed = Point2d[]
@@ -1048,11 +1050,21 @@ function Makie.initialize_block!(axis::GeoAxis)
         end
         xlims, ylims = extent
 
+        # One interval serves both directions, chosen from the room a label needs
+        # against the room the axis has.  `interval.minor` waits on a minor grid;
+        # anything finer than `LADDER_DEGREE_FLOOR` waits on a formatter, and
+        # `graticule_tickvalues` falls back to its tick finder for it.
+        interval = graticule_interval(
+            xlims[2] - xlims[1], ylims[2] - ylims[1], widths(vp)..., xlabelsize, ylabelsize)
+        major = interval.major < LADDER_DEGREE_FLOOR ? 0.0 : interval.major
         xtickvalues = collect(Float64,
-            user_xticks isa Makie.Automatic ? geoticks(-180, 180, xlims...) :
+            user_xticks isa Makie.Automatic ? graticule_tickvalues(xlims..., major) :
                 Makie.get_tickvalues(user_xticks, xlims...))
         ytickvalues = collect(Float64,
-            user_yticks isa Makie.Automatic ? geoticks(-90, 90, ylims...) :
+            user_yticks isa Makie.Automatic ?
+                limit_graticule_latitudes(
+                    graticule_tickvalues(ylims..., major),
+                    graticule_latitude_limit(dest)) :
                 Makie.get_tickvalues(user_yticks, ylims...))
 
         spines = spines_obs[]
@@ -1177,8 +1189,11 @@ function Makie.initialize_block!(axis::GeoAxis)
         ycorners = Point2d[p.projected for p in vcat(spines.bottom, spines.top)]
         corner_atol = TICKLABEL_COLLAPSE * norm(widths(scene.viewport[]))
 
+        # Labelled on the turn they are read on, selected on the turn they were
+        # traced on: only the formatter sees the wrapped values.
         xpositions, xlabels, xplacements, xreach = ticklabel_candidates(
-            getproperty(spines, xside), xvalues, ticklabel_strings(xformat, xvalues),
+            getproperty(spines, xside), xvalues,
+            ticklabel_strings(xformat, wrap_longitudes(xvalues)),
             1, xside, Makie.to_font(fonts, xfont), xsize, fonts, xpad, xrotation, xmode;
             corner_anchors = xcorners, corner_atol,
         )

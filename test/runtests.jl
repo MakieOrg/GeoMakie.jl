@@ -10,6 +10,7 @@ Makie.set_theme!(Theme(
     @testset "Basics" include("basics.jl")
     @testset "MeshImage" include("meshimage.jl")
     @testset "GeoAxis" include("geoaxis.jl")
+    @testset "Graticule" include("graticule.jl")
     @testset "GeoAxis tick labels" include("geoticklabels.jl")
     @testset "GlobeAxis" include("globeaxis.jl")
 end
