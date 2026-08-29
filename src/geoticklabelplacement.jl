@@ -102,6 +102,10 @@ reports a right angle whatever the sampled chord says.  That is the answer
 wanted: an orthographic foreshortens to nothing at its limb, where every
 graticule is tangent in the limit and the incidence says nothing about whether a
 label belongs there.  A frame edge is where it does.
+
+The graticule's direction is the chord to the neighbouring trace sample, so the
+incidence is read at the trace's own resolution -- a few degrees of arc on a
+world parallel -- which serves a threshold and not a limit.
 """
 function boundary_incidence(sample)
     line = unit_direction(sample.dir)
@@ -117,8 +121,11 @@ Whether the graticule meets its boundary at less than `min_angle` radians.
 
 A label there sits along the boundary rather than across it, and its tick grows
 as `1/|cos|` of the incidence, so a shallow enough crossing is not annotated at
-all -- GMT's `MAP_ANNOT_MIN_ANGLE`, which is what keeps the corners of a conic
-frame from stacking labels on top of each other.
+all -- GMT's `MAP_ANNOT_MIN_ANGLE`.  Only an end the view clipped can graze: an
+end on the map's own outline carries the outline's normal for a direction and
+reports the exempting right angle, which [`boundary_incidence`](@ref) wants at a
+limb, and which leaves the crowded corners of a projection's own frame to the
+collision filter.
 
 An unknown incidence does not graze: a label is dropped on evidence, never for
 want of it.

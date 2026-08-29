@@ -164,9 +164,9 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         ticklabelminangle::Float64 = 20f0
         "The smallest gap in pixels between two tick labels. Labels closer than this are dropped, the outermost first."
         ticklabelmingap::Float64 = 2f0
-        "Report tick labels dropped for crowding or grazing incidence at `@info` level. They are reported at `@debug` level either way."
-        verbose::Bool = false
-        "The latitude a polar cap begins at, where the map closes around a pole. Meridians stop there, except one every `POLAR_CAP_MERIDIAN_INTERVAL` degrees, and a parallel is drawn to close them. `nothing` draws every meridian to the pole. GMT's `MAP_POLAR_CAP`."
+        "The logging level tick labels dropped for crowding or grazing incidence are reported at: `:debug` or `:info`."
+        ticklabelreport::Symbol = :debug
+        "The latitude a polar cap begins at, where the map closes around a pole. Meridians stop there, except one every 90 degrees, and a parallel is drawn to close them. `nothing` draws every meridian to the pole. GMT's `MAP_POLAR_CAP`."
         polarcap::Union{Nothing,Float64} = 85.0
         "The horizontal and vertical alignment of the xticklabels."
         xticklabelalign::Union{Makie.Automatic, Tuple{Symbol, Symbol}} = Makie.automatic
@@ -893,14 +893,18 @@ end
 const NO_TICKLABELS_DROPPED = (crowding = 0, grazing = 0)
 
 """
-Why a tick label is dropped, in the wording of the report, with the attribute
-that controls it.  A named reason reads as a choice the axis made, and points at
-the attribute that reverses it; a silent drop reads as a bug in the projection.
+One sentence of the suppression report: which axes lost how many labels to one
+reason, and the attribute that reverses it.  A named reason reads as a choice
+the axis made; a silent drop reads as a bug in the projection.
 """
-const TICKLABEL_SUPPRESSION_REASONS = (
-    crowding = ("crowding", :ticklabelmingap),
-    grazing = ("grazing incidence", :ticklabelminangle),
-)
+function ticklabel_suppression_sentence(counted, wording, attribute, setting)
+    return string(
+        join(("$count $name" for (name, count) in counted), " and "),
+        " annotation", sum(last, counted) == 1 ? "" : "s",
+        " skipped due to ", wording,
+        "; controlled by `", attribute, "`, currently ", setting,
+    )
+end
 
 """
     ticklabel_suppression_message(dropped; mingap, minangle)
@@ -919,35 +923,31 @@ julia> ticklabel_suppression_message(
 ```
 """
 function ticklabel_suppression_message(dropped; mingap, minangle)
-    settings = (crowding = "$mingap px", grazing = "$minangle degrees")
+    any(pair -> last(pair).crowding > 0 || last(pair).grazing > 0, dropped) || return nothing
     sentences = String[]
-    for reason in keys(TICKLABEL_SUPPRESSION_REASONS)
-        counted = [(name, counts[reason]) for (name, counts) in dropped if counts[reason] > 0]
-        isempty(counted) && continue
-        wording, attribute = TICKLABEL_SUPPRESSION_REASONS[reason]
-        push!(sentences, string(
-            join(("$count $name" for (name, count) in counted), " and "),
-            " annotation", sum(last, counted) == 1 ? "" : "s",
-            " skipped due to ", wording,
-            "; controlled by `", attribute, "`, currently ", settings[reason],
-        ))
-    end
-    return isempty(sentences) ? nothing : join(sentences, ". ") * "."
+    crowded = [(name, counts.crowding) for (name, counts) in dropped if counts.crowding > 0]
+    isempty(crowded) || push!(sentences, ticklabel_suppression_sentence(
+        crowded, "crowding", :ticklabelmingap, "$mingap px"))
+    grazed = [(name, counts.grazing) for (name, counts) in dropped if counts.grazing > 0]
+    isempty(grazed) || push!(sentences, ticklabel_suppression_sentence(
+        grazed, "grazing incidence", :ticklabelminangle, "$minangle degrees"))
+    return join(sentences, ". ") * "."
 end
 
 """
-    report_ticklabel_suppression!(reported, message, verbose)
+    report_ticklabel_suppression!(reported, message, level)
 
-Report `message`, unless it is the one `reported` already holds: placement runs
-on every redraw and the same report each time is noise rather than information.
-
-`verbose` raises the report from `@debug` to `@info`.
+Report `message` at logging `level`, `:debug` or `:info`, unless it is the one
+`reported` already holds: placement runs on every redraw and the same report
+each time is noise rather than information.
 """
-function report_ticklabel_suppression!(reported, message, verbose)
+function report_ticklabel_suppression!(reported, message, level)
+    level in (:debug, :info) || throw(ArgumentError(
+        "ticklabelreport must be :debug or :info, got $(repr(level))"))
     message == reported[] && return
     reported[] = message
     isnothing(message) && return
-    verbose ? (@info message) : (@debug message)
+    level === :info ? (@info message) : (@debug message)
     return
 end
 
@@ -963,16 +963,19 @@ in component `dim`, which indexes into `tickvalues`/`labels`.  Those cover the
 whole tick vector rather than the visible subset, so that a user formatter sees
 the same input however many graticules are on screen.
 
-Returns `(positions, labels, placements, protrusion, dropped)`, the first three
-ordered by tick value.  `dropped` counts the labels this side lost, by reason, for
-[`ticklabel_suppression_message`](@ref) to report.
+Returns `(; positions, labels, placements, protrusion, dropped)`, the first
+three ordered by tick value.  `dropped` counts the labels this side lost, by
+reason, for [`ticklabel_suppression_message`](@ref) to report.
 """
 function ticklabel_candidates(
         samples, tickvalues, labels, dim, side, font, fontsize, fonts, pad, rotation, mode;
         corner_anchors = Point2d[], corner_atol = 0.0, occupied = Rect2{Float64}[],
         collision_gap = 2.0, min_angle = 0.0,
     )
-    isempty(samples) && return (Point2d[], Any[], NamedTuple[], 0.0f0, NO_TICKLABELS_DROPPED)
+    isempty(samples) && return (;
+        positions = Point2d[], labels = Any[], placements = NamedTuple[],
+        protrusion = 0.0f0, dropped = NO_TICKLABELS_DROPPED,
+    )
 
     # Resolve collisions from the centre of the side outward, measured where the
     # labels are drawn: the central label is the one worth keeping when anchors
@@ -990,6 +993,7 @@ function ticklabel_candidates(
     placement_values = Float64[]
     placed = Set{Int}()
     grazed = Set{Int}()
+    grazed_placements = NamedTuple[]
     corner_fallback = nothing
     for i in priority
         sample = samples[i]
@@ -1001,7 +1005,15 @@ function ticklabel_candidates(
         # two components.  The label belongs at one of those, the most central.
         tick in placed && continue
         if grazes_boundary(sample, min_angle)
-            push!(grazed, tick)
+            # Still placed for the protrusion measure below: grazing reads
+            # pixel-space directions, which the reservation itself moves.
+            if !(tick in grazed)
+                push!(grazed, tick)
+                placement = place_ticklabel(
+                    sample, side, label_extents(labels[tick], font, fontsize, fonts), pad;
+                    mode, rotation)
+                isnothing(placement) || push!(grazed_placements, placement)
+            end
             continue
         end
 
@@ -1030,11 +1042,11 @@ function ticklabel_candidates(
         push!(placement_labels, corner_fallback[2])
         push!(placement_values, corner_fallback[3])
     end
-    # Reserve space for every candidate, not only the ones surviving the filter
-    # below.  Which labels collide depends on the size of the scene, and this
-    # number decides that size; feeding the filtered set back would let the
-    # layout chase one label in and out of the frame forever.
-    protrusion = ticklabel_protrusion(placements, side)
+    # Reserve space for every candidate, grazed ones included, not only the ones
+    # surviving the filters.  Which labels are dropped depends on the size of the
+    # scene, and this number decides that size; feeding the filtered set back
+    # would let the layout chase one label in and out of the frame forever.
+    protrusion = ticklabel_protrusion(vcat(placements, grazed_placements), side)
 
     accepted = Int[]
     boxes = copy(occupied)
@@ -1045,12 +1057,12 @@ function ticklabel_candidates(
     end
 
     order = accepted[sortperm(placement_values[accepted])]
-    return (
-        Point2d[placements[i].center for i in order],
-        Any[placement_labels[i] for i in order],
-        NamedTuple[placements[i] for i in order],
-        protrusion,
-        (
+    return (;
+        positions = Point2d[placements[i].center for i in order],
+        labels = Any[placement_labels[i] for i in order],
+        placements = NamedTuple[placements[i] for i in order],
+        protrusion = protrusion,
+        dropped = (
             crowding = length(placements) - length(accepted),
             # A tick grazing one end of its graticule and reaching the boundary
             # squarely at the other is labelled there, and was not dropped.
@@ -1305,10 +1317,10 @@ function Makie.initialize_block!(axis::GeoAxis)
         axis.xticklabelrotation, axis.yticklabelrotation,
         axis.xticklabelplacement, axis.yticklabelplacement,
         axis.xticklabelsvisible, axis.yticklabelsvisible,
-        axis.ticklabelminangle, axis.ticklabelmingap, axis.verbose,
+        axis.ticklabelminangle, axis.ticklabelmingap, axis.ticklabelreport,
     ) do spines, xside, yside, xformat, yformat, xfont, yfont,
             xsize, ysize, xpad, ypad, xrotation, yrotation, xmode, ymode,
-            xvisible, yvisible, minangle, mingap, verbose
+            xvisible, yvisible, minangle, mingap, reportlevel
         xside in (:bottom, :top) || throw(ArgumentError(
             "xaxisposition must be :bottom or :top, got $xside"))
         yside in (:left, :right) || throw(ArgumentError(
@@ -1324,33 +1336,35 @@ function Makie.initialize_block!(axis::GeoAxis)
         corner_atol = TICKLABEL_COLLAPSE * norm(widths(scene.viewport[]))
 
         min_angle = deg2rad(minangle)
-        # Labelled on the turn they are read on, selected on the turn they were
-        # traced on: only the formatter sees the wrapped values.
-        xpositions, xlabels, xplacements, xreach, xdropped = ticklabel_candidates(
+        # Automatic ticks are labelled on the turn they are read on, selected on
+        # the turn they were traced on; a user's tick values are the user's, and
+        # the formatter sees them untouched.
+        xlabelvalues = axis.xticks[] isa Makie.Automatic ? wrap_longitudes(xvalues) : xvalues
+        xcand = ticklabel_candidates(
             getproperty(spines, xside), xvalues,
-            ticklabel_strings(xformat, wrap_longitudes(xvalues)),
+            ticklabel_strings(xformat, xlabelvalues),
             1, xside, Makie.to_font(fonts, xfont), xsize, fonts, xpad, xrotation, xmode;
             corner_anchors = xcorners, corner_atol, collision_gap = mingap, min_angle,
         )
-        ypositions, ylabels, yplacements, yreach, ydropped = ticklabel_candidates(
+        ycand = ticklabel_candidates(
             getproperty(spines, yside), yvalues, ticklabel_strings(yformat, yvalues),
             2, yside, Makie.to_font(fonts, yfont), ysize, fonts, ypad, yrotation, ymode;
             corner_anchors = ycorners, corner_atol, collision_gap = mingap, min_angle,
             # Hidden longitude labels occupy no space, so they must not evict
             # latitude labels either.
-            occupied = xvisible ? Rect2d[p.bbox for p in xplacements] : Rect2d[],
+            occupied = xvisible ? Rect2d[p.bbox for p in xcand.placements] : Rect2d[],
         )
         report_ticklabel_suppression!(
             reported,
             ticklabel_suppression_message(
-                ("longitude" => xdropped, "latitude" => ydropped);
+                ("longitude" => xcand.dropped, "latitude" => ycand.dropped);
                 mingap, minangle),
-            verbose)
+            reportlevel)
 
         # Keep positions and text lengths synchronized through Makie's compute
         # graph when ticks or limits change interactively.
-        Makie.update!(xticklabelplot; arg1=xpositions, text=xlabels)
-        Makie.update!(yticklabelplot; arg1=ypositions, text=ylabels)
+        Makie.update!(xticklabelplot; arg1=xcand.positions, text=xcand.labels)
+        Makie.update!(yticklabelplot; arg1=ycand.positions, text=ycand.labels)
         # Never reserve so much that the axis itself disappears.  The suggested
         # box already has the current reservation taken out of it, so add that
         # back: a cap that shrank as we reserved would be part of the loop.
@@ -1358,8 +1372,8 @@ function Makie.initialize_block!(axis::GeoAxis)
         outer = (room[1] + 2 * y_protrusion[], room[2] + 2 * x_protrusion[])
         cap = (0.35f0 * outer[2], 0.35f0 * outer[1])
         request = (
-            xvisible ? min(xreach, cap[1]) : 0.0f0,
-            yvisible ? min(yreach, cap[2]) : 0.0f0,
+            xvisible ? min(xcand.protrusion, cap[1]) : 0.0f0,
+            yvisible ? min(ycand.protrusion, cap[2]) : 0.0f0,
         )
         # Everything the labels depend on except the layout itself.  While it
         # holds still only growth propagates, which is what converges; when it

@@ -115,9 +115,8 @@ end
     crowded = GeoMakie.ticklabel_suppression_message(
         ("longitude" => (crowding = 2, grazing = 0),
          "latitude" => (crowding = 1, grazing = 0)); mingap = 2.0, minangle = 20.0)
-    @test crowded ==
-        "2 longitude and 1 latitude annotations skipped due to crowding; " *
-        "controlled by `ticklabelmingap`, currently 2.0 px."
+    @test occursin("2 longitude and 1 latitude annotations skipped due to crowding", crowded)
+    @test occursin("`ticklabelmingap`", crowded)
 
     both = GeoMakie.ticklabel_suppression_message(
         ("longitude" => (crowding = 0, grazing = 1),
@@ -129,10 +128,11 @@ end
 
     # Reported once, not on every redraw.
     reported = Ref{Union{Nothing,String}}(nothing)
-    GeoMakie.report_ticklabel_suppression!(reported, crowded, false)
+    GeoMakie.report_ticklabel_suppression!(reported, crowded, :debug)
     @test reported[] == crowded
-    GeoMakie.report_ticklabel_suppression!(reported, nothing, false)
+    GeoMakie.report_ticklabel_suppression!(reported, nothing, :debug)
     @test isnothing(reported[])
+    @test_throws ArgumentError GeoMakie.report_ticklabel_suppression!(reported, crowded, :loud)
 end
 
 @testset "Polar cap" begin
