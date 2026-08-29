@@ -87,3 +87,51 @@ end
     # Zoomed above the limit there is nothing else to draw, and it gives way.
     @test GeoMakie.limit_graticule_latitudes([70.0, 75.0, 80.0], 60.0) == [70.0, 75.0, 80.0]
 end
+
+@testset "Grazing incidence" begin
+    graze(line, edge) = (dir = Point2d(line), intersect_dir = Point2d(edge))
+    at(degrees) = graze((cosd(degrees), sind(degrees)), (1, 0))
+
+    @test GeoMakie.boundary_incidence(at(90)) ≈ pi / 2
+    @test GeoMakie.boundary_incidence(at(0)) ≈ 0 atol = 1.0e-12
+    # A line has no sense of direction: the reversed graticule meets the
+    # boundary at the same angle.
+    @test GeoMakie.boundary_incidence(at(170)) ≈ GeoMakie.boundary_incidence(at(10))
+
+    @test GeoMakie.grazes_boundary(at(10), deg2rad(20))
+    @test !GeoMakie.grazes_boundary(at(30), deg2rad(20))
+    @test !GeoMakie.grazes_boundary(at(10), 0.0)
+    # An end on a limb carries the boundary's normal rather than the graticule's
+    # direction, and reports the right angle that exempts it.
+    @test GeoMakie.boundary_incidence(graze((0, 1), (1, 0))) ≈ pi / 2
+    # An unknown incidence is not evidence, and the label stays.
+    @test isnothing(GeoMakie.boundary_incidence(graze((0, 0), (1, 0))))
+    @test !GeoMakie.grazes_boundary(graze((1, 0), (0, 0)), deg2rad(20))
+end
+
+@testset "Suppression is reported" begin
+    none = ("longitude" => GeoMakie.NO_TICKLABELS_DROPPED,)
+    @test isnothing(GeoMakie.ticklabel_suppression_message(none; mingap = 2.0, minangle = 20.0))
+
+    crowded = GeoMakie.ticklabel_suppression_message(
+        ("longitude" => (crowding = 2, grazing = 0),
+         "latitude" => (crowding = 1, grazing = 0)); mingap = 2.0, minangle = 20.0)
+    @test crowded ==
+        "2 longitude and 1 latitude annotations skipped due to crowding; " *
+        "controlled by `ticklabelmingap`, currently 2.0 px."
+
+    both = GeoMakie.ticklabel_suppression_message(
+        ("longitude" => (crowding = 0, grazing = 1),
+         "latitude" => (crowding = 3, grazing = 0)); mingap = 4.0, minangle = 25.0)
+    @test occursin("3 latitude annotations skipped due to crowding", both)
+    @test occursin("`ticklabelmingap`, currently 4.0 px", both)
+    @test occursin("1 longitude annotation skipped due to grazing incidence", both)
+    @test occursin("`ticklabelminangle`, currently 25.0 degrees", both)
+
+    # Reported once, not on every redraw.
+    reported = Ref{Union{Nothing,String}}(nothing)
+    GeoMakie.report_ticklabel_suppression!(reported, crowded, false)
+    @test reported[] == crowded
+    GeoMakie.report_ticklabel_suppression!(reported, nothing, false)
+    @test isnothing(reported[])
+end

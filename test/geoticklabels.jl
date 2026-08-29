@@ -563,8 +563,12 @@ end
     # orthogonal graticule made that pole look like one, and the meridian was
     # labelled over Scandinavia.
     dest = "+proj=ortho +lat_0=30 +lon_0=20"
+    # Every crossing labelled: the disc fills the viewport, so its limb is
+    # tangent to the frame, and the parallels reaching it there are grazing.
+    # What is under test is where a label goes, not which ones survive.
     _, ax = realize_geoaxis(; dest, limits = ((-180, 180), (-90, 90)),
-        xticklabelplacement = :normal, yticklabelplacement = :normal)
+        xticklabelplacement = :normal, yticklabelplacement = :normal,
+        ticklabelminangle = 0)
     assert_labels(ax; min_count = 4)
 
     trans = GeoMakie.create_transform(dest, "+proj=longlat +datum=WGS84")

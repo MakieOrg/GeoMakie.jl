@@ -90,6 +90,45 @@ function outward_frame(sample)
     return isnothing(blended) ? dir : blended
 end
 
+"""
+    boundary_incidence(sample)
+
+The angle in radians, in `[0, pi/2]`, between the graticule arriving at a
+boundary and the boundary itself, or `nothing` where either direction is unknown.
+
+`sample.dir` is the graticule's own direction where the view clipped it, and the
+boundary's own normal where the map ended instead, so an endpoint on a limb
+reports a right angle whatever the sampled chord says.  That is the answer
+wanted: an orthographic foreshortens to nothing at its limb, where every
+graticule is tangent in the limit and the incidence says nothing about whether a
+label belongs there.  A frame edge is where it does.
+"""
+function boundary_incidence(sample)
+    line = unit_direction(sample.dir)
+    edge = unit_direction(sample.intersect_dir)
+    (isnothing(line) || isnothing(edge)) && return nothing
+    return acos(clamp(abs(dot(line, edge)), 0, 1))
+end
+
+"""
+    grazes_boundary(sample, min_angle)
+
+Whether the graticule meets its boundary at less than `min_angle` radians.
+
+A label there sits along the boundary rather than across it, and its tick grows
+as `1/|cos|` of the incidence, so a shallow enough crossing is not annotated at
+all -- GMT's `MAP_ANNOT_MIN_ANGLE`, which is what keeps the corners of a conic
+frame from stacking labels on top of each other.
+
+An unknown incidence does not graze: a label is dropped on evidence, never for
+want of it.
+"""
+function grazes_boundary(sample, min_angle)
+    (isfinite(min_angle) && min_angle > 0) || return false
+    incidence = boundary_incidence(sample)
+    return isnothing(incidence) ? false : incidence < min_angle
+end
+
 """The two unit axes of a glyph box rotated by `rotation` radians."""
 function rotated_axes(rotation::Real)
     isfinite(rotation) || throw(ArgumentError("glyph rotation must be finite; got $rotation"))
