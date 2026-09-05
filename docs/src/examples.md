@@ -34,6 +34,7 @@ geoid
 
 ```@overviewgallery
 axis_config
+frame_styles
 italy
 world_population
 graph_on_usa

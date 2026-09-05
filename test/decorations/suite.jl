@@ -60,7 +60,7 @@ end
     end
     # issue 234: a tiny quadrangle is the whole view, so its limits are the
     # bbox of its projected outline (widest along the equator for eqearth)
-    fig, ax = build_case(decoration_case(ISSUE_CASES, "issue234"))
+    fig, ax = build_case(decoration_case(ISSUE_CASES, "issue_234"))
     tl = ax.targetlimits[]
     @test all(isfinite, minimum(tl)) && all(>(0), widths(tl))
     t = GM.decorations(ax).transform
@@ -155,7 +155,7 @@ end
         fig, ax = build_case(c)
         d = GM.decorations(ax)
         @testset "$name" begin
-            for (what, ok) in floor(d)
+            for (what, ok) in floor_results(floor, d, ax)
                 @test ok
                 ok || println(name, ": ", what, " failed; lon=", drawn_labels(d, :lon), " lat=", drawn_labels(d, :lat))
             end
@@ -164,7 +164,7 @@ end
 end
 
 @testset "determinism" begin
-    for name in ("eqearth", "ortho", "merc_reg", "igh", "issue388")
+    for name in ("eqearth", "ortho", "merc_reg", "igh", "issue_388")
         @test isempty(determinism(decoration_case(DECORATION_CASES, name)))
     end
 end
@@ -217,7 +217,7 @@ end
     end
     # issue 388: no longitude label sits in the latitude column, and the zero
     # meridian is labelled 0° on the bottom edge
-    fig, ax = build_case(decoration_case(ISSUE_CASES, "issue388"))
+    fig, ax = build_case(decoration_case(ISSUE_CASES, "issue_388"))
     d = GM.decorations(ax)
     lon = [l for l in d.labels[d.pixels.kept] if l.exit.family == :lon]
     @test all(l -> GM.edge_side(l.exit.normal) in (:bottom, :top), lon)
@@ -309,7 +309,7 @@ end
 
 # ---- Phase 5: interior labels -------------------------------------------------
 
-const REGIONAL_CASES = ("merc_reg", "zoom3", "lcc", "issue234", "issue388", "merc_reg_top", "merc_reg_right", "merc_reg_both")
+const REGIONAL_CASES = ("merc_reg", "zoom3", "lcc", "issue_234", "issue_388", "merc_reg_top", "merc_reg_right", "merc_reg_both")
 const INTERIOR_CASES = ("laea_polar_nolimits", "stere_polar", "moll", "igh", "ob_tran")
 
 @testset "interior labels" begin
@@ -746,9 +746,9 @@ end
 @testset "several axes" begin
     # issue 349: hidden y decorations leave no space, so the column gaps match
     fig, axes = build_issue349()
-    @test isempty(layout_no_collision("issue349", axes))
+    @test isempty(layout_no_collision("issue_349", axes))
     for ax in axes
-        @test isempty(layout_protrusions("issue349", ax))
+        @test isempty(layout_protrusions("issue_349", ax))
     end
     @test axes[2].layoutobservables.protrusions[].left == 0 && axes[3].layoutobservables.protrusions[].left == 0
     @test axes[1].layoutobservables.protrusions[].left > 0
@@ -760,12 +760,12 @@ end
     # (an eqearth frame carries latitude labels on both sides, tilted at the
     # corners), not the wide margins of the old width-of-the-longest-label rule
     fig, axes = build_issue268()
-    @test isempty(layout_no_collision("issue268", axes))
+    @test isempty(layout_no_collision("issue_268", axes))
     for ax in axes
         p = ax.layoutobservables.protrusions[]
         @test 0 < p.bottom <= ax.xticksize[] + ax.xticklabelpad[] + ax.xticklabelsize[] * 1.2 + 1
         @test p.top < p.left && p.top < p.right
-        @test isempty(layout_protrusions("issue268", ax))
+        @test isempty(layout_protrusions("issue_268", ax))
     end
     # the bound lets the tilted 60°N label reach above the frame wherever it sits;
     # tightening measures that nothing does and hands the space back
@@ -774,10 +774,10 @@ end
         Makie.update_state_before_display!(fig)
     end
     for ax in axes
-        @test isempty(layout_protrusions("issue268", ax; tight = true))
+        @test isempty(layout_protrusions("issue_268", ax; tight = true))
         @test ax.layoutobservables.protrusions[].top == 0
     end
-    @test isempty(layout_no_collision("issue268", axes))
+    @test isempty(layout_no_collision("issue_268", axes))
     # the two rows sit as close as the bottom decorations allow
     bb = [ax.layoutobservables.computedbbox[] for ax in axes]
     top_row = filter(ax -> minimum(ax.layoutobservables.computedbbox[])[2] > minimum(bb[1])[2] - 1, axes)
@@ -847,7 +847,7 @@ render_bytes(fig) = copy(colorbuffer(fig; px_per_unit = 1))
     @test d.xtickvalues.minors == setdiff(-10.0:2:30, -10.0:10:30)
     @test d.ytickvalues.minors == collect(37.5:5:57.5)
     # minor attributes reach the plots (#215)
-    fig, ax = build_case(decoration_case(DECORATION_CASES, "issue215"))
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "issue_215"))
     @test ax.elements[:xminorgrid].color[] == Makie.to_color((:red, 0.3)) && ax.elements[:xminorgrid].linewidth[] == 2
     @test ax.elements[:yminorgrid].linestyle[] == Makie.to_linestyle(:dash) || ax.yminorgridstyle[] == :dash
     @test ax.elements[:xminorticks].color[] == Makie.to_color(:red) && ax.elements[:xminorticks].linewidth[] == 2
@@ -942,7 +942,7 @@ end
     @test 0 < z(:mask) < z(:xgrid)
     ax.gridbehind = true
     for c in (decoration_case(DECORATION_CASES, "lcc_title"), decoration_case(DECORATION_CASES, "ortho"),
-              decoration_case(DECORATION_CASES, "robin150"), decoration_case(DECORATION_CASES, "issue388"))
+              decoration_case(DECORATION_CASES, "robin150"), decoration_case(DECORATION_CASES, "issue_388"))
         v = nothing_outside_frame(c)
         @test isempty(v)
         isempty(v) || foreach(println, v)
@@ -1009,4 +1009,88 @@ end
         @test Makie.to_color(a.elements[:mask].color[]) == Makie.to_color(a.elements[:background].color[]) == Makie.to_color(a.backgroundcolor[])
         @test isempty(nothing_outside_frame(decoration_case(DECORATION_CASES, "lcc_title")))
     end
+end
+
+
+# ---- Phase 10: issue closure ------------------------------------------------------
+
+# The invariants of every phase hold on the closure cases too (their floors
+# reproduce each report); issue_150 has nothing to place, so only its floor speaks.
+@testset "issue closure" begin
+    for c in CLOSURE_CASES
+        fig, ax = build_case(c)
+        d = GM.decorations(ax)
+        @testset "$(c.name)" begin
+            v = vcat(phase3_violations(c.name, d), phase4_violations(c.name, d), phase5_violations(c.name, d))
+            @test isempty(v)
+            isempty(v) || foreach(println, v)
+            c.name == "issue_150" || @test !isempty(d.pixels.kept)
+            @test isempty(frame_closed(c.name, d.frame))
+            @test isempty(frame_within_domain_and_limits(c.name, d))
+        end
+    end
+    # #190: the tick label pad moves the labels, and xlabelpadding moves the axis label alone
+    c = decoration_case(CLOSURE_CASES, "issue_190")
+    fig, ax0 = build_case(c)
+    fig, ax1 = build_case(c; xticklabelpad = 25.0, yticklabelpad = 25.0)
+    d0, d1 = GM.decorations(ax0), GM.decorations(ax1)
+    @test all(l -> GM.isinterior(l) || l.offset == d0.labels[1].offset + 20, d1.labels)
+    # the bound grows by the pad's projection on each side (the widest label on
+    # the limb sits at 45°, so by 20 cos 45° there), the reach with it
+    @test d1.bound.left > d0.bound.left + 10 && d1.bound.bottom > d0.bound.bottom + 10
+    @test d1.reach.left > d0.reach.left + 10 && d1.reach.bottom > d0.reach.bottom + 10
+    fig, ax2 = build_case(c; xlabelpadding = 40.0)
+    d2 = GM.decorations(ax2)
+    @test d2.bound == d0.bound && d2.reach.bottom > d0.reach.bottom + 30
+    # #388: `xticks = (values, labels)` reaches the labels, and no tick of the default set is dropped
+    fig, ax = build_case(decoration_case(ISSUE_CASES, "issue_388"); xticks = ([0.0, 10.0, 20.0, 30.0], ["zero", "ten", "twenty", "thirty"]))
+    d = GM.decorations(ax)
+    @test Set(drawn_labels(d, :lon)) == Set(["zero", "ten", "twenty", "thirty"])
+    fig, ax = build_case(decoration_case(ISSUE_CASES, "issue_388"))
+    d = GM.decorations(ax)
+    @test !any(s -> s.reason == :collision, d.suppressed)
+    @test Set(d.xtickvalues.values) == Set(l.exit.value for l in d.labels[d.pixels.kept] if l.exit.family == :lon)
+    # #157: the data follows the same model as the decorations
+    fig, ax = build_case(decoration_case(CLOSURE_CASES, "issue_157"))
+    coast = only(filter(p -> p isa Lines && !(p in values(ax.elements)), ax.scene.plots))
+    @test coast.model[][2, 2] == -1 && ax.elements[:xgrid].model[][2, 2] == 1
+    d = GM.decorations(ax)
+    plain = GM.decorations(build_case(decoration_case(BASELINE_CASES, "eqearth"))[2])
+    @test d.bound.top ≈ plain.bound.bottom && d.bound.bottom ≈ plain.bound.top
+    @test d.bound.left ≈ plain.bound.left
+    # a rotation reaches them too: a quarter turn puts the pole lines on the sides
+    fig, axr = build_case(decoration_case(BASELINE_CASES, "eqearth"); coastlines = false)
+    Makie.rotate!(axr.scene, pi / 2)
+    dr = GM.decorations(axr)
+    @test dr.transform isa GM.PlaneTransform && isempty(nothing_inside("eqearth_rotated", dr)) && isempty(no_overlap("eqearth_rotated", dr))
+    # the longitude labels now leave through the sides, the latitude labels through top and bottom
+    kept = dr.labels[dr.pixels.kept]
+    @test all(l -> abs(l.normal[1]) > abs(l.normal[2]), filter(l -> l.exit.family == :lon, kept))
+    @test all(l -> abs(l.normal[2]) > abs(l.normal[1]), filter(l -> l.exit.family == :lat && l.exit.value == 0, kept))
+    @test !isempty(drawn_labels(dr, :lon)) && Set(drawn_labels(dr, :lon)) ⊆ Set(drawn_labels(plain, :lon))
+    @test !isempty(drawn_labels(dr, :lat)) && Set(drawn_labels(dr, :lat)) ⊆ Set(drawn_labels(plain, :lat))
+    # #155: a limit reset after the zoom restores the labels
+    fig, ax = build_case(decoration_case(CLOSURE_CASES, "issue_155"))
+    zoomed = drawn_labels(GM.decorations(ax), :lon)
+    Makie.reset_limits!(ax)
+    d = GM.decorations(ax)
+    @test drawn_labels(d, :lon) == drawn_labels(plain, :lon) && drawn_labels(d, :lat) == drawn_labels(plain, :lat)
+    @test zoomed != drawn_labels(d, :lon)
+    # #339: a dark theme reaches both alike
+    with_theme(theme_dark()) do
+        fig, ax = build_case(decoration_case(CLOSURE_CASES, "issue_339"))
+        other = only(filter(b -> b isa Axis, fig.content))
+        # theme_dark recolours the grid (and hides the Axis spines; it leaves the
+        # spine colour alone), so the grid is what tells the theme reached both
+        @test Makie.to_color(ax.spinecolor[]) == Makie.to_color(other.leftspinecolor[])
+        @test Makie.to_color(ax.xgridcolor[]) == Makie.to_color(other.xgridcolor[]) == Makie.to_color((:white, 0.09))
+        @test Makie.to_color(ax.ygridcolor[]) == Makie.to_color(other.ygridcolor[])
+        @test ax.elements[:xgrid].color[] == Makie.to_color((:white, 0.09))
+    end
+    # #150: empty ticks of one family alone, and a `(values, labels)` pair with nothing in it
+    fig, ax = build_case(decoration_case(BASELINE_CASES, "merc_reg"); xticks = Float64[])
+    d = GM.decorations(ax)
+    @test isempty(drawn_labels(d, :lon)) && !isempty(drawn_labels(d, :lat))
+    fig, ax = build_case(decoration_case(BASELINE_CASES, "merc_reg"); yticks = (Float64[], String[]))
+    @test isempty(drawn_labels(GM.decorations(ax), :lat))
 end

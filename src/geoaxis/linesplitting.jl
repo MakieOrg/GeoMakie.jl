@@ -95,7 +95,7 @@ end
 
 _coords(p, N) = ntuple(i -> Float64(GI.getcoord(p, i)), N)
 _lerp(a, b, s) = ntuple(i -> a[i] + (b[i] - a[i]) * s, length(a))
-_finite3(x) = isfinite(x[1]) && isfinite(x[2]) && isfinite(x[3])
+# `_finite3` is defined in decorations/graticule.jl
 "Which side of the plane with normal `nrm` the unit vector `x` is on: `-1`, `1`, or `0` within `ON_SEAM` of it."
 _side(x, nrm) = (d = _dot3(x, nrm); d < -ON_SEAM ? -1 : d > ON_SEAM ? 1 : 0)
 "Is `x` at least `CUT_NUDGE` off the plane on side `want`?"

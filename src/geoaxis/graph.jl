@@ -6,22 +6,23 @@ each stage is computed once per change of its inputs and pulled on demand:
 
     1  transform          ← dest
     1  boundary           ← transform, outline, dest
+    1  ptransform         ← transform, model           (the projection into the scene's world space: the model's 2D part follows it)
     2  view               ← boundary, lonlat_limits
-    2  rim_loops          ← view, transform            (the projected, unclipped rim)
+    2  rim_loops          ← view, ptransform           (the projected, unclipped rim)
     2  view_bbox          ← rim_loops                  → targetlimits (bridged)
     3  frame              ← rim_loops, finallimits
     3  spine              ← frame                      → lines!(spine)
-    3  extent             ← frame, transform, view, finallimits
-    3  carriers           ← view, transform, finallimits, extent, viewport, frame (a pole line caps the longitude interval)
+    3  extent             ← frame, ptransform, view, finallimits
+    3  carriers           ← view, transform, ptransform, finallimits, extent, viewport, frame (a pole line caps the longitude interval)
     3  xtickvalues        ← xticks, xminorticks, extent, carriers, xticklabelsize   (ytickvalues likewise; majors and minors)
-    3  graticule          ← x/ytickvalues, view, transform, finallimits, extent  → lines!(grid)
-    3  minor_graticule    ← x/ytickvalues, view, transform, finallimits, extent, x/yminorgridvisible, x/yminorticksvisible
+    3  graticule          ← x/ytickvalues, view, ptransform, finallimits, extent  → lines!(grid)
+    3  minor_graticule    ← x/ytickvalues, view, ptransform, finallimits, extent, x/yminorgridvisible, x/yminorticksvisible
                             (the minor lines of a family, computed only while its minor grid or minor ticks show) → lines!(minor grid)
     2  rim_pieces         ← view                       (rim(view), for exit angles on the sphere)
     3  exits              ← graticule, frame, finallimits, rim_pieces
     3  minor_exits        ← minor_graticule, frame, finallimits, rim_pieces   (stubs and band boundaries, never labels)
     3  mask_polygons      ← frame, finallimits, maskoutside   → poly!(mask): the rect minus the map body, in the background colour
-    3  crossings          ← carriers, x/ytickvalues, view, transform, finallimits, carriermeridian, carrierparallel
+    3  crossings          ← carriers, x/ytickvalues, view, ptransform, finallimits, carriermeridian, carrierparallel
                             (where each graticule line meets the carrier lines interior labels sit beside)
     3  x/yinterior_size   ← interiorlabelsize, x/yticklabelsize   (0.8 × the family's size when automatic) → text! fontsize
     3  labels, suppressed ← exits, frame, finallimits, graticule, crossings, carriers, formats, fonts, sizes, pads,
@@ -44,7 +45,12 @@ each stage is computed once per change of its inputs and pulled on demand:
     4  x/ylabel_position  ← viewport, protrusion_bound, fixed_reach, axislabels   → text!(xlabel), text!(ylabel)
 
 `lonlat_limits` is the user's lon/lat limit rectangle (the whole sphere by
-default); `reset_limits!` writes it.  Level 3 reads the viewport only to
+default); `reset_limits!` writes it.  `model` is the axis scene's model matrix
+(`scale!(ax.scene, 1, -1, 1)` for a south-up map, `rotate!`, `translate!`):
+levels 2 and 3 work in the scene's world space, the space `finallimits` and
+the camera live in, so the frame, the graticule and the labels follow the
+model like the data plots do (#157); the graticule and mask plots are drawn
+with a transformation of their own so the model is not applied to them twice.  Level 3 reads the viewport only to
 size the tick interval (pixels per degree along a carrier); the protrusion
 bound depends on which labels exist, not on where the viewport puts them.
 `fixed_reach` is `nothing` until `tight_ticklabel_spacing!` measures the
@@ -55,6 +61,49 @@ drawn reach and writes it here in place of the bound.  `x/ylabelextent`,
 
 const FULL_LONLAT = Rect2d(-180.0, -90.0, 360.0, 180.0)
 const LONLAT_CRS = "+proj=longlat +datum=WGS84"
+
+"""
+    PlaneTransform(t, A, b)
+
+The projection `t` followed by the affine map `p ↦ A p + b`: lon/lat into the
+axis scene's world space when the scene carries a model transformation.  Its
+inverse undoes the affine map first.
+"""
+struct PlaneTransform{T}
+    t::T
+    A::Makie.Mat2d
+    b::Vec2d
+end
+
+struct PlaneInverse{T}
+    tinv::T
+    A::Makie.Mat2d
+    b::Vec2d
+end
+
+"The projection `t` into world space under `model`; `t` itself when the model's 2D part is the identity."
+function plane_transform(t, model::Makie.Mat4d)
+    A = Makie.Mat2d(model[1, 1], model[2, 1], model[1, 2], model[2, 2])
+    b = Vec2d(model[1, 4], model[2, 4])
+    (A == Makie.Mat2d(1, 0, 0, 1) && b == Vec2d(0, 0)) && return t
+    return PlaneTransform(t, A, b)
+end
+
+function Makie.apply_transform(m::PlaneTransform, pt::V) where V <: VecTypes{N, T} where {N, T <: Number}
+    q = Makie.apply_transform(m.t, pt)
+    r = m.A * Vec2d(q[1], q[2]) + m.b
+    return N == 2 ? V(r[1], r[2]) : V(r[1], r[2], ntuple(i -> q[i + 2], N - 2)...)
+end
+function Makie.apply_transform(m::PlaneInverse, pt::V) where V <: VecTypes{N, T} where {N, T <: Number}
+    r = m.A * Vec2d(pt[1], pt[2]) + m.b
+    q = N == 2 ? V(r[1], r[2]) : V(r[1], r[2], ntuple(i -> pt[i + 2], N - 2)...)
+    return Makie.apply_transform(m.tinv, q)
+end
+function Makie.inverse_transform(m::PlaneTransform)
+    Ainv = inv(m.A)
+    return PlaneInverse(Makie.inverse_transform(m.t), Ainv, -(Ainv * m.b))
+end
+identify(m::PlaneTransform) = identify(m.t)
 
 "Is this source CRS plain WGS84 lon/lat (so limits are already lon/lat)?"
 is_lonlat_source(sp) = sp == LONLAT_CRS || sp == "+proj=latlong +datum=WGS84 +type=crs" ||
@@ -162,6 +211,7 @@ function build_graph!(ax::GeoAxis)
     ComputePipeline.add_input!(g, :finallimits, ax.finallimits)
     ComputePipeline.add_input!(g, :viewport, scene.viewport)
     ComputePipeline.add_input!(g, :projectionview, scene.camera.projectionview)
+    ComputePipeline.add_input!(g, :model, scene.transformation.model)
     ComputePipeline.add_input!(g, :fonts, Makie.to_value(theme(ax.blockscene, :fonts)))
     for k in (:xticks, :yticks, :xminorticks, :yminorticks, :xtickformat, :ytickformat, :xticklabelalign, :yticklabelalign,
               :xticklabelfont, :yticklabelfont, :interiorlabels, :carriermeridian, :carrierparallel, :framecolors,
@@ -204,14 +254,17 @@ function build_graph!(ax::GeoAxis)
     ComputePipeline.map!(g, [:transform, :outline, :dest], :boundary) do t, outline, dest
         Ref{SphereRegion}(boundary(t, dest; outline))
     end
+    ComputePipeline.map!(g, [:transform, :model], :ptransform) do t, model
+        Ref{Any}(plane_transform(t, Makie.Mat4d(model)))
+    end
     ComputePipeline.map!(g, [:boundary, :lonlat_limits], :view) do b, lims
         q = Quadrangle(lims)
         Ref{SphereRegion}(isfullsphere(q) ? b : Intersection(b, q))
     end
-    ComputePipeline.map!(g, [:view, :transform], :rim_loops) do view, t
+    ComputePipeline.map!(g, [:view, :ptransform], :rim_loops) do view, t
         project_rim(view, t)
     end
-    ComputePipeline.map!(g, [:rim_loops, :view, :transform, :lonlat_limits], :view_bbox) do rl, view, t, lims
+    ComputePipeline.map!(g, [:rim_loops, :view, :ptransform, :lonlat_limits], :view_bbox) do rl, view, t, lims
         rl.bbox === nothing ? _rimless_bbox(view, t, lims) : rl.bbox
     end
     ComputePipeline.map!(g, [:view], :rim_pieces) do view
@@ -225,12 +278,12 @@ function build_graph!(ax::GeoAxis)
     ComputePipeline.map!(g, [:frame], :spine) do f
         spine_points(f)
     end
-    ComputePipeline.map!(g, [:frame, :transform, :view, :finallimits], :extent) do f, t, view, lims
+    ComputePipeline.map!(g, [:frame, :ptransform, :view, :finallimits], :extent) do f, t, view, lims
         visible_extent(f, t, view, Rect2d(lims))
     end
-    ComputePipeline.map!(g, [:view, :transform, :finallimits, :extent, :viewport, :frame], :carriers) do view, t, lims, ext, vp, f
+    ComputePipeline.map!(g, [:view, :transform, :ptransform, :finallimits, :extent, :viewport, :frame], :carriers) do view, t, pt, lims, ext, vp, f
         rect = Rect2d(lims)
-        c = carriers(view, t, rect, ext, central_meridian(t); tol = frame_tolerance(rect))
+        c = carriers(view, pt, rect, ext, central_meridian(t); tol = frame_tolerance(rect))
         # meridian labels land on a pole line when the frame has one: size to it
         (; lon = c.lon, lat = c.lat, px_scale = _pixel_scale(vp, rect), pole_length = pole_line_length(f, ext))
     end
@@ -240,7 +293,7 @@ function build_graph!(ax::GeoAxis)
     ComputePipeline.map!(g, [:yticks, :yminorticks, :extent, :carriers, :yticklabelsize], :ytickvalues) do finder, minor, ext, c, size
         _tickset(finder, minor, ext, c.lat, c.px_scale, size, :lat)
     end
-    ComputePipeline.map!(g, [:xtickvalues, :ytickvalues, :view, :transform, :finallimits, :extent],
+    ComputePipeline.map!(g, [:xtickvalues, :ytickvalues, :view, :ptransform, :finallimits, :extent],
                          [:graticule, :xgrid_points, :ygrid_points]) do xt, yt, view, t, lims, ext
         rect = Rect2d(lims)
         tol = frame_tolerance(rect)
@@ -252,7 +305,7 @@ function build_graph!(ax::GeoAxis)
         exits(lines, f, Rect2d(lims), pieces)
     end
     # the minor lines of a family cost nothing while nothing shows them
-    ComputePipeline.map!(g, [:xtickvalues, :ytickvalues, :view, :transform, :finallimits, :extent,
+    ComputePipeline.map!(g, [:xtickvalues, :ytickvalues, :view, :ptransform, :finallimits, :extent,
                              :xminorgridvisible, :yminorgridvisible, :xminorticksvisible, :yminorticksvisible],
                          [:minor_graticule, :xminorgrid_points, :yminorgrid_points]) do xt, yt, view, t, lims, ext, xg, yg, xs, ys
         rect = Rect2d(lims)
@@ -268,7 +321,7 @@ function build_graph!(ax::GeoAxis)
         mask ? mask_polygons(f, Rect2d(lims)) : Polygon{2, Float64}[]
     end
     # where each graticule line meets the carrier lines interior labels sit beside
-    ComputePipeline.map!(g, [:carriers, :xtickvalues, :ytickvalues, :view, :transform, :finallimits,
+    ComputePipeline.map!(g, [:carriers, :xtickvalues, :ytickvalues, :view, :ptransform, :finallimits,
                              :carriermeridian, :carrierparallel], :crossings) do c, xt, yt, view, t, lims, cm, cp
         rect = Rect2d(lims)
         lc = label_carriers(xt.values, yt.values, c.lat.value, c.lon.value, cm, cp)
@@ -392,7 +445,7 @@ end
 """
     decorations(ax::GeoAxis) -> NamedTuple
 
-The axis' current decoration state, read back from the graph: the dest-space
+The axis' current decoration state, read back from the graph: the world-space
 `frame`, `extent`, tick sets (majors and minors), `graticule`, `exits`,
 `labels`, the protrusion `bound` (the tick reach), the pixel-space `pixels`,
 and `suppressed` (every tick not drawn, with its reason, from both levels),
@@ -401,6 +454,9 @@ minors are hidden), the `mask` polygons, with `targetlimits`,
 `finallimits`, `view`, `transform`, `viewport`, the carrier `crossings`, the
 `interiorlabels` mode with the resolved `interiorlabelsize` per family and
 `interiorlabelrotation`, the `framestyle` and the fancy `bands` beside them.
+`transform` is the projection into the scene's world space (the PROJ
+transformation itself unless the scene carries a `model`, which is reported
+too).
 The layout's view of the axis is `axislabels`, `fixed_reach` (what
 `tight_ticklabel_spacing!` measured, or `nothing`), `reach` (tick reach plus
 axis labels), `titlespace`, `subtitlespace`, `protrusions` (what the layout
@@ -410,7 +466,8 @@ decorations(ax::GeoAxis) = (;
     frame = ax.graph[:frame][],
     targetlimits = ax.targetlimits[],
     view = ax.graph[:view][],
-    transform = ax.graph[:transform][],
+    transform = ax.graph[:ptransform][],
+    model = ax.graph[:model][],
     finallimits = ax.finallimits[],
     extent = ax.graph[:extent][],
     xticks = ax.graph[:xticks][],

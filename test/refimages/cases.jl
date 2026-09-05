@@ -1,6 +1,13 @@
 # cases.jl -- the reference-image cases: the same matrix as the decorations
-# suite (twelve research baselines, two issue reproductions, and the
-# most_projections destinations), rendered at 600 x 400.
+# suite (the research baselines, the issue reproductions, the attribute
+# variants and the most_projections destinations), rendered at 600 x 400.
+#
+# Layout under test_images/refimages/ (Makie's ReferenceTests convention, one
+# folder per backend):
+#   recorded/CairoMakie/<name>.png    what this run drew (record.jl)
+#   reference/CairoMakie/<name>.png   the release tarball's images (download.jl)
+#   diff/CairoMakie/<name>.png        |recorded - reference| (compare.jl)
+#   scores.tsv, new_files.txt, missing_files.txt, review.html
 
 using GeoMakie, CairoMakie, GeometryBasics
 using GeoMakie: Proj
@@ -8,9 +15,17 @@ using GeoMakie: Proj
 isdefined(@__MODULE__, :BoundaryHarness) || include(joinpath(@__DIR__, "..", "boundary", "harness.jl"))
 isdefined(@__MODULE__, :DecorationCase) || include(joinpath(@__DIR__, "..", "decorations", "cases.jl"))
 
-const REFIMAGE_CASES = DECORATION_CASES
+# issue_155 is a rectangle zoom, which saving a figure resets (as on Axis), so
+# its picture would be the world map again
+const REFIMAGE_CASES = filter(c -> c.name != "issue_155", DECORATION_CASES)
 const REFIMAGE_DIR = normpath(joinpath(@__DIR__, "..", "..", "test_images", "refimages"))
+const BACKEND = "CairoMakie"
 const RECORDED_DIR = joinpath(REFIMAGE_DIR, "recorded")
+const REFERENCE_DIR = joinpath(REFIMAGE_DIR, "reference")
+const DIFF_DIR = joinpath(REFIMAGE_DIR, "diff")
+
+"The path of a render's image under `dir` (`recorded`, `reference` or `diff`)."
+image_path(dir, name) = joinpath(dir, BACKEND, name * ".png")
 
 "Render one case to a figure."
 function render_case(c::DecorationCase)
@@ -35,9 +50,9 @@ const EXTRA_RENDERS = [
     # same size on screen, the labels lined up (Phase 7's manual check)
     "merc_reg_axis_parity" => () -> build_axis_parity()[1],
     # issue 349: hidden y decorations leave equal column gaps
-    "issue349_row" => () -> build_issue349()[1],
+    "issue_349_row" => () -> build_issue349()[1],
     # issue 268: a grid of GeoAxes packs like a grid of Axes
-    "issue268_grid" => () -> build_issue268()[1],
+    "issue_268_grid" => () -> build_issue268()[1],
     # the mask (Phase 8): markers straddling the frame are cut at it, under the spine and the labels
     "lcc_title_scatter" => () -> begin
         fig, ax = build_case(decoration_case(DECORATION_CASES, "lcc_title"))

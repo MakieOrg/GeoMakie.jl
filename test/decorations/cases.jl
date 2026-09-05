@@ -7,8 +7,11 @@ struct DecorationCase
     dest::String
     limits::Any            # `nothing` or ((lon0, lon1), (lat0, lat1))
     attrs::NamedTuple      # extra GeoAxis attributes
+    figure::NamedTuple     # extra Figure keywords (`fontsize`, …)
+    setup::Any             # `nothing`, or `(fig, ax) -> …` run after the axis is built and its limits set
 end
-DecorationCase(name, dest, limits) = DecorationCase(name, dest, limits, (;))
+DecorationCase(name, dest, limits, attrs = (;); figure = (;), setup = nothing) =
+    DecorationCase(name, dest, limits, attrs, figure, setup)
 
 const BASELINE_CASES = DecorationCase[
     DecorationCase("eqearth", "+proj=eqearth", nothing),
@@ -26,8 +29,8 @@ const BASELINE_CASES = DecorationCase[
 ]
 
 const ISSUE_CASES = DecorationCase[
-    DecorationCase("issue234", "+proj=eqearth", ((0, 3), (0, 3))),
-    DecorationCase("issue388", "+proj=tmerc +lon_0=15", ((-5, 35), (55, 73))),
+    DecorationCase("issue_234", "+proj=eqearth", ((0, 3), (0, 3))),
+    DecorationCase("issue_388", "+proj=tmerc +lon_0=15", ((-5, 35), (55, 73))),
 ]
 
 const MOST_PROJECTION_CASES = DecorationCase[
@@ -57,7 +60,7 @@ const FANCY_CASES = DecorationCase[
 const LAYOUT_CASES = DecorationCase[
     DecorationCase("lcc_title", "+proj=lcc +lon_0=-96 +lat_1=33 +lat_2=45", ((-125, -65), (23, 52)),
         (; title = "Lambert conformal conic", subtitle = "standard parallels 33°N and 45°N", xlabel = "Longitude", ylabel = "Latitude")),
-    DecorationCase("issue281", "+proj=eqearth", nothing, (; title = "issue 281", xlabel = "tight_ticklabel_spacing!")),
+    DecorationCase("issue_281", "+proj=eqearth", nothing, (; title = "issue 281", xlabel = "tight_ticklabel_spacing!")),
     DecorationCase("merc_reg_labels", "+proj=merc", ((-10, 30), (35, 60)),
         (; xlabel = "Longitude", ylabel = "Latitude", subtitle = "axis labels")),
     DecorationCase("merc_reg_labels_topright", "+proj=merc", ((-10, 30), (35, 60)),
@@ -72,7 +75,7 @@ const MINOR_CASES = DecorationCase[
     DecorationCase("merc_reg_minor", "+proj=merc", ((-10, 30), (35, 60)), MINOR_ATTRS),
     DecorationCase("ortho_minor", "+proj=ortho +lon_0=-20 +lat_0=30", nothing, MINOR_ATTRS),
     DecorationCase("merc_reg_fancy_minor", "+proj=merc", ((-10, 30), (35, 60)), (; framestyle = :fancy, MINOR_ATTRS...)),
-    DecorationCase("issue215", "+proj=webmerc", ((-30, 60), (-40, 70)),
+    DecorationCase("issue_215", "+proj=webmerc", ((-30, 60), (-40, 70)),
         (; xminorgridvisible = true, yminorgridvisible = true, xminorticksvisible = true, yminorticksvisible = true,
            xminorgridcolor = (:red, 0.3), yminorgridcolor = (:blue, 0.3), xminorgridwidth = 2.0, yminorgridstyle = :dash,
            xminorticksize = 8.0, yminorticksize = 8.0, xminortickcolor = :red, yminortickcolor = :blue, xminortickwidth = 2.0)),
@@ -88,18 +91,60 @@ const MASK_CASES = DecorationCase[
            maskoutside = false)),
 ]
 
+# Every tick issue as a case that reproduces its report.  #234 (issue_234),
+# #388 (issue_388) and #215 (issue_215) are above; #281, #349 and #268 are in
+# the layout cases and builders.  Each floor below would fail on the master
+# behaviour the report describes.
+const CLOSURE_CASES = DecorationCase[
+    # #317: the docs world map, latitude labels on the curved bulge and
+    # longitude labels cut by the outline
+    DecorationCase("issue_317", "+proj=eqearth", nothing),
+    # #190: an orthographic world map with the report's title and axis labels;
+    # the tick labels sat inside the disc and only `xlabelpadding` moved them
+    DecorationCase("issue_190", "+proj=ortho", nothing,
+        (; title = "Ground Trace", titlegap = 16, xlabel = "Longitude [°]", ylabel = "Latitude [°]", xticklabelsize = 20, yticklabelsize = 20)),
+    # #350: `yticklabelalign` was ignored (hard-coded centre), so the degree
+    # signs of a latitude column never lined up
+    DecorationCase("issue_350", "+proj=merc", ((-10, 30), (0, 60)), (; yticklabelalign = (:right, :center))),
+    # #231: `ylims!(0, 90)` on a conic; the graticule and its labels ran on to 60°S
+    DecorationCase("issue_231", "+proj=leac +lat_1=45 +ellps=sphere", ((-180, 180), (0, 90))),
+    # #157: a south-up map by `scale!(ax.scene, 1, -1, 1)`; the ticks ignored the model transform
+    DecorationCase("issue_157", "+proj=eqearth", nothing; setup = (fig, ax) -> scale!(ax.scene, 1, -1, 1)),
+    # #339: an Axis beside a GeoAxis; the spine and grid colours differed
+    DecorationCase("issue_339", "+proj=merc", ((-10, 30), (35, 60)); setup = (fig, ax) -> Axis(fig[1, 2])),
+    # #150: empty ticks segfaulted
+    DecorationCase("issue_150", "+proj=eqearth", nothing, (; xticks = Float64[], yticks = Float64[])),
+    # #134: a 20° × 10° eqc region lost its latitude labels (later thinned to every other degree)
+    DecorationCase("issue_134", "+proj=eqc", ((-150, -130), (-25, -15))),
+    # #155: a rectangle zoom emptied the labels and a reset did not bring them back
+    DecorationCase("issue_155", "+proj=eqearth", nothing;
+        setup = (fig, ax) -> ax.interactions[:rectanglezoom][2].callback(zoom_rect(ax))),
+    # #273: the figure's `fontsize` reaches every text the axis draws
+    DecorationCase("issue_273", "+proj=eqearth", nothing, (; title = "fontsize 24", xlabel = "Longitude", ylabel = "Latitude");
+        figure = (; fontsize = 24)),
+    # #338: the graticule is drawn behind the plots, as on Axis
+    DecorationCase("issue_338", "+proj=merc", ((-10, 30), (35, 60));
+        setup = (fig, ax) -> scatter!(ax, [0.0, 10.0, 20.0], [40.0, 45.0, 50.0]; markersize = 30, color = :orange)),
+]
+
+"The dest-space rectangle a rectangle zoom onto the middle of the view hands the axis (#155)."
+zoom_rect(ax) = (r = ax.finallimits[]; Rect2d(minimum(r) .+ 0.3 .* widths(r), 0.4 .* widths(r)))
+
 const DECORATION_CASES = vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES, FANCY_CASES, LAYOUT_CASES, MINOR_CASES, MASK_CASES,
-    MOST_PROJECTION_CASES)
+    CLOSURE_CASES, MOST_PROJECTION_CASES)
 
 decoration_case(cases::Vector{DecorationCase}, name::AbstractString) = cases[findfirst(c -> c.name == name, cases)]
 
-"A figure and a GeoAxis for the case, with coastlines (cut at the seams of its projection) plotted."
+"A figure and a GeoAxis for the case, with coastlines (cut at the seams of its projection) plotted, and its `setup` run."
 function build_case(c::DecorationCase; size = (600, 400), coastlines::Bool = true, attrs...)
-    fig = Figure(; size)
+    fig = Figure(; size, c.figure...)
     kw = c.limits === nothing ? (;) : (; limits = c.limits)
     ax = GeoAxis(fig[1, 1]; dest = c.dest, title = c.name, kw..., c.attrs..., attrs...)
     coastlines && lines!(ax, GeoMakie.coastlines(ax))
     Makie.update_state_before_display!(fig)
+    # the setup is last and not followed by another `update_state_before_display!`,
+    # which would reset the limits a zoom setup writes
+    c.setup === nothing || c.setup(fig, ax)
     return fig, ax
 end
 
@@ -224,13 +269,13 @@ const FLOORS = Dict{String, Function}(
     ],
     # a 0..3° view: every whole degree is a tick with both endpoints, at the
     # step each direction's room allows (the taller direction may go to 0.5°)
-    "issue234" => d -> [
+    "issue_234" => d -> [
         ("x values are exactly 0,1,2,3", d.xtickvalues.values == [0.0, 1.0, 2.0, 3.0]),
         ("y values are a:s:b with s dividing 1", d.ytickvalues.values == collect(0.0:d.ytickvalues.values[2]:3.0) && isinteger(1 / d.ytickvalues.values[2])),
         ("x labels", Set(drawn_labels(d, :lon)) == Set(["0°", "1°E", "2°E", "3°E"])),
         ("y labels", issubset(["0°", "1°N", "2°N", "3°N"], drawn_labels(d, :lat)) && length(drawn_labels(d, :lat)) == length(d.ytickvalues.values)),
     ],
-    "issue388" => d -> [
+    "issue_388" => d -> [
         ("zero meridian prints 0°", "0°" in drawn_labels(d, :lon)),
         ("no label reads 0.0°", !any(s -> occursin("0.0", s), drawn_labels(d, :lon))),
     ],
@@ -239,4 +284,106 @@ const FLOORS = Dict{String, Function}(
         ("lat labels are short decimals", all(s -> occursin(SHORT_DECIMAL, s), drawn_labels(d, :lat))),
         ("some label carries a decimal", any(s -> occursin('.', s), vcat(drawn_labels(d, :lon), drawn_labels(d, :lat)))),
     ],
+    # ---- issue closure ----------------------------------------------------------
+    "issue_317" => d -> [
+        ("no label box touches the map body or the frame", isempty(nothing_inside("issue_317", d))),
+        ("latitude labels are drawn", length(drawn_labels(d, :lat)) >= 4),
+        ("longitude labels are drawn", length(drawn_labels(d, :lon)) >= 4),
+        ("every latitude label sits outside the outline on the outward normal", isempty(placement_on_normal("issue_317", d))),
+    ],
+    "issue_190" => (d, ax) -> [
+        ("no label box touches the disc", isempty(nothing_inside("issue_190", d))),
+        ("latitude labels are on the limb", length(drawn_labels(d, :lat)) >= 3),
+        # the meridians of an equatorial view all meet at the pole points on the
+        # limb, so they are reported convergent and labelled along themselves
+        # inside (the ±90° ones lie on the limb itself and are reported instead)
+        ("meridians are labelled inside or reported, not piled at the poles",
+            count(s -> s.family == :lon && s.reason == :convergent, d.suppressed) >= 2 &&
+            "0°" in [l.text for l in interior_drawn(d, :lon)] &&
+            all(v -> any(l -> l.exit.value == v, interior_drawn(d, :lon)) || any(s -> s.family == :lon && s.value == v && s.kind == :interior, d.suppressed),
+                (l.value for l in d.graticule if l.family == :lon))),
+        ("the labels clear the title and the axis labels", isempty(layout_no_collision("issue_190", [ax]))),
+        ("the axis labels are drawn", ax.elements[:xlabel].visible[] && ax.elements[:ylabel].visible[] && d.axislabels.lon.extent > 0),
+    ],
+    "issue_350" => d -> [
+        ("the user alignment reaches every latitude label",
+            all(l -> l.align == (:right, :center) && !l.auto_align, [l for l in d.labels[d.pixels.kept] if l.exit.family == :lat])),
+        ("the labels' right edges line up", let xs = [maximum(c[1] for c in GeoMakie.corners(d.pixels.boxes[k]))
+                for (k, i) in enumerate(d.pixels.kept) if d.labels[i].exit.family == :lat && !GeoMakie.isinterior(d.labels[i])]
+            length(xs) >= 3 && maximum(xs) - minimum(xs) <= 0.5
+        end),
+        ("labels of different widths are drawn", length(unique(length.(drawn_labels(d, :lat)))) >= 2),
+    ],
+    "issue_231" => d -> [
+        ("the frame lies within the limits", isempty(frame_within_domain_and_limits("issue_231", d))),
+        ("the equator is a :limit edge of the frame", :limit in GeoMakie.edge_tags(d.frame)),
+        ("no graticule line lies south of the equator", all(l -> l.family != :lat || l.value >= 0, d.graticule) &&
+            all(p -> p[2] >= -1e-6, (xyz_lat(d, p) for l in d.graticule for pc in l.pieces for p in pc))),
+        ("no latitude label south of the equator", all(l -> l.exit.family != :lat || l.exit.value >= 0, d.labels[d.pixels.kept])),
+        ("latitude labels are drawn", length(drawn_labels(d, :lat)) + length(interior_drawn(d, :lat)) >= 3),
+    ],
+    # the decision for #157: the scene's model transformation is part of the
+    # plane the decorations are computed in (levels 2 and 3 of the graph), so
+    # a south-up map labels its flipped edges and reserves its space on the
+    # sides the labels are drawn on
+    "issue_157" => d -> [
+        ("the model reaches the decorations", d.model[2, 2] == -1 && d.transform isa GeoMakie.PlaneTransform),
+        ("the same labels as right way up", Set(drawn_labels(d, :lat)) == Set(["45°S", "0°", "45°N"]) && "0°" in drawn_labels(d, :lon)),
+        ("south is up: 45°S is drawn above 45°N", label_y(d, :lat, "45°S") > label_y(d, :lat, "0°") > label_y(d, :lat, "45°N")),
+        ("no label box touches the map body", isempty(nothing_inside("issue_157", d))),
+    ],
+    "issue_339" => (d, ax) -> let other = only(filter(b -> b isa Axis, ax.parent.content))
+        [
+            ("the spine colour is the Axis's", ax.spinecolor[] == other.leftspinecolor[]),
+            ("the spine width is the Axis's", ax.spinewidth[] == other.spinewidth[]),
+            ("the grid colour is the Axis's", ax.xgridcolor[] == other.xgridcolor[] && ax.ygridcolor[] == other.ygridcolor[]),
+            ("the grid width is the Axis's", ax.xgridwidth[] == other.xgridwidth[]),
+            ("the spine plot draws in that colour", ax.elements[:spine].color[] == Makie.to_color(other.leftspinecolor[])),
+        ]
+    end,
+    "issue_150" => d -> [
+        ("no ticks, no graticule, no labels, no error", isempty(d.xtickvalues.values) && isempty(d.ytickvalues.values) &&
+            isempty(d.graticule) && isempty(d.labels)),
+        ("nothing is reserved for labels", d.bound.left == 0 && d.bound.bottom == 0),
+    ],
+    "issue_134" => d -> [
+        ("latitude labels are drawn", length(drawn_labels(d, :lat)) >= 3),
+        ("every latitude tick is drawn", Set(d.ytickvalues.values) == Set(l.exit.value for l in d.labels[d.pixels.kept] if l.exit.family == :lat)),
+        ("every longitude tick is drawn", Set(d.xtickvalues.values) == Set(l.exit.value for l in d.labels[d.pixels.kept] if l.exit.family == :lon)),
+        ("the ticks are whole degrees at a fine step", all(isinteger, d.ytickvalues.values) && length(d.ytickvalues.values) >= 5),
+    ],
+    "issue_155" => (d, ax) -> [
+        ("the zoom took", d.finallimits == d.targetlimits && all(widths(d.finallimits) .< 0.5 .* widths(ax.graph[:view_bbox][]))),
+        ("labels survive a rectangle zoom", length(drawn_labels(d, :lon)) >= 2 && length(drawn_labels(d, :lat)) >= 2),
+        ("the labels are the zoomed extent's", all(l -> GeoMakie.lat_range(d.extent)[1] - 1e-6 <= l.exit.value <= GeoMakie.lat_range(d.extent)[2] + 1e-6,
+            [l for l in d.labels[d.pixels.kept] if l.exit.family == :lat])),
+    ],
+    "issue_273" => (d, ax) -> [
+        ("every size attribute inherits the figure's fontsize", all(==(24), (ax.titlesize[], ax.xlabelsize[], ax.ylabelsize[], ax.xticklabelsize[], ax.yticklabelsize[]))),
+        ("the drawn text uses it", ax.elements[:xticklabels].fontsize[] == 24 && ax.elements[:xlabel].fontsize[] == 24 && ax.elements[:title].fontsize[] == 24),
+        ("interior labels follow at 0.8×", d.interiorlabelsize.lon ≈ 0.8 * 24 && ax.elements[:xinteriorlabels].fontsize[] ≈ 0.8 * 24),
+        ("the glyph boxes are measured at that size", all(l -> l.half == GeoMakie.text_half_extents(l.text, Makie.to_font(ax.graph[:fonts][], :regular), 24.0),
+            filter(!GeoMakie.isinterior, d.labels))),
+    ],
+    "issue_338" => (d, ax) -> let sc = only(filter(p -> p isa Scatter, ax.scene.plots))
+        [
+            ("the graticule is behind the plot", isempty(grid_behind("issue_338", ax, sc))),
+            ("the z order matches Axis: grid, plot, spine", Makie.zvalue2d(ax.elements[:xgrid]) < Makie.zvalue2d(sc) < Makie.zvalue2d(ax.elements[:spine])),
+        ]
+    end,
 )
+
+"The latitude of a world-space graticule point of `d` (through the inverse projection)."
+xyz_lat(d, p) = Makie.apply_transform(Makie.inverse_transform(d.transform), Point2d(p))
+
+"The pixel y of the first drawn frame label of `family` reading `text`."
+function label_y(d, family, text)
+    for (k, i) in enumerate(d.pixels.kept)
+        l = d.labels[i]
+        l.text == text && l.exit.family == family && !GeoMakie.isinterior(l) && return d.pixels.boxes[k].centre[2]
+    end
+    return NaN
+end
+
+"Run a floor: floors take the decorations, or the decorations and the axis."
+floor_results(floor, d, ax) = hasmethod(floor, Tuple{Any, Any}) ? floor(d, ax) : floor(d)

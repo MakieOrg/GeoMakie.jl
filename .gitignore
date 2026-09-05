@@ -32,3 +32,4 @@ docs/GeoMakieDocumenterBlocks/Manifest.toml
 
 # boundary design spikes (TDD program design)
 /scratch/
+/test/refimages/reference_images/

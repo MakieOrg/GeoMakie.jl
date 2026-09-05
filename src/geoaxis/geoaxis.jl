@@ -351,20 +351,23 @@ function Makie.initialize_block!(axis::GeoAxis)
         inspectable=false)
     translate!(backgroundplot, 0, 0, BACKGROUND_Z)
 
-    # The graticule, in dest space from the graph, behind the plots unless
-    # asked otherwise; the minor lines first, so the major ones draw over them.
+    # The graticule, in the scene's world space from the graph (the graph
+    # applies the scene's model itself, so these plots carry a transformation
+    # of their own), behind the plots unless asked otherwise; the minor lines
+    # first, so the major ones draw over them.
+    world() = Makie.Transformation()
     xminorgridplot = lines!(scene, graph[:xminorgrid_points]; color=axis.xminorgridcolor, linewidth=axis.xminorgridwidth,
         visible=axis.xminorgridvisible, linestyle=axis.xminorgridstyle, transparency=true, inspectable=false,
-        xautolimits=false, yautolimits=false)
+        xautolimits=false, yautolimits=false, transformation=world())
     yminorgridplot = lines!(scene, graph[:yminorgrid_points]; color=axis.yminorgridcolor, linewidth=axis.yminorgridwidth,
         visible=axis.yminorgridvisible, linestyle=axis.yminorgridstyle, transparency=true, inspectable=false,
-        xautolimits=false, yautolimits=false)
+        xautolimits=false, yautolimits=false, transformation=world())
     longridplot = lines!(scene, graph[:xgrid_points]; color=axis.xgridcolor, linewidth=axis.xgridwidth,
         visible=axis.xgridvisible, linestyle=axis.xgridstyle, transparency=true, inspectable=false,
-        xautolimits=false, yautolimits=false)
+        xautolimits=false, yautolimits=false, transformation=world())
     latgridplot = lines!(scene, graph[:ygrid_points]; color=axis.ygridcolor, linewidth=axis.ygridwidth,
         visible=axis.ygridvisible, linestyle=axis.ygridstyle, transparency=true, inspectable=false,
-        xautolimits=false, yautolimits=false)
+        xautolimits=false, yautolimits=false, transformation=world())
     on(axis.blockscene, axis.gridbehind; update=true) do behind
         z = behind ? -GRID_Z : GRID_Z
         for p in (xminorgridplot, yminorgridplot, longridplot, latgridplot)
@@ -376,7 +379,7 @@ function Makie.initialize_block!(axis::GeoAxis)
     # colour, over the plots and under the frame, so nothing plotted beyond
     # the frame reaches the tick labels.  Empty when the frame is the rectangle.
     maskplot = poly!(scene, graph[:mask_polygons]; color=axis.backgroundcolor, strokewidth=0, visible=axis.maskoutside,
-        inspectable=false, xautolimits=false, yautolimits=false)
+        inspectable=false, xautolimits=false, yautolimits=false, transformation=world())
     translate!(maskplot, 0, 0, MASK_Z)
 
     # The spine, the fancy band, tick stubs and labels live in the block scene,
@@ -627,7 +630,10 @@ function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)
     transformfunc = lift(create_transform, axis.dest, source)
 
     if !Makie.not_in_data_space(plot)
-        trans = Makie.Transformation(transformfunc; get(plot.kw, :transformation, Attributes())...)
+        # the plot projects through its own transform function and follows the
+        # scene's model, so `scale!(ax.scene, 1, -1, 1)` flips it with the
+        # decorations (#157)
+        trans = Makie.Transformation(axis.scene; transform_func = transformfunc, get(plot.kw, :transformation, Attributes())...)
         plot.kw[:transformation] = trans
     end
 

@@ -1,5 +1,30 @@
 # Unreleased
 
+# 0.8.0 - 2026-09-05
+
+`GeoAxis` draws its decorations on the shape the projection gives it.  The frame is the projection's own boundary (an ellipse, a limb, a lon/lat-limited region, or an `outline` of your own), the graticule is clipped to it, the ticks sit where meridians and parallels leave the frame, and the labels stand outside on the frame's normal, thinned where they would overlap.  Lines that never reach the frame (polar parallels, converging meridians) are labelled inside the map.  Titles, axis labels, spine and grid are drawn natively and take their colours from the `Axis` theme, so a `GeoAxis` lines up with an `Axis` beside it.  Data plots are cut at the boundary's seams and everything drawn beyond the frame is masked.
+
+New attributes: `framestyle` (`:plain` / `:fancy`), `framewidth`, `framecolors`, `gridbehind`, `maskoutside`, `outline`, `x/yaxisposition`, `ticklabelminangle`, `ticklabelmingap`, `ticklabelcollisions`, `ticklabelreport`, `interiorlabels`, `carriermeridian`, `carrierparallel`, `interiorlabelsize`, `interiorlabelrotation`, `interiorlabelhalo`, `interiorlabelhalocolor`, `interiorlabelhalowidth`, and the `Axis` minor tick and minor grid attributes.  New tick finders `GeographicTicks` (the default) and `ArcMinuteTicks`.  `hidedecorations!`, `hidexdecorations!`, `hideydecorations!`, `hidespines!` and `tight_ticklabel_spacing!` work as on `Axis`.
+
+Behaviour changes for existing attributes:
+
+| Attribute | Before | After |
+|---|---|---|
+| `x/yticks` | `automatic`, a fixed tick set over the whole domain | `GeographicTicks()` sized to the visible extent; any Makie finder, vector, range, or `(values, labels)` tuple accepted |
+| `x/ytickformat` | declared, never read | honoured; `automatic` prints hemisphere suffixes (`110°W`, `45°N`, `0°`, `180°`) |
+| `x/yticklabelpad` | protrusion padding only | the gap between the tick mark and the label |
+| `x/ylabelpadding` | moved the tick labels | pads the axis label, as on `Axis` |
+| `x/yticklabelrotation` | ignored | honoured |
+| `x/yticklabelalign` | hard-coded `(:center, :center)` | derived from the frame normal; a user value overrides |
+| `x/yticksize`, `*tickwidth`, `*tickcolor`, `*ticksvisible`, `*tickalign` | no tick marks existed | tick marks drawn on the frame |
+| `spinewidth`, `spinecolor`, `spinevisible` | no spine existed | the frame's spine, defaulting to the `Axis` theme |
+| `x/yminorticks`, `x/yminorgrid*` | absent | minor ticks and minor graticule, paired with the major step |
+| a `transformation` on `ax.scene` | ignored by the ticks | frame, graticule and labels follow it |
+
+Closes #134, #150, #155, #157, #190, #215, #231, #234, #268, #273, #281, #317, #338, #339, #349, #350 and #388.  The decoration tests in `test/decorations` name each of these as an `issue_NNN` case, and `test/refimages` renders every case against a reference set hosted on the `refimages-0.8` release (Makie's `ReferenceTests`; skipped when it is not installed).
+
+Requires ComputePipeline 0.1.8; Julia 1.10 stays supported.
+
 # 0.7.17 - 2026-08-29
 - `geo2basic` converts any GeoInterface geometry: it decomposes the input to geometries and hands each to `GeoInterface.convert`.
 - `GlobeAxis` lights the globe automatically.

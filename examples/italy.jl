@@ -34,12 +34,21 @@ poly!(
     strokecolor = :blue, strokewidth = 1, shading = NoShading
     )
 fig
-# That looks like a lot of ticks.  Let's simplify the grid:
+# The axis fits its limits to the data, so the frame is the rectangle of the
+# limits in projected space, with the graticule sized to it by the default
+# `GeographicTicks()`.  Any Makie tick finder works as well, if a coarser or
+# finer grid is wanted:
 ga.xticks = Makie.WilkinsonTicks(5; k_min = 3)
 ga.yticks = Makie.WilkinsonTicks(10; k_min = 5)
 fig
-# Whoops, this doesn't cover the whole of Italy!
-# No worries, we'll have a spine eventually to show this.
+# A `:fancy` frame shows the tick spacing along the spine, and minor ticks
+# can be switched on as on `Axis`:
+ga.xticks = GeographicTicks()
+ga.yticks = GeographicTicks()
+ga.framestyle = :fancy
+ga.xminorticksvisible = true
+ga.yminorticksvisible = true
+fig
 
 #=
 ```@cardmeta
