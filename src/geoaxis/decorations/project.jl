@@ -69,6 +69,17 @@ until the chord midpoint deviation is under `tol`.  Non-finite samples are
 dropped unless `dropnan = false`, which keeps them as `NaN` breaks.
 """
 function adaptive_project(t, arc::CircleArc; tol::Real, max_depth::Integer = MAX_DEPTH, min_depth::Integer = MIN_DEPTH, dropnan::Bool = true)
+    out, _ = adaptive_project_params(t, arc; tol, max_depth, min_depth)
+    return dropnan ? filter(_finite2, out) : out
+end
+
+"""
+    adaptive_project_params(t, arc; tol, max_depth, min_depth) -> (Vector{Point2d}, Vector{Float64})
+
+[`adaptive_project`](@ref) with `dropnan = false`, also returning the arc
+parameter of every sample.
+"""
+function adaptive_project_params(t, arc::CircleArc; tol::Real, max_depth::Integer = MAX_DEPTH, min_depth::Integer = MIN_DEPTH)
     n = _seed_segments(arc)
     ts = range(arc.t0, arc.t1; length = n + 1)
     ps = Vector{Point2d}(undef, n + 1)
@@ -77,15 +88,15 @@ function adaptive_project(t, arc::CircleArc; tol::Real, max_depth::Integer = MAX
                 i == n + 1 ? project_on_arc(t, arc, ts[end], -1; tol) :
                 project_point(t, arcpoint(arc, ts[i]))
     end
-    out = Point2d[ps[1]]
+    out = Point2d[ps[1]]; outt = Float64[ts[1]]
     for i in 1:n
-        _refine!(out, t, arc, ts[i], ps[i], ts[i + 1], ps[i + 1], float(tol), 0, max_depth, min_depth)
-        push!(out, ps[i + 1])
+        _refine!(out, outt, t, arc, ts[i], ps[i], ts[i + 1], ps[i + 1], float(tol), 0, max_depth, min_depth)
+        push!(out, ps[i + 1]); push!(outt, ts[i + 1])
     end
-    return dropnan ? filter(_finite2, out) : out
+    return out, outt
 end
 
-function _refine!(out, t, arc, ta, pa, tb, pb, tol, depth, max_depth, min_depth)
+function _refine!(out, outt, t, arc, ta, pa, tb, pb, tol, depth, max_depth, min_depth)
     depth >= max_depth && return
     tm = 0.5 * (ta + tb)
     pm = project_point(t, arcpoint(arc, tm))
@@ -94,9 +105,9 @@ function _refine!(out, t, arc, ta, pa, tb, pb, tol, depth, max_depth, min_depth)
         dev = hypot(pm[1] - 0.5 * (pa[1] + pb[1]), pm[2] - 0.5 * (pa[2] + pb[2]))
         dev <= tol && return
     end
-    _refine!(out, t, arc, ta, pa, tm, pm, tol, depth + 1, max_depth, min_depth)
-    push!(out, pm)
-    _refine!(out, t, arc, tm, pm, tb, pb, tol, depth + 1, max_depth, min_depth)
+    _refine!(out, outt, t, arc, ta, pa, tm, pm, tol, depth + 1, max_depth, min_depth)
+    push!(out, pm); push!(outt, tm)
+    _refine!(out, outt, t, arc, tm, pm, tb, pb, tol, depth + 1, max_depth, min_depth)
     return
 end
 

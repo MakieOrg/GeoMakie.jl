@@ -19,14 +19,15 @@ each stage is computed once per change of its inputs and pulled on demand:
     3  exits              ← graticule, frame, finallimits, rim_pieces
     3  crossings          ← carriers, x/ytickvalues, view, transform, finallimits, carriermeridian, carrierparallel
                             (where each graticule line meets the carrier lines interior labels sit beside)
+    3  x/yinterior_size   ← interiorlabelsize, x/yticklabelsize   (0.8 × the family's size when automatic) → text! fontsize
     3  labels, suppressed ← exits, frame, finallimits, graticule, crossings, carriers, formats, fonts, sizes, pads,
                             tick sizes, rotations, aligns, x/yaxisposition, ticklabelminangle, ticklabelmingap, interiorlabels,
-                            framestyle, framewidth (a fancy band pushes labels out by its width)
+                            x/yinterior_size, interiorlabelrotation, framestyle, framewidth (a fancy band pushes labels out by its width)
     3  protrusion_bound   ← labels, x/yticklabelsvisible, framestyle, framewidth   → layoutobservables.protrusions (bridged)
     4  pixels             ← frame, graticule, labels, projectionview, viewport, tick attributes, framestyle,
                             ticklabelmingap, ticklabelcollisions       → text! (frame and interior), linesegments! (no stubs when fancy),
                                                                          lines!(spine_px); the crowding report
-    4  bands              ← frame, exits, projectionview, viewport, framestyle, framewidth, framecolors
+    4  bands              ← frame, exits, finallimits, ticklabelminangle, projectionview, viewport, framestyle, framewidth, framecolors
                                                                        → poly!(band_polygons; color = band_colors)
 
 `lonlat_limits` is the user's lon/lat limit rectangle (the whole sphere by
@@ -103,6 +104,12 @@ end
 
 _lon_in_range(v, lo, hi) = (w = mod(v - lo, 360.0); w <= hi - lo + 1e-9 || w >= 360 - 1e-9)
 
+"An automatic `interiorlabelsize` is this fraction of the family's tick label size."
+const INTERIOR_SIZE_FACTOR = 0.8
+
+"The interior label size of a family: `interiorlabelsize`, or `INTERIOR_SIZE_FACTOR` × the family's tick label size."
+interior_label_size(size, ticklabelsize) = size isa Makie.Automatic ? INTERIOR_SIZE_FACTOR * float(ticklabelsize) : float(size)
+
 "Label strings keyed by tick value."
 function _label_table(ts::TickSet, fmt, finder, family::Symbol)
     strs = format_tickvalues(fmt, finder, family, ts.values, ts.labels)
@@ -134,7 +141,8 @@ function build_graph!(ax::GeoAxis)
     ComputePipeline.add_input!(g, :projectionview, scene.camera.projectionview)
     ComputePipeline.add_input!(g, :fonts, Makie.to_value(theme(ax.blockscene, :fonts)))
     for k in (:xticks, :yticks, :xtickformat, :ytickformat, :xticklabelalign, :yticklabelalign,
-              :xticklabelfont, :yticklabelfont, :interiorlabels, :carriermeridian, :carrierparallel, :framecolors)
+              :xticklabelfont, :yticklabelfont, :interiorlabels, :carriermeridian, :carrierparallel, :framecolors,
+              :interiorlabelsize, :interiorlabelrotation)
         ComputePipeline.add_input!(boxed, g, k, getproperty(ax, k))
     end
     for k in (:xticklabelsize, :yticklabelsize, :xticklabelpad, :yticklabelpad, :xticksize, :yticksize,
@@ -147,6 +155,11 @@ function build_graph!(ax::GeoAxis)
     # the band's width in pixels: what labels and the layout must clear beyond the frame
     ComputePipeline.map!(g, [:framestyle, :framewidth], :band) do style, width
         style === :fancy ? float(width) : 0.0
+    end
+    # interior labels are smaller than the frame labels of their family unless told otherwise
+    ComputePipeline.map!(g, [:interiorlabelsize, :xticklabelsize, :yticklabelsize],
+                         [:xinterior_size, :yinterior_size]) do size, xsize, ysize
+        (interior_label_size(size, xsize), interior_label_size(size, ysize))
     end
 
     # ---- levels 1 and 2: the projection and the view --------------------------
@@ -218,17 +231,19 @@ function build_graph!(ax::GeoAxis)
                              :xticklabelsize, :yticklabelsize, :xticklabelfont, :yticklabelfont,
                              :xticklabelpad, :yticklabelpad, :xticksize, :yticksize, :xticksvisible, :yticksvisible,
                              :xticklabelrotation, :yticklabelrotation, :xticklabelalign, :yticklabelalign,
-                             :xaxisposition, :yaxisposition, :ticklabelminangle, :ticklabelmingap, :interiorlabels, :band],
+                             :xaxisposition, :yaxisposition, :ticklabelminangle, :ticklabelmingap, :interiorlabels, :band,
+                             :xinterior_size, :yinterior_size, :interiorlabelrotation],
                          [:labels, :suppressed]) do ex, f, lims, lines, crossings, c, xt, yt, xticks, yticks, xfmt, yfmt, fonts,
                                      xsize, ysize, xfont, yfont, xpad, ypad, xtsize, ytsize, xtvis, ytvis,
-                                     xrot, yrot, xalign, yalign, xpos, ypos, minangle, mingap, interior, band
+                                     xrot, yrot, xalign, yalign, xpos, ypos, minangle, mingap, interior, band,
+                                     xisize, yisize, irot
         attrs = (;
             lon = (; labels = _label_table(xt, xfmt, xticks, :lon), size = xsize, font = xfont, pad = xpad,
                      ticksize = xtsize, ticksvisible = xtvis, rotation = xrot, align = xalign),
             lat = (; labels = _label_table(yt, yfmt, yticks, :lat), size = ysize, font = yfont, pad = ypad,
                      ticksize = ytsize, ticksvisible = ytvis, rotation = yrot, align = yalign),
             fonts, xaxisposition = xpos, yaxisposition = ypos, minangle, band,
-            interior = (; mode = interior, px_scale = c.px_scale, mingap),
+            interior = (; mode = interior, px_scale = c.px_scale, mingap, size = (; lon = xisize, lat = yisize), rotation = irot),
         )
         place(ex, f, Rect2d(lims), lines, crossings, attrs)
     end
@@ -242,7 +257,8 @@ function build_graph!(ax::GeoAxis)
                              :xticksize, :yticksize, :xtickalign, :ytickalign, :xticksvisible, :yticksvisible,
                              :ticklabelmingap, :ticklabelcollisions, :ticklabelreport, :ticklabelminangle, :band],
                          [:pixels, :xlabel_positions, :xlabel_strings, :ylabel_positions, :ylabel_strings,
-                          :xinterior_positions, :xinterior_strings, :yinterior_positions, :yinterior_strings,
+                          :xinterior_positions, :xinterior_strings, :xinterior_rotations,
+                          :yinterior_positions, :yinterior_strings, :yinterior_rotations,
                           :xstubs, :ystubs, :spine_px]) do f, lines, labels, sup3, pv, vp, xts, yts, xta, yta, xtv, ytv,
                                                 mingap, collisions, report, minangle, band
         # the band's edges mark the ticks: no stubs on a fancy frame
@@ -258,18 +274,22 @@ function build_graph!(ax::GeoAxis)
             isempty(msg) || report_suppressions(vcat(sup3, px.suppressed), report, mingap, minangle)
         end
         (px, px.positions[:lon], px.strings[:lon], px.positions[:lat], px.strings[:lat],
-         px.interior_positions[:lon], px.interior_strings[:lon], px.interior_positions[:lat], px.interior_strings[:lat],
+         px.interior_positions[:lon], px.interior_strings[:lon], px.interior_rotations[:lon],
+         px.interior_positions[:lat], px.interior_strings[:lat], px.interior_rotations[:lat],
          px.stubs[:lon], px.stubs[:lat], closed_polylines(px.frame))
     end
-    # the fancy band, swept along the frame in pixels between consecutive exits
-    ComputePipeline.map!(g, [:frame, :exits, :projectionview, :viewport, :band, :framecolors],
-                         [:bands, :band_polygons, :band_colors]) do f, ex, pv, vp, band, colors
+    # the fancy band, swept along the frame in pixels between consecutive tick
+    # exits, with a corner cell in the background colour at every run corner
+    ComputePipeline.map!(g, [:frame, :exits, :finallimits, :ticklabelminangle, :projectionview, :viewport, :band, :framecolors],
+                         [:bands, :band_polygons, :band_colors]) do f, ex, lims, minangle, pv, vp, band, colors
         band > 0 || return (FrameBands(), Vector{Point2d}[], RGBAf[])
         m = PixelMap(pv, vp)
         loops = [Point2d[m(p) for p in lp] for lp in f.loops]
-        epx = [(e.loop, e.edge, m(e.p)) for e in ex]
-        b = frame_bands(loops, epx, band, RGBAf[Makie.to_color(c) for c in colors]; outward = pixel_orientation(m))
-        (b, b.polygons, b.colors)
+        epx = [(e.loop, e.edge, m(e.p)) for e in band_exits(ex, Rect2d(lims), minangle)]
+        cols = RGBAf[Makie.to_color(c) for c in colors]
+        b = frame_bands(loops, f.tags, f.source, epx, band, cols; outward = pixel_orientation(m))
+        bg = cols[min(2, end)]
+        (b, vcat(b.polygons, b.cells), vcat(b.colors, fill(bg, length(b.cells))))
     end
 
     setfield!(ax, :graph, g)
@@ -286,7 +306,8 @@ The axis' current decoration state, read back from the graph: the dest-space
 `bound`, the pixel-space `pixels`, and `suppressed` (every tick not drawn,
 with its reason, from both levels), with `targetlimits`, `finallimits`,
 `view`, `transform`, `viewport`, the carrier `crossings`, the
-`interiorlabels` mode, the `framestyle` and the fancy `bands` beside them.
+`interiorlabels` mode with the resolved `interiorlabelsize` per family and
+`interiorlabelrotation`, the `framestyle` and the fancy `bands` beside them.
 """
 decorations(ax::GeoAxis) = (;
     frame = ax.graph[:frame][],
@@ -310,8 +331,11 @@ decorations(ax::GeoAxis) = (;
     projectionview = ax.scene.camera.projectionview[],
     xaxisposition = ax.xaxisposition[],
     yaxisposition = ax.yaxisposition[],
+    ticklabelminangle = ax.ticklabelminangle[],
     crossings = ax.graph[:crossings][],
     interiorlabels = ax.interiorlabels[],
+    interiorlabelrotation = ax.interiorlabelrotation[],
+    interiorlabelsize = (; lon = ax.graph[:xinterior_size][], lat = ax.graph[:yinterior_size][]),
     framestyle = ax.framestyle[],
     bands = ax.graph[:bands][],
 )

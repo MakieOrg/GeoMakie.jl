@@ -114,18 +114,32 @@ const FLOORS = Dict{String, Function}(
         ("every parallel is labelled once on the central meridian", interior_once(d, :lat, 0.0)),
         ("no interior longitude labels", isempty(interior_drawn(d, :lon))),
     ],
+    # the 80°N circle is 35 px across at this size: the 27 px of arc between
+    # two 45° meridians cannot hold "80°N" along the line, so it is reported
     "stere_polar" => d -> [
-        ("every parallel is labelled once on the central meridian", interior_once(d, :lat, 0.0)),
+        ("50°N, 60°N and 70°N are labelled once on the central meridian, on their own circles",
+            Set(l.text for l in interior_drawn(d, :lat)) == Set(["50°N", "60°N", "70°N"]) &&
+            all(l -> l.carrier == 0.0, interior_drawn(d, :lat))),
+        ("80°N is reported as crossed", [(s.value, s.reason) for s in d.suppressed if s.kind == :interior] == [(80.0, :crossed)]),
         ("no interior longitude labels", isempty(interior_drawn(d, :lon))),
     ],
-    # "45°S" is too wide to sit between its parallel and the equator on the side
     "laea_polar_c90" => d -> [
-        ("the column moves to the 90°E meridian", Set(l.text for l in interior_drawn(d, :lat)) == Set(["0°", "45°N"]) &&
-            all(l -> l.carrier == 90.0, interior_drawn(d, :lat))),
-        ("the parallel that does not fit is reported", any(s -> s.kind == :interior && s.value == -45.0, d.suppressed)),
+        ("the column moves to the 90°E meridian", interior_once(d, :lat, 90.0)),
+        ("nothing is reported", !any(s -> s.kind == :interior, d.suppressed)),
     ],
     "merc_reg" => d -> [
         ("no interior labels", isempty(interior_drawn(d, :lon)) && isempty(interior_drawn(d, :lat))),
+    ],
+    # the coastline limits stop a degree short of the poles, so the viewport
+    # cuts the meridians where they bunch towards the corners: the bottom exits
+    # converge, the top ones are the other axis position's, and the meridians
+    # are labelled along themselves instead
+    "most_adams_hemi" => d -> [
+        ("nothing drawn for longitudes at the frame", isempty([l for l in d.labels[d.pixels.kept] if l.exit.family == :lon && !GeoMakie.isinterior(l)])),
+        ("bottom exits are reported convergent", all(s -> s.reason in (:convergent, :family, :noexit), filter(s -> s.family == :lon && s.kind == :frame, d.suppressed)) &&
+            count(s -> s.family == :lon && s.reason == :convergent, d.suppressed) == 7),
+        ("the seven meridians are labelled once each along themselves", interior_once(d, :lon) && length(interior_drawn(d, :lon)) == 7),
+        ("no collision drop", !any(s -> s.reason == :collision, d.suppressed)),
     ],
     # a 0..3° view: every whole degree is a tick with both endpoints, at the
     # step each direction's room allows (the taller direction may go to 0.5°)

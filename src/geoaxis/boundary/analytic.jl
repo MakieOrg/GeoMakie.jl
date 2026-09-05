@@ -111,6 +111,7 @@ Tokens not listed fall through to the probe.
 """
 const PROJ_TOKENS = Dict{Symbol, Tuple{Function, Symbol}}(
     :ortho => (p -> Cap(90.0), :centre),
+    :airy => (p -> Cap(90.0), :centre),      # PROJ refuses beyond the hemisphere whatever +lat_b is
     :laea => (p -> Cap(ANTIPODE_CAP_DEG), :centre),
     :aeqd => (p -> Cap(ANTIPODE_CAP_DEG), :centre),
     :stere => (p -> Cap(STEREO_CAP_DEG), :centre),

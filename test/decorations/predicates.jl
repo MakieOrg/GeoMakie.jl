@@ -318,11 +318,38 @@ function graticule_pieces_px(d)
     return out
 end
 
+"The pixel pieces of one graticule line."
+own_pieces_px(pieces, family, value) = [pc for (pf, pv, pc) in pieces if (pf, pv) == (family, value)]
+
+"Distance from `q` to the nearest segment of the polylines."
+function polylines_distance(pieces, q)
+    best = Inf
+    for pc in pieces, i in 1:(length(pc) - 1)
+        best = min(best, GM._seg_dist(q, pc[i], pc[i + 1]))
+    end
+    return best
+end
+
+"The direction of the segment of the polylines nearest to `q`."
+function polylines_direction(pieces, q)
+    best = Inf; dir = Vec2d(1, 0)
+    for pc in pieces, i in 1:(length(pc) - 1)
+        d = GM._seg_dist(q, pc[i], pc[i + 1])
+        d < best || continue
+        e = pc[i + 1] - pc[i]
+        n = norm(e)
+        n > 0 && (best = d; dir = Vec2d(e / n))
+    end
+    return dir
+end
+
 """
 Every drawn interior label belongs to a line with no frame candidate (unless
 interior labels are forced on), hangs from the crossing of its line with its
-carrier, lies wholly on the map, and its box crosses no graticule line but its
-own and its carrier.
+carrier, sits on its own line (the line passes through its box, or touches
+the box shifted off the line by `INTERIOR_SHIFT_GAP` of the pad) turned along
+it (or at the fixed `interiorlabelrotation`), lies wholly on the map, clears
+its crossing and the carrier by the pad, and crosses no other graticule line.
 """
 function interior_labels(name, d)
     out = Violation[]
@@ -343,17 +370,34 @@ function interior_labels(name, d)
         p = Makie.apply_transform(d.transform, Point2d(lon, lat))
         (all(isfinite, p) && norm(p - l.anchor) <= 1e-6 * extent) ||
             push!(out, Violation(name, :interior_labels, "$(l.text) anchor $(l.anchor) is not at ($lon, $lat) = $p on its carrier $(l.carrier)"))
+        # on its own line, turned along it
+        own = own_pieces_px(pieces, fam, v)
+        slack = GM.INTERIOR_SHIFT_GAP * l.offset + 0.01
+        any(pc -> GM.polyline_crosses_box(GM.inflate(b, slack), pc, GM._aabb(pc)), own) ||
+            push!(out, Violation(name, :interior_labels, "$(l.text) box at $(b.centre) is not on its line ($(polylines_distance(own, b.centre)) px away)"))
+        if d.interiorlabelrotation isa Makie.Automatic
+            dir = polylines_direction(own, b.centre)
+            axis = Vec2d(cos(b.θ), sin(b.θ))
+            abs(axis ⋅ dir) >= cosd(3) ||
+                push!(out, Violation(name, :interior_labels, "$(l.text) is turned $(rad2deg(b.θ))°, its line runs at $(rad2deg(atan(dir[2], dir[1])))°"))
+            -pi / 2 < b.θ <= pi / 2 || push!(out, Violation(name, :interior_labels, "$(l.text) is not upright ($(rad2deg(b.θ))°)"))
+        else
+            b.θ == float(d.interiorlabelrotation) || push!(out, Violation(name, :interior_labels, "$(l.text) ignores the fixed rotation"))
+        end
         GM.box_within_loops(b, px.frame) || push!(out, Violation(name, :interior_labels, "$(l.text) box is not wholly on the map"))
         other = fam === :lon ? :lat : :lon
         for (pf, pv, pc) in pieces
-            ((pf, pv) == (fam, v) || (pf, pv) == (other, l.carrier)) && continue
+            (pf, pv) == (fam, v) && continue
             GM.polyline_crosses_box(b, pc, GM._aabb(pc)) &&
                 (push!(out, Violation(name, :interior_labels, "$(l.text) box crosses $pf $pv")); break)
+            (pf, pv) == (other, l.carrier) || continue
+            GM.polyline_crosses_box(GM.inflate(b, l.offset - 0.01), pc, GM._aabb(pc)) &&
+                (push!(out, Violation(name, :interior_labels, "$(l.text) box is within the pad of its carrier")); break)
         end
         # the box clears the crossing by the pad
         q = GM._to_local(b, px.exits[k])
         dist = norm(max.(abs.(q) .- b.half, 0.0))
-        dist >= l.offset - 1e-6 ||
+        dist >= l.offset - 0.01 ||
             push!(out, Violation(name, :interior_labels, "$(l.text) box sits $(dist) px from its crossing, within the pad $(l.offset)"))
     end
     return out
@@ -365,43 +409,69 @@ phase5_violations(name, d) = interior_labels(name, d)
 # ---- Phase 6: the fancy band and the grid's z-order -----------------------------
 
 """
-On a `:fancy` frame every tick exit is a band boundary (within a pixel), every
-boundary is at an exit except the one a loop may add to keep two colours
-alternating around an odd count, and no two consecutive bands of a loop
-share a colour.  A `:plain` frame has no bands.
+On a `:fancy` frame every tick exit (`band_exits`) is a band boundary (within
+a pixel), every boundary is at an exit or a run corner (except the one a
+single-run loop may add to keep two colours alternating around an odd count),
+consecutive bands of one run never share a colour (nor the closing pair of a
+single-run loop), every run corner of the frame has a corner cell outside
+the map, and every corner touches exactly two runs.  A `:plain` frame has no
+bands.
 """
 function frame_band(name, d)
     out = Violation[]
     b = d.bands
     if d.framestyle !== :fancy
-        isempty(b.polygons) || push!(out, Violation(name, :frame_band, "a plain frame has $(length(b.polygons)) bands"))
+        (isempty(b.polygons) && isempty(b.cells)) || push!(out, Violation(name, :frame_band, "a plain frame has $(length(b.polygons)) bands"))
         return out
     end
     m = GM.PixelMap(d.projectionview, d.viewport)
-    epx = [m(e.p) for e in d.exits]
+    marks = [m(e.p) for e in GM.band_exits(d.exits, d.finallimits, d.ticklabelminangle)]
     allb = reduce(vcat, b.boundaries; init = Point2d[])
-    length(b.polygons) == length(allb) == length(b.colors) ||
+    length(b.polygons) == length(allb) == length(b.colors) == length(b.loop) == length(b.run) ||
         push!(out, Violation(name, :frame_band, "$(length(b.polygons)) bands for $(length(allb)) boundaries"))
-    for (e, p) in zip(d.exits, epx)
-        minimum(norm(p - q) for q in allb; init = Inf) <= 1.0 + 1e-6 ||
-            push!(out, Violation(name, :frame_band, "exit $(e.family) $(e.value) at $p is not a band boundary"))
+    length(b.cells) == length(b.corners) == length(b.cell_loop) ||
+        push!(out, Violation(name, :frame_band, "$(length(b.cells)) cells for $(length(b.corners)) corners"))
+    near(p, pts) = minimum(norm(p - q) for q in pts; init = Inf) <= 1.0 + 1e-6
+    for p in marks
+        near(p, allb) || push!(out, Violation(name, :frame_band, "exit at $p is not a band boundary"))
     end
     for (k, pts) in enumerate(b.boundaries)
+        corners = b.corners[b.cell_loop .== k]
+        want = [m(d.frame.loops[k][j]) for j in GM.run_corners([m(p) for p in d.frame.loops[k]], d.frame.tags[k], d.frame.source[k])]
+        (length(corners) == length(want) && all(c -> minimum(norm(c - w) for w in want; init = Inf) <= 1e-6, corners)) ||
+            push!(out, Violation(name, :frame_band, "loop $k has corners $corners, its runs meet at $want"))
         for (i, q) in enumerate(pts)
             i == b.extra[k] && continue
-            minimum(norm(p - q) for p in epx; init = Inf) <= 1.0 + 1e-6 ||
-                push!(out, Violation(name, :frame_band, "boundary $i of loop $k at $q is not at an exit"))
+            (near(q, marks) || near(q, corners)) ||
+                push!(out, Violation(name, :frame_band, "boundary $i of loop $k at $q is not at an exit or a corner"))
         end
-        cols = b.colors[b.loop .== k]
-        n = length(cols)
-        for i in 1:n
-            (n >= 2 && cols[i] == cols[mod1(i + 1, n)]) &&
-                push!(out, Violation(name, :frame_band, "bands $i and $(mod1(i + 1, n)) of loop $k share a colour"))
+        idx = findall(==(k), b.loop)
+        n = length(idx)
+        for a in 1:n
+            c = mod1(a + 1, n)
+            (n >= 2 && b.run[idx[a]] == b.run[idx[c]] && b.colors[idx[a]] == b.colors[idx[c]]) &&
+                push!(out, Violation(name, :frame_band, "bands $a and $c of loop $k share a colour"))
+        end
+        isempty(corners) || length(unique(b.run[idx])) == length(corners) ||
+            push!(out, Violation(name, :frame_band, "loop $k has $(length(corners)) corners but $(length(unique(b.run[idx]))) runs"))
+        # every corner starts exactly one band, and the band ending there is of another run
+        for c in corners
+            starts = findall(q -> norm(q - c) <= 1e-6, pts)
+            length(starts) == 1 || (push!(out, Violation(name, :frame_band, "corner $c starts $(length(starts)) bands")); continue)
+            a = starts[1]; prev = mod1(a - 1, n)
+            b.run[idx[a]] != b.run[idx[prev]] || push!(out, Violation(name, :frame_band, "corner $c lies inside run $(b.run[idx[a]])"))
         end
     end
     for (i, poly) in enumerate(b.polygons)
         (length(poly) >= 4 && all(p -> all(isfinite, p), poly)) ||
             push!(out, Violation(name, :frame_band, "band $i is degenerate"))
+    end
+    for (i, cell) in enumerate(b.cells)
+        (length(cell) >= 3 && all(p -> all(isfinite, p), cell)) ||
+            (push!(out, Violation(name, :frame_band, "corner cell $i is degenerate")); continue)
+        cell[1] == b.corners[i] || push!(out, Violation(name, :frame_band, "corner cell $i does not start at its corner"))
+        GM.inside_loops(d.pixels.frame, sum(cell) / length(cell)) &&
+            push!(out, Violation(name, :frame_band, "corner cell $i lies on the map"))
     end
     return out
 end

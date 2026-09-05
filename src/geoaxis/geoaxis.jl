@@ -300,6 +300,10 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         carriermeridian = Makie.automatic
         "The parallel interior longitude labels sit beside.  `automatic` is the outermost drawn parallel along which every label finds a place clear of the frame, other graticule lines and its neighbours; the equator when none does."
         carrierparallel = Makie.automatic
+        "The font size of interior labels; `automatic` is 0.8 × the family's tick label size."
+        interiorlabelsize = Makie.automatic
+        "The rotation of interior labels in radians; `automatic` turns each label along its own graticule line, reading upright."
+        interiorlabelrotation = Makie.automatic
         "Draw interior labels over a halo so they stay legible over the graticule and plotted data."
         interiorlabelhalo::Bool = true
         "The halo colour; `automatic` is the axis background."
@@ -400,26 +404,29 @@ function Makie.initialize_block!(axis::GeoAxis)
     translate!(lontex, 0, 0, LABEL_Z)
     translate!(lattex, 0, 0, LABEL_Z)
 
-    # Interior labels sit on the map, so they are drawn above the graticule and
-    # the plots, over a halo: the same string in the halo colour, stroked, underneath.
+    # Interior labels sit on the map, centred on their own graticule line and
+    # turned along it, so they are drawn above the graticule and the plots,
+    # over a halo: the same string in the halo colour, stroked, underneath.
     halocolor = map(axis.blockscene, axis.interiorlabelhalocolor, axis.blockscene.backgroundcolor) do c, bg
         c isa Makie.Automatic ? Makie.to_color(bg) : Makie.to_color(c)
     end
     halovisible(labelsvisible) = map((h, v) -> h && v, axis.blockscene, axis.interiorlabelhalo, labelsvisible)
-    interior_text!(positions, strings, align, rotation, font, color, fontsize, visible) = begin
-        halo = text!(axis.blockscene, positions; text=strings, space=:pixel, align, rotation, font, fontsize,
+    interior_text!(positions, strings, rotation, font, color, fontsize, visible) = begin
+        halo = text!(axis.blockscene, positions; text=strings, space=:pixel, align=(:center, :center), rotation, font, fontsize,
             color=halocolor, strokecolor=halocolor, strokewidth=axis.interiorlabelhalowidth,
             visible=halovisible(visible), inspectable=false)
         translate!(halo, 0, 0, INTERIOR_LABEL_Z)
-        label = text!(axis.blockscene, positions; text=strings, space=:pixel, align, rotation, font, fontsize,
+        label = text!(axis.blockscene, positions; text=strings, space=:pixel, align=(:center, :center), rotation, font, fontsize,
             color, visible, inspectable=false)
         translate!(label, 0, 0, INTERIOR_LABEL_Z + 1)
         (halo, label)
     end
-    lonhalo, lonint = interior_text!(graph[:xinterior_positions], graph[:xinterior_strings], xalign,
-        axis.xticklabelrotation, axis.xticklabelfont, axis.xticklabelcolor, axis.xticklabelsize, axis.xticklabelsvisible)
-    lathalo, latint = interior_text!(graph[:yinterior_positions], graph[:yinterior_strings], yalign,
-        axis.yticklabelrotation, axis.yticklabelfont, axis.yticklabelcolor, axis.yticklabelsize, axis.yticklabelsvisible)
+    xinteriorsize = ComputePipeline.get_observable!(graph, :xinterior_size; use_deepcopy = false)
+    yinteriorsize = ComputePipeline.get_observable!(graph, :yinterior_size; use_deepcopy = false)
+    lonhalo, lonint = interior_text!(graph[:xinterior_positions], graph[:xinterior_strings], graph[:xinterior_rotations],
+        axis.xticklabelfont, axis.xticklabelcolor, xinteriorsize, axis.xticklabelsvisible)
+    lathalo, latint = interior_text!(graph[:yinterior_positions], graph[:yinterior_strings], graph[:yinterior_rotations],
+        axis.yticklabelfont, axis.yticklabelcolor, yinteriorsize, axis.yticklabelsvisible)
 
     elements = Dict{Symbol,Any}()
     setfield!(axis, :elements, elements)

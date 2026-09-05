@@ -9,6 +9,11 @@ result is a star-shaped region about the seed: exact for caps and bands, an
 under-approximation (never an over-approximation) for anything lobed.  Cuts are
 invisible to a round trip and are not claimed.
 
+Forward-only projections (airy, adams_hemi, chamb, ...) get an inverse object
+from PROJ that answers `Inf` everywhere, so no point round-trips.  When nothing
+round-trips but something projects, the on-map test drops to "the forward is
+finite", which is exactly where PROJ refuses beyond the hemisphere.
+
 The probe never warns.  A projection that answers nowhere yields the whole
 sphere, and so does one that answers everywhere.
 =#
@@ -48,8 +53,10 @@ end
     onmap(t, inv, p) -> Bool
 
 The round-trip oracle: `p` (unit vector) projects finitely and inverts back to
-within `PROBE_ROUNDTRIP_DEG`.
+within `PROBE_ROUNDTRIP_DEG`.  With `inv === nothing` (a forward-only
+projection) only the finite forward is asked for.
 """
+onmap(t, ::Nothing, p) = _finite2(_project_xyz(t, p))
 function onmap(t, inv, p)
     q = _project_xyz(t, p)
     _finite2(q) || return false
@@ -62,11 +69,23 @@ function onmap(t, inv, p)
     return rad2deg(angular_distance(p, lonlat_to_xyz(ll[1], ll[2]))) < PROBE_ROUNDTRIP_DEG
 end
 
-function _probe_seed(t, inv)
-    p0 = XHAT
-    onmap(t, inv, p0) && return p0
-    for p in fibonacci_sphere(PROBE_SEED_SAMPLES)
-        onmap(t, inv, p) && return p
+"""
+    _probe_seed(t) -> (seed, inv) or nothing
+
+The first on-map point among `x̂` and a Fibonacci sample, with the oracle it was
+found by: the round trip when the inverse answers anywhere, else the finite
+forward (`inv = nothing`).  `nothing` when the transform answers nowhere.
+"""
+function _probe_seed(t)
+    candidates = pushfirst!(fibonacci_sphere(PROBE_SEED_SAMPLES), XHAT)
+    inv = _inverse_of(t)
+    if inv !== nothing
+        for p in candidates
+            onmap(t, inv, p) && return (p, inv)
+        end
+    end
+    for p in candidates
+        onmap(t, nothing, p) && return (p, nothing)
     end
     return nothing
 end
@@ -89,13 +108,12 @@ end
 
 The star-shaped domain of `t` about a seed on the map, as a `SpherePolygon` of
 great-circle arcs, or `whole_sphere()` when every ray reaches the antipode (or
-the transform answers nowhere / has no inverse).
+the transform answers nowhere).
 """
 function probe(t; tol::Real = PROBE_TOL)
-    inv = _inverse_of(t)
-    inv === nothing && return whole_sphere()
-    seed = _probe_seed(t, inv)
-    seed === nothing && return whole_sphere()
+    found = _probe_seed(t)
+    found === nothing && return whole_sphere()
+    seed, inv = found
     e1 = _perp3(seed)
     e2 = _cross3(seed, e1)
     n = probe_rays(tol)

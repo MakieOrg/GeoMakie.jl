@@ -131,20 +131,28 @@ end
 # ---- clipping a polyline to a rectangle -------------------------------------
 
 """
-    clip_polyline_rect(pts, rect, eps) -> Vector{(points, start_cut, end_cut)}
+    clip_polyline_rect(pts, rect, eps) -> Vector{(points, start_cut, end_cut, i0, i1)}
 
 Runs of `pts` inside `rect` (points within `eps` of a side count as inside and
 are clamped onto it).  `NaN` points split runs.  A run's flags say whether its
-first / last point was created by the rectangle.
+first / last point was created by the rectangle; `i0` and `i1` are the
+(fractional) sample indices into `pts` of the run's first and last point, so a
+point the rectangle made can be placed between the two samples it lies between.
 """
 function clip_polyline_rect(pts::Vector{Point2d}, rect::Rect2d, eps::Real)
     x0, y0 = minimum(rect); x1, y1 = maximum(rect)
     inside(p) = x0 - eps <= p[1] <= x1 + eps && y0 - eps <= p[2] <= y1 + eps
     clampr(p) = Point2d(clamp(p[1], x0, x1), clamp(p[2], y0, y1))
-    out = Tuple{Vector{Point2d}, Bool, Bool}[]
-    cur = Point2d[]; cur_start_cut = false
+    # fractional index of `q` on the segment `pts[i-1] → pts[i]`
+    function frac(i, q)
+        a, b = pts[i - 1], pts[i]
+        d = norm(b - a)
+        return d <= 1e-300 ? float(i - 1) : (i - 1) + clamp(norm(q - a) / d, 0.0, 1.0)
+    end
+    out = Tuple{Vector{Point2d}, Bool, Bool, Float64, Float64}[]
+    cur = Point2d[]; cur_start_cut = false; cur_i0 = 0.0; cur_i1 = 0.0
     function flush!(end_cut)
-        length(cur) >= 2 && push!(out, (cur, cur_start_cut, end_cut))
+        length(cur) >= 2 && push!(out, (cur, cur_start_cut, end_cut, cur_i0, cur_i1))
         cur = Point2d[]; cur_start_cut = false
     end
     n = length(pts)
@@ -157,19 +165,20 @@ function clip_polyline_rect(pts::Vector{Point2d}, rect::Rect2d, eps::Real)
         if inside(p)
             if isempty(cur) && i > 1 && _finite2(pts[i - 1]) && !inside(pts[i - 1])
                 q = _rect_entry(pts[i - 1], p, rect)
-                q === nothing || (push!(cur, clampr(q)); cur_start_cut = true)
+                q === nothing || (push!(cur, clampr(q)); cur_start_cut = true; cur_i0 = frac(i, q))
             end
-            push!(cur, clampr(p))
+            isempty(cur) && (cur_i0 = float(i))
+            push!(cur, clampr(p)); cur_i1 = float(i)
         else
             if !isempty(cur)
                 q = _rect_entry(p, cur[end], rect)
-                q === nothing || push!(cur, clampr(q))
+                q === nothing || (push!(cur, clampr(q)); cur_i1 = frac(i, q))
                 flush!(true)
             elseif i > 1 && _finite2(pts[i - 1]) && !inside(pts[i - 1])
                 # both outside: the segment may still cross the rect
                 seg = _rect_segment(pts[i - 1], p, rect)
                 if seg !== nothing
-                    push!(out, ([clampr(seg[1]), clampr(seg[2])], true, true))
+                    push!(out, ([clampr(seg[1]), clampr(seg[2])], true, true, frac(i, seg[1]), frac(i, seg[2])))
                 end
             end
         end
@@ -293,13 +302,17 @@ end
 
 # ---- exits ---------------------------------------------------------------------
 
+const NO_SPHERE_POINT = Vec3d(NaN, NaN, NaN)
+_finite3(v) = isfinite(v[1]) && isfinite(v[2]) && isfinite(v[3])
+
 """
     Exit
 
 Where a graticule line meets the frame: `p` (dest), the frame edge (`loop`,
 `edge` into `Frame.loops`), the edge's outward unit normal, the angle (degrees,
-0..90) between the line and the frame there, and the tangent of the line
-leaving the map.
+0..90) between the line and the frame there, the tangent of the line leaving
+the map, and `sphere`, the unit-sphere point of the line at the exit (`NaN`
+when unknown).
 
 The angle is measured on the sphere where the exit is a sphere-clip endpoint
 on a rim piece: in the plane a projection's Jacobian is singular at a limb, so
@@ -318,7 +331,10 @@ struct Exit
     normal::Vec2d
     angle::Float64
     tangent::Vec2d
+    sphere::Vec3d
 end
+Exit(family, value, p, loop, edge, tag, normal, angle, tangent) =
+    Exit(family, value, p, loop, edge, tag, normal, angle, tangent, NO_SPHERE_POINT)
 
 "Outward unit normal of the edge `a → b` of a loop traversed with the map on its left."
 function outward_normal(a, b)
@@ -333,8 +349,9 @@ end
 
 One graticule line after clipping: `pieces` are dest-space polylines;
 `closed[i]` marks a piece that is a closed loop (no exits); `ends[i]` holds
-the unit-sphere points of the piece's two ends where they are sphere-clip
-endpoints of the arc (`NaN` where the rect cut the piece).
+the unit-sphere points of the piece's two ends (`NaN` where unknown), and
+`onrim[i]` says which of them are sphere-clip endpoints of the arc, on the
+view's rim, rather than points where the rect cut the piece.
 """
 struct GraticuleLine
     family::Symbol
@@ -342,12 +359,11 @@ struct GraticuleLine
     pieces::Vector{Vector{Point2d}}
     closed::Vector{Bool}
     ends::Vector{Tuple{Vec3d, Vec3d}}
+    onrim::Vector{Tuple{Bool, Bool}}
 end
+GraticuleLine(family, value, pieces, closed, ends) =
+    GraticuleLine(family, value, pieces, closed, ends, [(_finite3(s), _finite3(e)) for (s, e) in ends])
 
-const NO_SPHERE_POINT = Vec3d(NaN, NaN, NaN)
-_finite3(v) = isfinite(v[1]) && isfinite(v[2]) && isfinite(v[3])
-
-"The axis of the circle a graticule line lies on."
 graticule_axis(family::Symbol, value::Real) = family === :lon ? _cross3(_dir(value), ZHAT) : ZHAT
 
 """
@@ -363,30 +379,40 @@ function graticule_lines(family::Symbol, values, view::SphereRegion, t, rect::Re
         # a pole is a point (or a pole line already on the frame), not a parallel
         family === :lat && abs(v) >= 90 - 1e-9 && continue
         arc = family === :lon ? meridian_arc(v) : parallel_arc(v)
-        pieces = Vector{Point2d}[]; closed = Bool[]; ends = Tuple{Vec3d, Vec3d}[]
+        pieces = Vector{Point2d}[]; closed = Bool[]; ends = Tuple{Vec3d, Vec3d}[]; onrim = Tuple{Bool, Bool}[]
         for a in clip(view, arc)
-            pts = adaptive_project(t, a; tol, dropnan = false)
+            pts, ts = adaptive_project_params(t, a; tol)
             runs = clip_polyline_rect(pts, rect, eps)
             isempty(runs) && continue
             if isfull(a) && length(runs) >= 2 && !runs[1][2] && !runs[end][3]
                 # the circle's seed point is inside the rect: the last run continues into the first
                 merged = vcat(runs[end][1], runs[1][1][2:end])
-                runs = vcat([(merged, runs[end][2], runs[1][3])], runs[2:(end - 1)])
+                runs = vcat([(merged, runs[end][2], runs[1][3], runs[end][4], runs[1][5])], runs[2:(end - 1)])
             end
-            first_pt = isempty(pts) ? Point2d(NaN, NaN) : pts[1]
-            last_pt = isempty(pts) ? Point2d(NaN, NaN) : pts[end]
-            for (r, sc, ec) in runs
+            # an arc end that does not project (a pole notch on a probed rim) leaves
+            # the first / last finite sample standing for it
+            i0 = findfirst(_finite2, pts); i1 = findlast(_finite2, pts)
+            first_pt = i0 === nothing ? Point2d(NaN, NaN) : pts[i0]
+            last_pt = i1 === nothing ? Point2d(NaN, NaN) : pts[i1]
+            # the sphere point at a fractional sample index
+            function at(fi)
+                i = clamp(floor(Int, fi), 1, length(ts))
+                tt = i >= length(ts) ? ts[end] : ts[i] + (fi - i) * (ts[i + 1] - ts[i])
+                return arcpoint(a, tt)
+            end
+            for (r, sc, ec, fi0, fi1) in runs
                 push!(pieces, r)
                 full = isfull(a)
                 push!(closed, full && !sc && !ec)
                 # a run end that is the arc's own end (not the rect's cut) sits on the rim
-                s = (!full && !sc && _finite2(first_pt) && norm(r[1] - first_pt) <= eps) ? arcpoint(a, a.t0) : NO_SPHERE_POINT
-                e = (!full && !ec && _finite2(last_pt) && norm(r[end] - last_pt) <= eps) ? arcpoint(a, a.t1) : NO_SPHERE_POINT
-                push!(ends, (s, e))
+                own_s = !full && !sc && _finite2(first_pt) && norm(r[1] - first_pt) <= eps
+                own_e = !full && !ec && _finite2(last_pt) && norm(r[end] - last_pt) <= eps
+                push!(ends, (own_s ? arcpoint(a, a.t0) : at(fi0), own_e ? arcpoint(a, a.t1) : at(fi1)))
+                push!(onrim, (own_s, own_e))
             end
         end
         isempty(pieces) && continue
-        push!(out, GraticuleLine(family, v, pieces, closed, ends))
+        push!(out, GraticuleLine(family, v, pieces, closed, ends, onrim))
     end
     return out
 end
@@ -449,16 +475,15 @@ function _exit_at(l::GraticuleLine, k::Int, atstart::Bool, fr::Frame, idx::Frame
     e = b - a
     ne = norm(e)
     angle = ne <= 1e-300 ? 90.0 : rad2deg(asin(clamp(abs(e[1] * tangent[2] - e[2] * tangent[1]) / ne, 0.0, 1.0)))
+    sp = atstart ? l.ends[k][1] : l.ends[k][2]
+    rim = atstart ? l.onrim[k][1] : l.onrim[k][2]
     if tag === :pole
         angle = 90.0
-    elseif tag !== :viewport
-        sp = atstart ? l.ends[k][1] : l.ends[k][2]
-        if _finite3(sp)
-            sa = sphere_angle(l.family, l.value, sp, pieces, fr.source[loop][edge])
-            sa === nothing || (angle = sa)
-        end
+    elseif tag !== :viewport && rim && _finite3(sp)
+        sa = sphere_angle(l.family, l.value, sp, pieces, fr.source[loop][edge])
+        sa === nothing || (angle = sa)
     end
-    return Exit(l.family, l.value, p, loop, edge, tag, nrm, angle, tangent)
+    return Exit(l.family, l.value, p, loop, edge, tag, nrm, angle, tangent, sp)
 end
 
 """
@@ -507,7 +532,7 @@ function _carrier(family::Symbol, value::Real, arc::CircleArc, view, t, rect::Re
     for a in clip(view, arc)
         span += rad2deg(abs(a.t1 - a.t0))
         pts = adaptive_project(t, a; tol, dropnan = false)
-        for (r, _, _) in clip_polyline_rect(pts, rect, eps)
+        for (r, _, _, _, _) in clip_polyline_rect(pts, rect, eps)
             push!(pieces, r)
             len += _polyline_length(r)
         end

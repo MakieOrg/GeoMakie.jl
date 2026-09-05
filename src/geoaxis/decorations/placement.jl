@@ -19,16 +19,21 @@ Which exits become candidates (level 3):
     is not labelled.
 
 A line that never reaches the frame (a closed parallel, a meridian ending in a
-pole point) gets one `:interior` candidate instead: beside its crossing with a
-carrier line of the other family, inside the map, over a halo.  This is the
-one sanctioned exception to "nothing inside the map": the box must lie within
-the map and cross no graticule line but its own and its carrier.
+pole point) or that lost every frame exit to geometry rather than to the family
+rule alone gets one `:interior` candidate instead: on the line itself, turned
+to read along it, just past its crossing with a carrier line of the other
+family, inside the map, over a halo.  This is the one sanctioned exception to
+"nothing inside the map": the box must lie within the map, clear the carrier
+by the pad and cross no other graticule line but its own.
 
 Which candidates are drawn (level 4): a frame box on the map body is not drawn,
 an interior box off the map is not drawn, and of two colliding boxes the one
 with the better priority (rounder value, nearer the middle of its edge,
 earlier) wins.  Every drop is a `Suppressed` record.
 =#
+
+const POLE_CONVERGE_DEG = 1.0           # exits this close to a pole on the sphere ...
+const POLE_CONVERGE_FRAC = 0.05         # ... and to each other (× extent) converge there
 
 "An oriented box: `centre`, half extents `half` along its own axes, rotated by `θ`."
 struct OBox
@@ -66,10 +71,13 @@ end
 
 A tick label: its exit, text, dest-space `anchor`, the `offset` (tick length +
 pad) from anchor to glyph box, the box's half extents and rotation, alignment,
-and the family's font attributes.  The box is pushed from the anchor along
-`normal` by `offset` plus its own half extent; an interior label may also be
-pushed along `normal2` (zero otherwise), so it sits in the quadrant beside its
-carrier and off its own line.  `carrier` is the carrier's value for an
+and the family's font attributes.  A frame label's box is pushed from the
+anchor along `normal` by `offset` plus its own half extent.  An interior
+label's anchor is its crossing with the carrier, `centre` where its box ended
+up on the line (`NaN` for a frame label), `normal` the line's direction there
+(the way it was walked from the crossing) and `offset` the pad it clears the
+carrier by; with `auto_rotation` its rotation follows that direction,
+re-measured in pixels at level 4.  `carrier` is the carrier's value for an
 interior label (`NaN` for a frame label).  `priority` orders labels for the
 collision pass: `(roundness, distance from the edge middle, order)`, smaller
 first.
@@ -79,10 +87,11 @@ struct TickLabel
     text::String
     anchor::Point2d
     normal::Vec2d
-    normal2::Vec2d
+    centre::Point2d
     offset::Float64
     half::Vec2d
     rotation::Float64
+    auto_rotation::Bool
     align::Tuple{Symbol, Symbol}
     auto_align::Bool
     kind::Symbol
@@ -105,9 +114,10 @@ axis position), `:convergent` (a pole point), `:grazing`, `:noexit` (the line
 never reaches the frame), `:inside` (the box would lie on the map),
 `:collision`, `:duplicate` (the same tick already drawn beside it, from the
 other side of a cut).  Interior reasons: `:nocrossing` (the line does not meet
-the carrier in view), `:outside` (no placement keeps the box on the map),
-`:crossed` (every placement on the map crosses another graticule line),
-`:collision`.
+the carrier in view), `:outside` (no placement keeps the box on the map, or
+the line is too short or too oblique to the carrier to hold one), `:crossed`
+(every placement on the map crosses another graticule line, or comes within
+the pad of the carrier), `:collision`.
 """
 struct Suppressed
     index::Int
@@ -169,27 +179,40 @@ end
 admits(e::Exit, xaxisposition::Symbol, yaxisposition::Symbol) = admits(e.tag, e.family, e.normal, xaxisposition, yaxisposition)
 
 """
-    convergent_exits(exits, tol) -> Set{Int}
+    convergent_exits(exits, tol; poletol) -> Set{Int}
 
 Indices of exits where two or more lines of one family, with distinct values,
-reach the frame within `tol` of each other.  Two meridians (or two parallels)
-meet only at a pole, so such a point is a pole drawn as a point.
+reach the frame at one point.  Two meridians (or two parallels) meet only at a
+pole, so such a point is a pole drawn as a point.  Two exits count as one
+point when they are within `tol` of each other in dest space, or when both
+lie within `POLE_CONVERGE_DEG` of the same pole on the sphere and within
+`poletol` of each other in dest space.  The second test is what catches a
+pole on a probed rim: the rim's polygon cuts the corner at the pole by a
+fraction of a degree, and a projection singular there spreads that fraction
+over many pixels.  It does not apply on a `:pole` edge, where every exit is
+at the pole on the sphere by construction and the pole is drawn as a line.
 """
-function convergent_exits(exits::Vector{Exit}, tol::Real)
+function convergent_exits(exits::Vector{Exit}, tol::Real; poletol::Real = tol * POLE_CONVERGE_FRAC / ON_FRAME_FRAC)
     out = Set{Int}()
     n = length(exits)
     for i in 1:n
         e = exits[i]
         vals = Set{Float64}((e.value,))
+        pole = e.tag === :pole ? 0 : near_pole(e.sphere)
         for j in 1:n
             f = exits[j]
-            (f.family === e.family && norm(f.p - e.p) <= tol) || continue
+            f.family === e.family || continue
+            d = norm(f.p - e.p)
+            (d <= tol || (pole != 0 && f.tag !== :pole && near_pole(f.sphere) == pole && d <= poletol)) || continue
             push!(vals, f.value)
         end
         length(vals) >= 2 && push!(out, i)
     end
     return out
 end
+
+"`±1` for a unit vector within `POLE_CONVERGE_DEG` of the north / south pole, `0` otherwise (or for `NaN`)."
+near_pole(q) = (_finite3(q) && abs(q[3]) >= cosd(POLE_CONVERGE_DEG)) ? Int(sign(q[3])) : 0
 
 # ---- boxes against polylines ---------------------------------------------------
 
@@ -274,16 +297,14 @@ function box_within_loops(b::OBox, loops::Vector{Vector{Point2d}}, bbs = [_aabb(
 end
 
 """
-    graticule_crosses_box(box, lines, pieces_bb, own, carrier) -> Bool
+    graticule_crosses_box(box, lines, pieces_bb, own) -> Bool
 
-Does a piece of any graticule line other than `own` and `carrier` (both
-`(family, value)`) touch the box?  `pieces_bb[i]` holds the bounds of
-`lines[i].pieces`.
+Does a piece of any graticule line other than `own` (`(family, value)`) touch
+the box?  `pieces_bb[i]` holds the bounds of `lines[i].pieces`.
 """
-function graticule_crosses_box(b::OBox, lines::Vector{GraticuleLine}, pieces_bb, own, carrier)
+function graticule_crosses_box(b::OBox, lines::Vector{GraticuleLine}, pieces_bb, own)
     for (i, l) in enumerate(lines)
-        key = (l.family, l.value)
-        (key == own || key == carrier) && continue
+        (l.family, l.value) == own && continue
         for (k, pc) in enumerate(l.pieces)
             polyline_crosses_box(b, pc, pieces_bb[i][k]) && return true
         end
@@ -295,39 +316,143 @@ _pieces_bounds(lines::Vector{GraticuleLine}) = [[_aabb(pc) for pc in l.pieces] f
 
 # ---- interior labels ------------------------------------------------------------
 
-"""
-The placements tried for an interior label, as signs on the carrier's normal
-and the line's own normal: beside the carrier with the label straddling its
-own line (the halo masks the line), then the four quadrants beside the
-carrier and off the line, then across the carrier and off the line.
-"""
-const INTERIOR_MODES = ((1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1), (0, 1), (0, -1))
-
 _right_normal(t::Vec2d) = Vec2d(t[2], -t[1])
 
-"The box of an interior label at crossing `x` in mode `(mc, mo)`, half extents and pad in the space of `x.p`."
-function interior_box(x::CarrierCrossing, mode, half::Vec2d, pad::Real, rotation::Real)
-    nc, no = _right_normal(x.ctangent), _right_normal(x.ltangent)
-    box0 = OBox(Point2d(0, 0), half, rotation)
-    c = Point2d(x.p)
-    mode[1] == 0 || (c += mode[1] * nc * (pad + half_extent(box0, nc)))
-    mode[2] == 0 || (c += mode[2] * no * (pad + half_extent(box0, no)))
-    return OBox(c, half, rotation)
+"The two ways along a line from its carrier crossing: with the line's tangent and against it."
+const INTERIOR_DIRECTIONS = (1, -1)
+"""
+The placements tried for an interior label, as `(reach, shift)`: on the line at
+the distance that clears the carrier by the pad, then further along it when a
+curved neighbour still touches; then flush against the line on either side,
+for a line that lies on the frame or a circle too tight to hold the label.
+"""
+const INTERIOR_PLACEMENTS = ((1.0, 0), (1.25, 0), (1.5, 0), (2.0, 0), (1.0, 1), (1.0, -1), (1.5, 1), (1.5, -1))
+"A box shifted off its line keeps this fraction of the pad between them, so a line on the frame stays outside the box."
+const INTERIOR_SHIFT_GAP = 0.2
+"""
+Level 3 places interior labels in an isotropic dest space, but the viewport is
+rounded to whole pixels per axis; the pad is widened by this fraction there so
+the gap to the carrier is still the pad in pixels.
+"""
+const INTERIOR_PAD_SLACK = 0.03
+"An interior label needs its line and carrier to cross at least this steeply (sine of the angle), or the walk would be unbounded."
+const INTERIOR_MIN_CROSS = sind(15)
+"A line within this of vertical reads bottom to top, whichever way it leans."
+const VERTICAL_SNAP_DEG = 0.5
+
+"""
+    upright_rotation(θ) -> Float64
+
+`θ` folded into `(-π/2, π/2]`, so the text reads upright; within
+`VERTICAL_SNAP_DEG` of vertical it is `π/2`, so a meridian that is vertical
+up to rounding always reads bottom to top.
+"""
+function upright_rotation(θ::Real)
+    θ = mod(θ + π / 2, π) - π / 2        # [-π/2, π/2)
+    abs(abs(θ) - π / 2) <= deg2rad(VERTICAL_SNAP_DEG) && (θ = π / 2)
+    return float(θ)
 end
+
+"The upright rotation reading along the direction `t`."
+tangent_rotation(t) = upright_rotation(atan(t[2], t[1]))
+
+"""
+    along_line(line, p, dir, s) -> Union{Nothing, Tuple{Point2d, Vec2d}}
+
+The point at arc length `s` from `p` (a point on the line) along the line's
+pieces in the direction `dir`, with the line's unit direction there, or
+`nothing` when the line ends first.  A closed piece wraps.
+"""
+function along_line(line::GraticuleLine, p, dir, s::Real)
+    best = nothing; bd = Inf
+    for (k, pc) in enumerate(line.pieces)
+        n = length(pc)
+        for i in 1:(line.closed[k] ? n : n - 1)
+            d = _seg_dist(p, pc[i], pc[mod1(i + 1, n)])
+            d < bd && (bd = d; best = (k, i))
+        end
+    end
+    best === nothing && return nothing
+    k, i = best
+    pc = line.pieces[k]
+    n = length(pc)
+    closed = line.closed[k]
+    a, b = pc[i], pc[mod1(i + 1, n)]
+    seg = b - a
+    forward = seg[1] * dir[1] + seg[2] * dir[2] >= 0
+    # start from p's projection onto the segment
+    l2 = seg[1]^2 + seg[2]^2
+    t = l2 > 0 ? clamp(((p - a)[1] * seg[1] + (p - a)[2] * seg[2]) / l2, 0.0, 1.0) : 0.0
+    cur = Point2d(a + seg * t)
+    remaining = float(s)
+    j = forward ? i + 1 : i
+    steps = 0
+    while steps <= n
+        (closed || 1 <= j <= n) || return nothing
+        q = pc[mod1(j, n)]
+        step = q - cur
+        len = norm(step)
+        if len >= remaining
+            t = len > 0 ? Vec2d(step / len) : Vec2d(dir / norm(dir))
+            return Point2d(cur + step * (len > 0 ? remaining / len : 0.0)), t
+        end
+        remaining -= len
+        cur = q
+        j += forward ? 1 : -1
+        steps += 1
+    end
+    return nothing
+end
+
+"""
+    interior_box(x, dir, half, pad, rotation, line; reach = 1, shift = 0) -> Union{Nothing, Tuple{OBox, Vec2d}}
+
+The box of an interior label on its own line, `reach` times as far along it
+(with `dir = ±1` the line's tangent) from the crossing `x` as it takes to
+clear the carrier by `pad`, and the line's direction at the box, in the space
+of `x.p`.  `rotation` is `automatic` for that direction's upright angle.  With
+`shift = ±1` the box is moved off the line to that side, `INTERIOR_SHIFT_GAP`
+of the pad away from it.  `nothing` when the line ends first or crosses the
+carrier too obliquely.
+"""
+function interior_box(x::CarrierCrossing, dir::Int, half::Vec2d, pad::Real, rotation, line::GraticuleLine;
+                      reach::Real = 1.0, shift::Int = 0)
+    lt, ct = x.ltangent, x.ctangent
+    sinφ = abs(lt[1] * ct[2] - lt[2] * ct[1])
+    sinφ >= INTERIOR_MIN_CROSS || return nothing
+    θ0 = rotation isa Makie.Automatic ? tangent_rotation(lt) : float(rotation)
+    box0 = OBox(Point2d(0, 0), half, θ0)
+    dist = reach * (pad * (1 + INTERIOR_PAD_SLACK) + half_extent(box0, _right_normal(ct))) / sinφ
+    at = along_line(line, x.p, dir * lt, dist)
+    at === nothing && return nothing
+    c, t = at
+    θ = rotation isa Makie.Automatic ? tangent_rotation(t) : float(rotation)
+    b = OBox(c, half, θ)
+    if shift != 0
+        n = _right_normal(t)
+        b = OBox(Point2d(c + n * (shift * (half_extent(b, n) + INTERIOR_SHIFT_GAP * pad))), half, θ)
+    end
+    return b, t
+end
+
+"A box grown by `pad` on every side."
+inflate(b::OBox, pad::Real) = OBox(b.centre, b.half .+ pad, b.θ)
 
 """
     _interior_candidates!(labels, suppressed, family, groups, lines, fr, attrs)
 
 Add one `:interior` candidate per line of `family` that qualifies: a line with
-no frame candidate whose every exit was suppressed as `:convergent` or that
-never reached the frame (every line when `attrs.interior.mode === :all`).
+no frame candidate that lost at least one exit for a geometric reason
+(`:convergent`, `:grazing`, `:noexit`), so not a line whose every exit was
+turned away solely by the family / axis-position rule (every line when
+`attrs.interior.mode === :all`).
 `groups` are `(carrier value, crossings)` in preference order.  The carrier
-and placement mode are chosen together, in dest space scaled by
+and direction along the line are chosen together, in dest space scaled by
 `attrs.interior.px_scale`: the first pair under which every label is on the
-map, crosses no other graticule line and clears its neighbours; failing that
-the pair with the most such labels (the equator, then the earlier pair, on a
-tie), and each remaining label takes the first placement that works for it
-alone, or is suppressed.
+map, clears the carrier by the pad, crosses no other graticule line and
+clears its neighbours; failing that the pair with the most such labels (the
+equator, then the earlier pair, on a tie), and each remaining label takes the
+first placement that works for it alone, or is suppressed.
 """
 function _interior_candidates!(labels::Vector{TickLabel}, suppressed::Vector{Suppressed}, family::Symbol,
                                groups, lines::Vector{GraticuleLine}, fr::Frame, attrs)
@@ -336,75 +461,99 @@ function _interior_candidates!(labels::Vector{TickLabel}, suppressed::Vector{Sup
     px_scale = max(int.px_scale, 1e-300)
     # which lines qualify
     framed = Set{Float64}(l.exit.value for l in labels if l.exit.family === family && !isinterior(l))
-    blocked = Set{Float64}(s.value for s in suppressed if s.family === family && s.kind === :frame && s.reason in (:family, :grazing))
+    geometric = Set{Float64}(s.value for s in suppressed if s.family === family && s.kind === :frame && s.reason !== :family)
     values = Float64[]
     for l in lines
         l.family === family || continue
-        (int.mode === :all || !(l.value in framed || l.value in blocked)) && push!(values, l.value)
+        (int.mode === :all || (!(l.value in framed) && l.value in geometric)) && push!(values, l.value)
     end
     isempty(values) && return
-    other = family === :lon ? :lat : :lon
     font = Makie.to_font(attrs.fonts, fa.font)
-    halves = Dict{Float64, Vec2d}(v => text_half_extents(fa.labels[v], font, fa.size) for v in values)
+    size = int.size[family]
+    halves = Dict{Float64, Vec2d}(v => text_half_extents(fa.labels[v], font, size) for v in values)
+    own = Dict{Float64, GraticuleLine}(l.value => l for l in lines if l.family === family)
     pad = fa.pad / px_scale
     gap = int.mingap / px_scale
-    rotation = float(fa.rotation)
+    auto_rot = int.rotation isa Makie.Automatic
     pieces_bb = _pieces_bounds(lines)
     loops_bb = [_aabb(lp) for lp in fr.loops]
     valueset = Set(values)
 
-    # a box is clear when it lies on the map and crosses nothing but its own line and the carrier
-    clear(b, x) = box_within_loops(b, fr.loops, loops_bb) && !graticule_crosses_box(b, lines, pieces_bb, (family, x.value), (other, x.carrier))
-    function score(xs, mode)
-        boxes = [interior_box(x, mode, halves[x.value] / px_scale, pad, rotation) for x in xs]
-        ok = [clear(boxes[i], xs[i]) for i in eachindex(xs)]
+    other = family === :lon ? :lat : :lon
+    carriers = Dict{Float64, Int}(l.value => i for (i, l) in enumerate(lines) if l.family === other)
+    # does the box cross a line other than its own, or come within the pad of the carrier?
+    function crossed(b, x)
+        graticule_crosses_box(b, lines, pieces_bb, (family, x.value)) && return true
+        i = get(carriers, x.carrier, 0)
+        i == 0 && return false
+        ib = inflate(b, pad * (1 + INTERIOR_PAD_SLACK))
+        return any(k -> polyline_crosses_box(ib, lines[i].pieces[k], pieces_bb[i][k]), eachindex(lines[i].pieces))
+    end
+    # the first placement at which the box is on the map and clear
+    function fit(x, dir)
+        reason = :outside
+        for (reach, shift) in INTERIOR_PLACEMENTS
+            at = interior_box(x, dir, halves[x.value] / px_scale, pad, int.rotation, own[x.value]; reach, shift)
+            at === nothing && break
+            b, t = at
+            box_within_loops(b, fr.loops, loops_bb) || continue
+            reason = :crossed
+            crossed(b, x) && continue
+            return (b, t), :ok
+        end
+        return nothing, reason
+    end
+    function score(xs, dir)
+        placed = [fit(x, dir)[1] for x in xs]
+        ok = [b !== nothing for b in placed]
         for i in eachindex(xs), j in (i + 1):length(xs)
-            (ok[i] && ok[j] && collides(boxes[i], boxes[j]; gap)) || continue
+            (ok[i] && ok[j] && collides(placed[i][1], placed[j][1]; gap)) || continue
             ok[i] = false; ok[j] = false
         end
-        return count(ok), ok
+        return count(ok), ok, placed
     end
 
-    best = nothing   # (score, equator?, order, group index, mode index, ok)
+    best = nothing   # (score, group index, direction index, crossings, ok, boxes)
     order = 0
-    for (gi, (carrier, xs)) in enumerate(groups), (mi, mode) in enumerate(INTERIOR_MODES)
+    for (gi, (carrier, xs)) in enumerate(groups), (di, dir) in enumerate(INTERIOR_DIRECTIONS)
         order += 1
         sel = [x for x in xs if x.value in valueset]
-        n, ok = score(sel, mode)
+        n, ok, boxes = score(sel, dir)
         key = (n, carrier == 0 ? 1 : 0, -order)
         if best === nothing || key > best[1]
-            best = (key, gi, mi, sel, ok)
+            best = (key, gi, di, sel, ok, boxes)
         end
         n == length(values) && break
     end
     best === nothing && return
-    _, gi, mi, sel, ok = best
+    _, gi, di, sel, ok, fits = best
     carrier = groups[gi][1]
-    mode = INTERIOR_MODES[mi]
     present = Set(x.value for x in sel)
     for v in values
         v in present || push!(suppressed, Suppressed(0, family, v, :nocrossing, 0, :interior))
     end
-    # the labels the shared mode places, then each remaining one in the first
-    # mode that fits it beside what is already placed
-    chosen = Vector{Union{Nothing, Tuple{Int, Int}}}(nothing, length(sel))
+    # the labels the shared direction places, then each remaining one in the
+    # first direction that fits it beside what is already placed
+    chosen = Vector{Union{Nothing, Tuple{Int, OBox, Vec2d}}}(nothing, length(sel))
     placed = OBox[]
     for (i, x) in enumerate(sel)
         ok[i] || continue
-        chosen[i] = mode
-        push!(placed, interior_box(x, mode, halves[x.value] / px_scale, pad, rotation))
+        chosen[i] = (INTERIOR_DIRECTIONS[di], fits[i]...)
+        push!(placed, fits[i][1])
     end
     for (i, x) in enumerate(sel)
         ok[i] && continue
         reason = :outside
-        for m in INTERIOR_MODES
-            b = interior_box(x, m, halves[x.value] / px_scale, pad, rotation)
-            box_within_loops(b, fr.loops, loops_bb) || continue
-            reason === :outside && (reason = :crossed)
-            graticule_crosses_box(b, lines, pieces_bb, (family, x.value), (other, x.carrier)) && continue
+        for dir in INTERIOR_DIRECTIONS
+            at, why = fit(x, dir)
+            if at === nothing
+                (reason === :outside && why === :crossed) && (reason = :crossed)
+                continue
+            end
+            b, t = at
             reason = :collision
             any(q -> collides(q, b; gap), placed) && continue
-            chosen[i] = m
+            chosen[i] = (dir, b, t)
             push!(placed, b)
             break
         end
@@ -413,11 +562,10 @@ function _interior_candidates!(labels::Vector{TickLabel}, suppressed::Vector{Sup
     for (i, x) in enumerate(sel)
         m = chosen[i]
         m === nothing && continue
-        nc, no = _right_normal(x.ctangent), _right_normal(x.ltangent)
-        exit = Exit(family, x.value, x.p, 0, 0, :interior, nc, 90.0, x.ltangent)
-        auto = fa.align isa Makie.Automatic
-        push!(labels, TickLabel(exit, fa.labels[x.value], x.p, m[1] * nc, m[2] * no, float(fa.pad),
-            halves[x.value], rotation, auto ? (:center, :center) : fa.align, auto, :interior, carrier,
+        dir, b, t = m
+        exit = Exit(family, x.value, x.p, 0, 0, :interior, _right_normal(x.ctangent), 90.0, x.ltangent)
+        push!(labels, TickLabel(exit, fa.labels[x.value], x.p, Vec2d(dir * t), b.centre, float(fa.pad),
+            halves[x.value], b.θ, auto_rot, (:center, :center), true, :interior, carrier,
             (roundness(x.value), 0.0, length(labels) + 1)))
     end
     return
@@ -430,9 +578,10 @@ One label per admitted exit, and one interior label per line that never gets
 one.  `attrs` carries per-family `(labels, size, font, pad, ticksize,
 ticksvisible, rotation, align)` under `:lon` and `:lat`, `fonts`,
 `xaxisposition`, `yaxisposition`, `minangle`, `band` (the fancy band's width
-in pixels, `0` for a plain frame), and `interior = (mode, px_scale, mingap)`;
-`crossings` has the carrier crossings (`lat` for the carrier
-meridian, `lon` per candidate parallel).  The suppressed list names every exit
+in pixels, `0` for a plain frame), and `interior = (mode, px_scale, mingap,
+size, rotation)` (`size` per family; `rotation` a fixed angle or `automatic`
+for the line's tangent); `crossings` has the carrier crossings (`lat` for the
+carrier meridian, `lon` per candidate parallel).  The suppressed list names every exit
 that was not admitted, every tick value with no exit, and every interior
 label that found no place.
 """
@@ -440,7 +589,7 @@ function place(exits::Vector{Exit}, fr::Frame, rect::Rect2d, lines::Vector{Grati
     labels = TickLabel[]
     suppressed = Suppressed[]
     extent = max(maximum(widths(rect)), 1e-300)
-    convergent = convergent_exits(exits, ON_FRAME_FRAC * extent)
+    convergent = convergent_exits(exits, ON_FRAME_FRAC * extent; poletol = POLE_CONVERGE_FRAC * extent)
     seen = Dict{Symbol, Set{Float64}}(:lon => Set{Float64}(), :lat => Set{Float64}())
     for (k, e) in enumerate(exits)
         push!(seen[e.family], e.value)
@@ -466,7 +615,7 @@ function place(exits::Vector{Exit}, fr::Frame, rect::Rect2d, lines::Vector{Grati
         align = auto ? (:center, :center) : fa.align
         # distance from the middle of the edge, in units of the extent
         mid = _edge_middle_distance(fr, e, extent)
-        push!(labels, TickLabel(e, text, e.p, e.normal, Vec2d(0, 0), offset, half, float(fa.rotation), align, auto,
+        push!(labels, TickLabel(e, text, e.p, e.normal, Point2d(NaN, NaN), offset, half, float(fa.rotation), false, align, auto,
             :frame, NaN, (roundness(e.value), mid, length(labels) + 1)))
     end
     for family in (:lon, :lat)
@@ -479,6 +628,20 @@ function place(exits::Vector{Exit}, fr::Frame, rect::Rect2d, lines::Vector{Grati
         _interior_candidates!(labels, suppressed, :lon, crossings.lon, lines, fr, attrs)
     end
     return labels, suppressed
+end
+
+"""
+    band_exits(exits, rect, minangle) -> Vector{Exit}
+
+The exits that mark the frame for the `:fancy` band: the family that varies
+along a straight edge (longitudes on horizontal viewport edges, latitudes on
+vertical ones, whichever side the labels are on), both families elsewhere,
+never a convergent pole point or a grazing exit.
+"""
+function band_exits(exits::Vector{Exit}, rect::Rect2d, minangle::Real)
+    extent = max(maximum(widths(rect)), 1e-300)
+    convergent = convergent_exits(exits, ON_FRAME_FRAC * extent; poletol = POLE_CONVERGE_FRAC * extent)
+    return Exit[e for (k, e) in enumerate(exits) if admits(e, :both, :both) && !(k in convergent) && e.angle >= minangle]
 end
 
 function _edge_middle_distance(fr::Frame, e::Exit, extent)
@@ -564,10 +727,10 @@ end
 
 Level 4: everything in pixel space.  `frame` loops, `graticule` polylines per
 family, per drawn frame label the pixel `position` handed to `text!` and its
-string (`interior_positions` / `interior_strings` for the interior labels),
-the glyph `box`, exit and normal of every drawn label, `kept` (indices into
-the level-3 labels, in label order), `suppressed` (the level-4 drops), and
-the tick `stub` segments per family.
+string (`interior_positions` / `interior_strings` / `interior_rotations` for
+the interior labels), the glyph `box`, exit and normal of every drawn label,
+`kept` (indices into the level-3 labels, in label order), `suppressed` (the
+level-4 drops), and the tick `stub` segments per family.
 """
 struct Pixels
     frame::Vector{Vector{Point2d}}
@@ -576,6 +739,7 @@ struct Pixels
     strings::Dict{Symbol, Vector{String}}
     interior_positions::Dict{Symbol, Vector{Point2d}}
     interior_strings::Dict{Symbol, Vector{String}}
+    interior_rotations::Dict{Symbol, Vector{Float64}}
     boxes::Vector{OBox}
     exits::Vector{Point2d}
     normals::Vector{Vec2d}
@@ -608,17 +772,16 @@ function pixels(fr::Frame, lines::Vector{GraticuleLine}, labels::Vector{TickLabe
     for (k, l) in enumerate(labels)
         e = l.exit
         p = m(e.p)
-        box0 = OBox(Point2d(0, 0), l.half, l.rotation)
-        c = p
-        nrm = Vec2d(0, 0)
-        for nd in (l.normal, l.normal2)
-            norm(nd) > 1e-300 || continue
-            u = pixel_direction(m, e.p, nd * (scale / norm(nd)))
-            c += u * (l.offset + half_extent(box0, u))
-            norm(nrm) > 1e-300 || (nrm = u)
+        u = norm(l.normal) > 1e-300 ? pixel_direction(m, e.p, l.normal * (scale / norm(l.normal))) : Vec2d(0, 0)
+        if isinterior(l)
+            # on its line: the rotation follows the line as the pixel map draws it
+            θ = l.auto_rotation ? tangent_rotation(pixel_direction(m, l.centre, l.normal * scale)) : l.rotation
+            boxes[k] = OBox(m(l.centre), l.half, θ)
+        else
+            box0 = OBox(Point2d(0, 0), l.half, l.rotation)
+            boxes[k] = OBox(Point2d(p + u * (l.offset + half_extent(box0, u))), l.half, l.rotation)
         end
-        boxes[k] = OBox(Point2d(c), l.half, l.rotation)
-        epx[k] = p; npx[k] = nrm
+        epx[k] = p; npx[k] = u
     end
     # the greedy pass, in priority order: the record it leaves is order-free
     kept = Int[]; suppressed = Suppressed[]
@@ -653,13 +816,16 @@ function pixels(fr::Frame, lines::Vector{GraticuleLine}, labels::Vector{TickLabe
     strings = Dict{Symbol, Vector{String}}(:lon => String[], :lat => String[])
     ipositions = Dict{Symbol, Vector{Point2d}}(:lon => Point2d[], :lat => Point2d[])
     istrings = Dict{Symbol, Vector{String}}(:lon => String[], :lat => String[])
+    irotations = Dict{Symbol, Vector{Float64}}(:lon => Float64[], :lat => Float64[])
     for k in kept
         l = labels[k]
-        pos = l.auto_align ? boxes[k].centre : Point2d(epx[k] + npx[k] * l.offset)
         if isinterior(l)
-            push!(ipositions[l.exit.family], pos)
+            # centred on its line, whatever the frame labels' alignment
+            push!(ipositions[l.exit.family], boxes[k].centre)
             push!(istrings[l.exit.family], l.text)
+            push!(irotations[l.exit.family], boxes[k].θ)
         else
+            pos = l.auto_align ? boxes[k].centre : Point2d(epx[k] + npx[k] * l.offset)
             push!(positions[l.exit.family], pos)
             push!(strings[l.exit.family], l.text)
         end
@@ -681,7 +847,7 @@ function pixels(fr::Frame, lines::Vector{GraticuleLine}, labels::Vector{TickLabe
         start = Point2d(p - nrm * (tk.align * tk.size))
         push!(stubs[e.family], start, Point2d(start + nrm * tk.size))
     end
-    return Pixels(fpx, gpx, positions, strings, ipositions, istrings, boxes[kept], epx[kept], npx[kept], kept, suppressed, stubs)
+    return Pixels(fpx, gpx, positions, strings, ipositions, istrings, irotations, boxes[kept], epx[kept], npx[kept], kept, suppressed, stubs)
 end
 
 # ---- the report -------------------------------------------------------------------
@@ -705,7 +871,7 @@ function suppression_report(suppressed::Vector{Suppressed}, mingap::Real, minang
     graze > 0 && push!(parts,
         "$graze labels skipped for leaving the frame at a grazing angle; controlled by `ticklabelminangle`, currently $(float(minangle))°")
     interior > 0 && push!(parts,
-        "$interior interior labels skipped for finding no place on the map clear of other graticule lines; controlled by `carriermeridian` and `carrierparallel`")
+        "$interior interior labels skipped for finding no place on the map clear of other graticule lines; controlled by `carriermeridian`, `carrierparallel` and `interiorlabelsize`")
     isempty(parts) && return nothing
     return join(parts, ". ")
 end

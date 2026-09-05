@@ -247,6 +247,23 @@ end
     end
 end
 
+# adams_hemi's probed rim cuts the corner at each pole a fraction of a degree
+# short, and the projection is singular there: seven meridians leave through
+# ten pixels of notch.  They are a pole drawn as a point all the same.
+@testset "pole on a probed rim" begin
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "most_adams_hemi"); coastlines = false)
+    d = GM.decorations(ax)
+    lon = filter(e -> e.family == :lon, d.exits)
+    @test length(lon) == 14 && all(e -> e.tag === :limb, lon)
+    @test all(e -> GM.near_pole(e.sphere) != 0, lon)
+    @test all(e -> abs(e.sphere[3]) < 1 - 1e-6, lon)          # cut short of the pole, not at it
+    @test all(s -> s.reason in (:convergent, :noexit), filter(s -> s.family == :lon, d.suppressed))
+    @test count(s -> s.family == :lon && s.reason == :convergent, d.suppressed) == 14
+    @test isempty([l for l in d.labels[d.pixels.kept] if l.exit.family == :lon && !GM.isinterior(l)])
+    @test interior_once(d, :lon)
+    @test isempty(phase4_violations("most_adams_hemi", d))
+end
+
 @testset "attribute semantics" begin
     c = decoration_case(BASELINE_CASES, "merc_reg")
     # the pad is the gap between tick end and glyph box; the tick is drawn on the frame
@@ -310,9 +327,11 @@ const INTERIOR_CASES = ("laea_polar_nolimits", "stere_polar", "moll", "igh", "ob
             end
             # interior labels reserve no layout space
             @test d.bound == GM.protrusion_bound(filter(!GM.isinterior, d.labels), (; lon = true, lat = true))
-            # every line with neither a frame candidate nor a frame-rule drop is drawn inside or reported
+            # every line with no frame candidate that lost an exit to geometry
+            # (not only to the family rule) is drawn inside or reported
             framed = Set((l.exit.family, l.exit.value) for l in d.labels if !GM.isinterior(l))
-            blocked = Set((s.family, s.value) for s in d.suppressed if s.kind == :frame && s.reason in (:family, :grazing))
+            geometric = Set((s.family, s.value) for s in d.suppressed if s.kind == :frame && s.reason != :family)
+            blocked = setdiff(Set((s.family, s.value) for s in d.suppressed if s.kind == :frame), geometric)
             inside = Set((l.exit.family, l.exit.value) for l in interior_drawn(d, :lon)) ∪ Set((l.exit.family, l.exit.value) for l in interior_drawn(d, :lat))
             reported = Set((s.family, s.value) for s in d.suppressed if s.kind == :interior)
             for l in d.graticule
@@ -329,6 +348,30 @@ const INTERIOR_CASES = ("laea_polar_nolimits", "stere_polar", "moll", "igh", "ob
         @test !any(GM.isinterior, d.labels)
         @test !any(s -> s.kind == :interior, d.suppressed)
     end
+    # a line turned away only by the family rule is not labelled inside either:
+    # merc_reg's meridians leave through the top as well as the bottom, and on
+    # lcc with a data-driven viewport the outer meridians leave through the
+    # sides alone and 50°N through the top
+    for name in ("merc_reg", "lcc")
+        fig, ax = build_case(decoration_case(DECORATION_CASES, name))
+        d = GM.decorations(ax)
+        @test d.xaxisposition == :bottom && d.yaxisposition == :left
+        @test !any(GM.isinterior, d.labels) && !any(s -> s.kind == :interior, d.suppressed)
+    end
+    fig = Figure(size = (600, 400))
+    ax = GeoAxis(fig[1, 1]; dest = "+proj=lcc +lon_0=-96 +lat_1=33 +lat_2=45")
+    scatter!(ax, [-125.0, -65.0], [23.0, 52.0])
+    Makie.update_state_before_display!(fig)
+    d = GM.decorations(ax)
+    @test all(==(:viewport), vcat(d.frame.tags...))
+    framed = Set((l.exit.family, l.exit.value) for l in d.labels if !GM.isinterior(l))
+    reasons = Dict{Tuple{Symbol, Float64}, Set{Symbol}}()
+    for s in d.suppressed
+        s.kind == :frame && push!(get!(reasons, (s.family, s.value), Set{Symbol}()), s.reason)
+    end
+    family_only = Set(k for (k, rs) in reasons if !(k in framed) && rs == Set([:family]))
+    @test issubset(Set([(:lon, -140.0), (:lon, -130.0), (:lon, -60.0), (:lon, -50.0), (:lat, 50.0)]), family_only)
+    @test !any(GM.isinterior, d.labels) && !any(s -> s.kind == :interior, d.suppressed)
     # the switch removes them and every other predicate still passes
     for name in INTERIOR_CASES
         c = decoration_case(DECORATION_CASES, name)
@@ -342,22 +385,38 @@ const INTERIOR_CASES = ("laea_polar_nolimits", "stere_polar", "moll", "igh", "ob
             isempty(v) || foreach(println, v)
         end
     end
-    # the carrier meridian moves the polar column.  On the 90°E meridian the
-    # labels' width runs radially, and "45°S" no longer fits between its own
-    # parallel and the equator (28 px apart at this size), so that one is
-    # reported rather than drawn.
+    # the carrier meridian moves the polar column: the labels sit on their
+    # circles just past the 90°E meridian instead of the central one, turned
+    # along the circle (vertical there, horizontal at the bottom)
     fig, ax0 = build_case(decoration_case(DECORATION_CASES, "laea_polar_nolimits"))
     fig, ax90 = build_case(decoration_case(DECORATION_CASES, "laea_polar_c90"))
     d0, d90 = GM.decorations(ax0), GM.decorations(ax90)
     @test Set(l.text for l in interior_drawn(d0, :lat)) == Set(["45°S", "0°", "45°N"])
-    @test Set(l.text for l in interior_drawn(d90, :lat)) == Set(["0°", "45°N"])
-    @test [(s.value, s.reason) for s in d90.suppressed if s.kind == :interior] == [(-45.0, :crossed)]
+    @test Set(l.text for l in interior_drawn(d90, :lat)) == Set(["45°S", "0°", "45°N"])
     @test all(l -> l.carrier == 0.0, interior_drawn(d0, :lat)) && all(l -> l.carrier == 90.0, interior_drawn(d90, :lat))
     @test d0.pixels.interior_positions[:lat] != d90.pixels.interior_positions[:lat]
     # the column on the 90°E meridian lies to the right of the pole, the default one below it
     pole = d0.pixels.frame[1] |> pts -> Point2d(sum(pts) / length(pts))
     @test all(p -> p[1] > pole[1] + 5, d90.pixels.interior_positions[:lat])
     @test all(p -> p[2] < pole[2] - 5, d0.pixels.interior_positions[:lat])
+    @test all(r -> abs(r) < deg2rad(30), d0.pixels.interior_rotations[:lat])
+    @test all(r -> abs(r) > deg2rad(60), d90.pixels.interior_rotations[:lat])
+    # interior labels are smaller than the frame labels of their family, and their own attribute overrides that
+    @test ax0.elements[:yinteriorlabels].fontsize[] ≈ 0.8 * ax0.yticklabelsize[]
+    @test all(l -> l.half == GM.text_half_extents(l.text, Makie.to_font(ax0.graph[:fonts][], :regular), 0.8 * ax0.yticklabelsize[]), interior_drawn(d0, :lat))
+    @test ax0.elements[:yinteriorlabels].rotation[] == Makie.to_rotation.(d0.pixels.interior_rotations[:lat])
+    fig, axs = build_case(decoration_case(DECORATION_CASES, "laea_polar_nolimits"); interiorlabelsize = 20.0, interiorlabelrotation = 0.3)
+    ds = GM.decorations(axs)
+    @test axs.elements[:yinteriorlabels].fontsize[] ≈ 20.0
+    @test all(l -> l.half == GM.text_half_extents(l.text, Makie.to_font(axs.graph[:fonts][], :regular), 20.0), interior_drawn(ds, :lat))
+    @test all(==(0.3), ds.pixels.interior_rotations[:lat]) && all(l -> l.rotation == 0.3 && !l.auto_rotation, interior_drawn(ds, :lat))
+    @test isempty(phase5_violations("laea_polar_fixed", ds))
+    # meridians on a pseudocylindrical read along their lines: vertical at the central meridian, leaning with the others
+    fig, axm = build_case(decoration_case(DECORATION_CASES, "moll"))
+    dm = GM.decorations(axm)
+    rot = Dict(l.text => l.rotation for l in interior_drawn(dm, :lon))
+    @test rot["0°"] == pi / 2
+    @test all(r -> deg2rad(45) < abs(r) <= pi / 2, values(rot))
     # a named carrier parallel is used as given
     fig, ax = build_case(decoration_case(DECORATION_CASES, "moll"); carrierparallel = 45)
     d = GM.decorations(ax)
@@ -415,6 +474,12 @@ end
             @test isempty(v)
             isempty(v) || foreach(println, v)
             @test !isempty(d.bands.polygons) && ax.elements[:bands].visible[]
+            # the plot draws the bands and then the corner cells, in the background colour
+            @test length(ax.graph[:band_polygons][]) == length(d.bands.polygons) + length(d.bands.cells)
+            @test ax.graph[:band_colors][][(end - length(d.bands.cells) + 1):end] == fill(Makie.to_color(ax.framecolors[][2]), length(d.bands.cells))
+            for cell in d.bands.cells
+                @test !GM.inside_loops(d.pixels.frame, sum(cell) / length(cell))
+            end
             # the band's edges mark the ticks: no stubs, and labels clear the band instead
             @test isempty(d.pixels.stubs[:lon]) && isempty(d.pixels.stubs[:lat])
             @test all(l -> GM.isinterior(l) || l.offset == ax.framewidth[] + (l.exit.family == :lon ? ax.xticklabelpad[] : ax.yticklabelpad[]), d.labels)
@@ -427,6 +492,21 @@ end
             end
         end
     end
+    # a rectangle has four corner cells with a run per side, a pseudocylindrical
+    # outline one at each end of its two pole lines, and a limb none
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "merc_reg_fancy"))
+    d = GM.decorations(ax)
+    @test length(d.bands.corners) == 4 && length(unique(d.bands.run)) == 4
+    @test Set(d.bands.corners) == Set(d.pixels.frame[1])
+    @test all(cell -> length(cell) == 4, d.bands.cells)
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "robin150_fancy"))
+    d = GM.decorations(ax)
+    @test length(d.bands.corners) == 4 && length(unique(d.bands.run)) == 4
+    poles = [d.pixels.frame[1][j] for j in eachindex(d.frame.tags[1]) if d.frame.tags[1][j] == :pole]
+    @test all(p -> p in d.bands.corners, poles)
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "ortho_fancy"))
+    d = GM.decorations(ax)
+    @test isempty(d.bands.corners) && isempty(d.bands.cells) && all(==(1), d.bands.run)
     # a plain frame draws no band, and the style switches live
     fig, ax = build_case(decoration_case(BASELINE_CASES, "merc_reg"))
     d = GM.decorations(ax)
@@ -454,10 +534,12 @@ end
 @testset "band sweep" begin
     black, white = Makie.to_color(:black), Makie.to_color(:white)
     lp = Point2d[(0, 0), (100, 0), (100, 50), (0, 50)]
-    # three exits: two colours cannot alternate around an odd count, so the
-    # closing band is split and the extra boundary is recorded
+    # a single run round the rectangle (no tags: the loop is one run).  Three
+    # exits: two colours cannot alternate around an odd count, so the closing
+    # band is split and the extra boundary is recorded
     ex = [(1, 1, Point2d(30, 0)), (1, 1, Point2d(60, 0)), (1, 3, Point2d(40, 50))]
     b = GM.frame_bands([lp], ex, 5.0, [black, white])
+    @test isempty(b.corners) && isempty(b.cells) && all(==(1), b.run)
     @test length(b.polygons) == 4 && length(b.boundaries[1]) == 4 && b.extra[1] != 0
     @test all(b.colors[i] != b.colors[mod1(i + 1, 4)] for i in 1:4)
     @test all(b.loop .== 1)
@@ -484,6 +566,37 @@ end
     # a mirrored loop (map on the right) is offset the other way
     bmir = GM.frame_bands([lp], ex4, 5.0, [black, white]; outward = -1)
     @test all(p -> 0 - 1e-9 <= p[1] <= 100 + 1e-9 && 0 - 1e-9 <= p[2] <= 50 + 1e-9, Iterators.flatten(bmir.polygons))
+
+    # runs: viewport sides are one run each, with a corner cell between them
+    vtags = [fill(:viewport, 4)]; vsrc = [zeros(Int, 4)]
+    @test GM.run_corners(lp, vtags[1], vsrc[1]) == [1, 2, 3, 4]
+    br = GM.frame_bands([lp], vtags, vsrc, ex, 5.0, [black, white])
+    @test length(br.corners) == 4 && Set(br.corners) == Set(lp) && br.extra[1] == 0
+    # bottom: two exits → three bands; right: one; top: one exit → two; left: one
+    @test br.run == [1, 1, 1, 2, 3, 3, 4] && length(br.polygons) == 7
+    # the colours restart at every corner
+    @test br.colors == [black, white, black, black, black, white, black]
+    @test br.boundaries[1] == Point2d[(0, 0), (30, 0), (60, 0), (100, 0), (100, 50), (40, 50), (0, 50)]
+    # a corner cell is the square outside the corner; the bands beside it stop flush with their edges
+    cell = br.cells[findfirst(==(Point2d(0, 0)), br.corners)]
+    @test Set(cell) == Set(Point2d[(0, 0), (0, -5), (-5, -5), (-5, 0)])
+    @test !(Point2d(-5, -5) in br.polygons[1]) && !(Point2d(-5, -5) in br.polygons[end])
+    @test Point2d(0, -5) in br.polygons[1] && Point2d(-5, 0) in br.polygons[end]
+    # a run may wrap past the loop's first vertex; a vertex inside a run is no corner
+    hex = Point2d[(0, 0), (40, -20), (80, 0), (80, 60), (40, 80), (0, 60)]
+    htags = [[:cut, :pole, :cut, :cut, :pole, :cut]]; hsrc = [[1, 0, 2, 2, 0, 1]]
+    @test GM.run_corners(hex, htags[1], hsrc[1]) == [2, 3, 5, 6]
+    bh = GM.frame_bands([hex], htags, hsrc, [(1, 3, Point2d(80, 30)), (1, 6, Point2d(0, 30))], 5.0, [black, white])
+    @test length(bh.polygons) == 6 && length(bh.cells) == 4
+    # the wrapping run (edges 6 and 1) is one run of two bands: from the corner at (0, 60) to the exit, and on past (0, 0) to (40, -20)
+    wrap = findall(==(bh.run[end]), bh.run)
+    @test length(wrap) == 2 && bh.colors[wrap] == [black, white]
+    @test Point2d(0, 0) in bh.polygons[wrap[2]]
+    # a straight tag meeting a curved one at a shallow turn is still a corner; a collinear join is not
+    flat = Point2d[(0, 0), (50, 0), (100, 0), (100, 50), (0, 50)]
+    @test GM.run_corners(flat, [:viewport, :viewport, :viewport, :viewport, :viewport], [0, 0, 0, 0, 0]) == [1, 3, 4, 5]
+    @test GM.run_corners(flat, [:limb, :limb, :viewport, :viewport, :viewport], [1, 1, 0, 0, 0]) == [1, 3, 4, 5]
+    @test GM.run_corners(flat, [:limb, :limb, :limb, :limb, :limb], [1, 1, 1, 1, 1]) == Int[]
 end
 
 @testset "grid z-order and render order" begin
