@@ -60,6 +60,13 @@ jobs:
         with:
           name: test_images-${{ matrix.version }}
           path: test_images/
+      - name: Upload reference-image review
+        uses: actions/upload-artifact@v7
+        if: always() && matrix.version == '1'
+        with:
+          name: refimage-review
+          path: test_images/refimages/
+          if-no-files-found: warn
   refimages:
     # After a green test run on master, the recorded gallery becomes the
     # reference set for this minor version: test/refimages/upload.jl attaches
