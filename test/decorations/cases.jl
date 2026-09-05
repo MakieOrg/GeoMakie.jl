@@ -93,12 +93,12 @@ const DECORATION_CASES = vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES, FANCY_
 
 decoration_case(cases::Vector{DecorationCase}, name::AbstractString) = cases[findfirst(c -> c.name == name, cases)]
 
-"A figure and a GeoAxis for the case, with coastlines plotted."
+"A figure and a GeoAxis for the case, with coastlines (cut at the seams of its projection) plotted."
 function build_case(c::DecorationCase; size = (600, 400), coastlines::Bool = true, attrs...)
     fig = Figure(; size)
     kw = c.limits === nothing ? (;) : (; limits = c.limits)
     ax = GeoAxis(fig[1, 1]; dest = c.dest, title = c.name, kw..., c.attrs..., attrs...)
-    coastlines && lines!(ax, GeoMakie.coastlines())
+    coastlines && lines!(ax, GeoMakie.coastlines(ax))
     Makie.update_state_before_display!(fig)
     return fig, ax
 end
@@ -113,7 +113,7 @@ const PARITY_ATTRS = (; title = "Title", subtitle = "Subtitle", xlabel = "Longit
 function build_axis_parity(; size = (900, 420))
     fig = Figure(; size)
     ga = GeoAxis(fig[1, 1]; dest = "+proj=merc", limits = ((-10, 30), (35, 60)), PARITY_ATTRS...)
-    lines!(ga, GeoMakie.coastlines())
+    lines!(ga, GeoMakie.coastlines(ga))
     Makie.update_state_before_display!(fig)
     d = GeoMakie.decorations(ga)
     lon = d.pixels.strings[:lon]; lat = d.pixels.strings[:lat]
@@ -129,7 +129,7 @@ function build_issue349(; size = (1200, 440))
     axes = GeoAxis[]
     for i in 1:3
         ax = GeoAxis(fig[1, i]; dest = "+proj=longlat +datum=WGS84", limits = ((-19, 55), (-38, 42)), title = "panel $i")
-        lines!(ax, GeoMakie.coastlines())
+        lines!(ax, GeoMakie.coastlines(ax))
         i > 1 && hideydecorations!(ax; grid = false)
         push!(axes, ax)
     end
@@ -141,7 +141,7 @@ end
 function build_issue268(; size = (800, 600))
     fig = Figure(; size)
     axes = [GeoAxis(fig[i, j]; limits = (-30, 55, -50, 80)) for i in 1:2, j in 1:2]
-    foreach(ax -> lines!(ax, GeoMakie.coastlines()), axes)
+    foreach(ax -> lines!(ax, GeoMakie.coastlines(ax)), axes)
     Makie.update_state_before_display!(fig)
     return fig, vec(axes)
 end
