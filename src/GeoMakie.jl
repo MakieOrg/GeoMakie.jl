@@ -50,15 +50,15 @@ include("conversions.jl")
 include("data.jl")
 include("utils.jl")
 include("geodesy.jl")
-include("geoticks.jl")
+include("geoaxis/geoticks.jl")
 include("projection.jl")
 
-include("geoaxis.jl")
-include("makie-axis.jl")
+include("geoaxis/geoaxis.jl")
+include("geoaxis/makie-axis.jl")
 
 # some basic recipes
 include("mesh_image.jl")
-include("linesplitting.jl")
+include("geoaxis/linesplitting.jl")
 
 include("sphere/unit_sphere_transforms.jl")
 include("sphere/icosphere.jl")
