@@ -25,6 +25,8 @@ using GeometryBasics: Polygon, MultiPolygon
 using Geodesy
 using Proj
 import GeoFormatTypes
+using ComputePipeline
+using Makie: Observables
 
 export GeoInterface
 
@@ -53,7 +55,18 @@ include("geodesy.jl")
 include("geoaxis/geoticks.jl")
 include("projection.jl")
 
+# The boundary of a projection on the unit sphere, and the decorations built on it.
+include("geoaxis/boundary/arcs.jl")
+include("geoaxis/boundary/regions.jl")
+include("geoaxis/boundary/analytic.jl")
+include("geoaxis/boundary/identify.jl")
+include("geoaxis/boundary/probe.jl")
+include("geoaxis/boundary/boundary.jl")
+include("geoaxis/decorations/project.jl")
+include("geoaxis/decorations/frame.jl")
+
 include("geoaxis/geoaxis.jl")
+include("geoaxis/graph.jl")
 include("geoaxis/makie-axis.jl")
 
 # some basic recipes

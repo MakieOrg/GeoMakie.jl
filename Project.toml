@@ -5,6 +5,7 @@ version = "0.7.17"
 
 [deps]
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
+ComputePipeline = "95dc2771-c249-4cd0-9c9f-1f3b4330693c"
 CoordinateTransformations = "150eb455-5306-5404-9cee-2592286d6298"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 GeoFormatTypes = "68eda718-8dee-11e9-39e7-89f7f65f511f"
@@ -24,6 +25,7 @@ StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
 
 [compat]
 Colors = "0.12, 0.13"
+ComputePipeline = "0.1.8"
 CoordinateTransformations = "0.6.3"
 Downloads = "1"
 GeoFormatTypes = "0.4"

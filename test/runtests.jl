@@ -11,4 +11,7 @@ Makie.set_theme!(Theme(
     @testset "MeshImage" include("meshimage.jl")
     @testset "GeoAxis" include("geoaxis.jl")
     @testset "GlobeAxis" include("globeaxis.jl")
+    @testset "Boundary" include("boundary/runtests.jl")
+    @testset "Frame" include("frame/runtests.jl")
+    @testset "Decorations" include("decorations/runtests.jl")
 end

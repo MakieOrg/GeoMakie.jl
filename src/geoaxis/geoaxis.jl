@@ -2,7 +2,7 @@
 # GeoAxis
 =#
 
-const Rect2d = Rect2{Float64}
+# `Rect2d` comes from GeometryBasics.
 
 Makie.@Block GeoAxis <: Makie.AbstractAxis begin
     scene::Scene
@@ -15,6 +15,7 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
     elements::Dict{Symbol, Any}
     transform_func::Observable{Any}
     inv_transform_func::Observable{Any}
+    graph::ComputePipeline.ComputeGraph
     @attributes begin
         # unused - only for compat with Makie AbstractAxis functions
         xscale = identity
@@ -40,6 +41,8 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         source = "+proj=longlat +datum=WGS84"
         "Projection that the axis uses to display the data."
         dest = "+proj=eqearth"
+        "A user outline replacing the projection's own domain: a vector of lon/lat points, or `:dest => points` in projected coordinates. `nothing` uses the projection's domain."
+        outline = nothing
 
         "Controls if the y axis goes upwards (false) or downwards (true)"
         yreversed::Bool = false
@@ -180,8 +183,12 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         xtickcolor::RGBAf = RGBf(0, 0, 0)
         "The color of the ytick marks."
         ytickcolor::RGBAf = RGBf(0, 0, 0)
-        # "The width of the axis spines."
-        # spinewidth::Float64 = 1f0
+        "The width of the axis spine (the frame of the map)."
+        spinewidth::Float64 = 1f0
+        "Controls if the axis spine is visible."
+        spinevisible::Bool = true
+        "The color of the axis spine."
+        spinecolor::RGBAf = :black
         "Controls if the x grid lines are visible."
         xgridvisible::Bool = true
         "Controls if the y grid lines are visible."
@@ -238,11 +245,6 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         xminorgridstyle = nothing
         "The linestyle of the y minor grid lines."
         yminorgridstyle = nothing
-        # "Controls if the axis spine is visible."
-        # spinevisible::Bool = true
-        # "The color of the axis spine."
-        # spinecolor::RGBAf = :black
-        # spinetype::Symbol = :geospine
         "The button for panning."
         panbutton::Makie.Mouse.Button = Makie.Mouse.right
         "The key for limiting panning to the x direction."
@@ -465,14 +467,17 @@ function mean_distances(points)
     return mean(dists)
 end
 
-# Choses the spine with the biggest mean distance between points
+# Choses the spine with the biggest mean distance between points.  The
+# comparison is relative so that a uniform rescaling of the viewport (which is
+# what a protrusion change does under DataAspect) cannot flip the choice and
+# send protrusions and viewport into a two-cycle.
 function choose_side(a, b)
     isempty(a) && return b
     isempty(b) && return a
     distsa = mean_distances(a)
     distsb = mean_distances(b)
-    distsa - distsb < 3 && return a
-    return distsb <= distsa ? a : b
+    distsa >= 0.8 * distsb && return a
+    return b
 end
 
 function angle_between(v1::Point, v2::Point)
@@ -536,6 +541,10 @@ function Makie.initialize_block!(axis::GeoAxis)
 
     # Set up the axis for the Scene, mostly using Makie's existing functionality
     scene = axis_setup!(axis)
+
+    # The decoration graph: boundary, view, frame and spine, computed once per
+    # change of dest / limits, with `targetlimits` bridged from the view's bbox.
+    build_graph!(axis)
 
     # Shorthand for what you see below - ONLY ACCESSIBLE WITHIN THIS FUNCTION!!
     Obs(x) = Observable(x; ignore_equal_values=true)
@@ -616,6 +625,11 @@ function Makie.initialize_block!(axis::GeoAxis)
     latgridplot = lines!(scene, latticks_line_obs; color=axis.ygridcolor, linewidth=axis.ygridwidth,
         visible=axis.ygridvisible, linestyle=axis.ygridstyle, transparency=true, inspectable=false)
     translate!(latgridplot, 0, 0, 100)
+
+    # The spine: the frame of the map, drawn in dest space from the decoration graph.
+    spineplot = lines!(scene, axis.graph[:spine]; color=axis.spinecolor, linewidth=axis.spinewidth,
+        visible=axis.spinevisible, inspectable=false, xautolimits=false, yautolimits=false)
+    translate!(spineplot, 0, 0, 101)
 
     # This creates the spines and ticklabels plots for the grid.
     cam = scene.camera
@@ -707,9 +721,22 @@ function Makie.initialize_block!(axis::GeoAxis)
     fonts = theme(axis.blockscene, :fonts)
     # Finally calculate protrusions and report all bounding boxes
     # to the layout system.
+    # The protrusions are computed from every candidate label of the spine
+    # (in data space, so they depend on the limits and ticks only), not from
+    # the labels that survive the pixel-space filtering above: those depend on
+    # the viewport, which depends on the protrusions, and that feedback loop
+    # can settle into a two-cycle that never converges.
+    label_string(p, d) = (x = round(p.input[d]; sigdigits = 3); string(isinteger(x) ? round(Int, x) : x, "°"))
+    lat_text_candidates = map(axis.blockscene, spines_obs; ignore_equal_values=true) do sp
+        String[label_string(p, 1) for p in vcat(sp.bottom, sp.top) if isfinite(p.input)]
+    end
+    lon_text_candidates = map(axis.blockscene, spines_obs; ignore_equal_values=true) do sp
+        String[label_string(p, 2) for p in vcat(sp.left, sp.right) if isfinite(p.input)]
+    end
     approx_x_protrusion = map(
         axis.blockscene, 
-        axis.yticklabelfont, axis.yticklabelsize, axis.yticklabelpad, lat_text, axis.yticklabelsvisible
+        axis.yticklabelfont, axis.yticklabelsize, axis.yticklabelpad, lat_text_candidates, axis.yticklabelsvisible;
+        ignore_equal_values=true
         ) do ticklabel_font, ticklabel_size, ticklabel_pad, text, ticklabelsvisible
         ret = 0.0f0
 
@@ -727,7 +754,8 @@ function Makie.initialize_block!(axis::GeoAxis)
 
     approx_y_protrusion = map(
         axis.blockscene, 
-        axis.xticklabelfont, axis.xticklabelsize, axis.xticklabelpad, lon_text, axis.xticklabelsvisible,
+        axis.xticklabelfont, axis.xticklabelsize, axis.xticklabelpad, lon_text_candidates, axis.xticklabelsvisible;
+        ignore_equal_values=true
         ) do ticklabel_font, ticklabel_size, ticklabel_pad, text, ticklabelsvisible
 
         ret = 0.0f0
@@ -749,6 +777,7 @@ function Makie.initialize_block!(axis::GeoAxis)
     setfield!(axis, :elements, elements)
     elements[:xgrid] = longridplot
     elements[:ygrid] = latgridplot
+    elements[:spine] = spineplot
     elements[:xticklabels] = lontex
     elements[:yticklabels] = lattex
 
