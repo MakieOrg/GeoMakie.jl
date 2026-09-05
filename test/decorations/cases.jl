@@ -64,7 +64,32 @@ const LAYOUT_CASES = DecorationCase[
         (; xaxisposition = :top, yaxisposition = :right, xlabel = "Longitude", ylabel = "Latitude", title = "labels on top and right")),
 ]
 
-const DECORATION_CASES = vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES, FANCY_CASES, LAYOUT_CASES, MOST_PROJECTION_CASES)
+# Minor graticule and minor ticks: the paired minor step on a rectangle, a
+# limb and a fancy frame; #215's webmerc with every minor attribute set; and
+# IntervalsBetween on user majors.
+const MINOR_ATTRS = (; xminorgridvisible = true, yminorgridvisible = true, xminorticksvisible = true, yminorticksvisible = true)
+const MINOR_CASES = DecorationCase[
+    DecorationCase("merc_reg_minor", "+proj=merc", ((-10, 30), (35, 60)), MINOR_ATTRS),
+    DecorationCase("ortho_minor", "+proj=ortho +lon_0=-20 +lat_0=30", nothing, MINOR_ATTRS),
+    DecorationCase("merc_reg_fancy_minor", "+proj=merc", ((-10, 30), (35, 60)), (; framestyle = :fancy, MINOR_ATTRS...)),
+    DecorationCase("issue215", "+proj=webmerc", ((-30, 60), (-40, 70)),
+        (; xminorgridvisible = true, yminorgridvisible = true, xminorticksvisible = true, yminorticksvisible = true,
+           xminorgridcolor = (:red, 0.3), yminorgridcolor = (:blue, 0.3), xminorgridwidth = 2.0, yminorgridstyle = :dash,
+           xminorticksize = 8.0, yminorticksize = 8.0, xminortickcolor = :red, yminortickcolor = :blue, xminortickwidth = 2.0)),
+    DecorationCase("merc_reg_intervals", "+proj=merc", ((-10, 30), (35, 60)),
+        (; xticks = -10:10:30, yticks = 35:5:60, xminorticks = IntervalsBetween(5), yminorticks = IntervalsBetween(2), MINOR_ATTRS...)),
+]
+
+# The mask outside the frame: lcc_title without it shows the coastlines of
+# the Phase 7 render running out to the viewport, over the tick labels.
+const MASK_CASES = DecorationCase[
+    DecorationCase("lcc_title_nomask", "+proj=lcc +lon_0=-96 +lat_1=33 +lat_2=45", ((-125, -65), (23, 52)),
+        (; title = "Lambert conformal conic", subtitle = "standard parallels 33°N and 45°N", xlabel = "Longitude", ylabel = "Latitude",
+           maskoutside = false)),
+]
+
+const DECORATION_CASES = vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES, FANCY_CASES, LAYOUT_CASES, MINOR_CASES, MASK_CASES,
+    MOST_PROJECTION_CASES)
 
 decoration_case(cases::Vector{DecorationCase}, name::AbstractString) = cases[findfirst(c -> c.name == name, cases)]
 

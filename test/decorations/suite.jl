@@ -783,3 +783,230 @@ end
     top_row = filter(ax -> minimum(ax.layoutobservables.computedbbox[])[2] > minimum(bb[1])[2] - 1, axes)
     @test length(top_row) == 2
 end
+
+# ---- Phase 8: minor graticule, minor ticks, and the mask ---------------------------
+
+"Render `fig` to pixels."
+# `colorbuffer` may hand back the screen's own buffer, so keep a copy
+render_bytes(fig) = copy(colorbuffer(fig; px_per_unit = 1))
+
+@testset "minor graticule and ticks" begin
+    for c in MINOR_CASES
+        fig, ax = build_case(c)
+        d = GM.decorations(ax)
+        shown = (; lon = ax.xminorgridvisible[] || ax.xminorticksvisible[], lat = ax.yminorgridvisible[] || ax.yminorticksvisible[])
+        @testset "$(c.name)" begin
+            v = vcat(phase3_violations(c.name, d), phase4_violations(c.name, d), phase5_violations(c.name, d),
+                phase6_violations(c.name, d), phase7_violations(c.name, ax), phase8_violations(c.name, d, shown))
+            @test isempty(v)
+            isempty(v) || foreach(println, v)
+            @test !isempty(d.xtickvalues.minors) && !isempty(d.ytickvalues.minors)
+            @test !isempty(d.minor_graticule) && !isempty(d.minor_exits)
+            # the minor lines are drawn through their own plots, lighter than the majors
+            @test ax.elements[:xminorgrid].visible[] && ax.elements[:yminorgrid].visible[]
+            @test ax.elements[:xminorgrid].color[] == Makie.to_color(ax.xminorgridcolor[])
+            @test ax.elements[:xminorgrid].linewidth[] == ax.xminorgridwidth[]
+            @test Makie.zvalue2d(ax.elements[:xminorgrid]) == Makie.zvalue2d(ax.elements[:xgrid])
+            @test isequal(ax.graph[:xminorgrid_points][], GM.graticule_points(filter(l -> l.family == :lon, d.minor_graticule)))
+            if ax.framestyle[] === :fancy
+                # the band's edges mark the minor ticks too: no stubs, and a boundary at every minor exit
+                @test isempty(d.minor_stubs.lon) && isempty(d.minor_stubs.lat)
+                m = GM.PixelMap(d.projectionview, d.viewport)
+                allb = reduce(vcat, d.bands.boundaries; init = Point2d[])
+                for e in GM.band_exits(d.minor_exits, d.finallimits, d.ticklabelminangle)
+                    @test minimum(norm(m(e.p) - q) for q in allb) <= 1.0 + 1e-6
+                end
+            else
+                # shorter stubs of the minor size at the admitted minor exits, one per exit
+                for family in (:lon, :lat)
+                    pts = d.minor_stubs[family]
+                    size = family === :lon ? ax.xminorticksize[] : ax.yminorticksize[]
+                    @test iseven(length(pts)) && !isempty(pts)
+                    @test all(i -> norm(pts[i + 1] - pts[i]) ≈ size, 1:2:(length(pts) - 1))
+                    admitted = count(e -> e.family == family, GM.stub_exits(d.minor_exits, d.finallimits, d.ticklabelminangle, d.xaxisposition, d.yaxisposition))
+                    @test length(pts) ÷ 2 <= admitted
+                end
+                @test ax.elements[:xminorticks].visible[] && ax.elements[:xminorticks].color[] == Makie.to_color(ax.xminortickcolor[])
+                @test ax.elements[:xminorticks].linewidth[] == ax.xminortickwidth[]
+            end
+            # minors reserve no layout space (as on Axis): the bound is the majors' alone
+            @test d.bound == GM.protrusion_bound(filter(!GM.isinterior, d.labels), (; lon = true, lat = true);
+                ticks = (; lon = (; size = ax.xticksize[], align = ax.xtickalign[], visible = ax.xticksvisible[] && ax.framestyle[] !== :fancy),
+                          lat = (; size = ax.yticksize[], align = ax.ytickalign[], visible = ax.yticksvisible[] && ax.framestyle[] !== :fancy)),
+                base = ax.framestyle[] === :fancy ? ax.framewidth[] : 0.0)
+        end
+    end
+    # the paired steps: merc_reg's 10° / 5° majors carry 2° / 1° minors
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "merc_reg_minor"))
+    d = GM.decorations(ax)
+    @test d.xtickvalues.values == [-10.0, 0.0, 10.0, 20.0, 30.0] && d.xtickvalues.minors == setdiff(-8.0:2:28, d.xtickvalues.values)
+    @test d.ytickvalues.values == collect(35.0:5:60) && d.ytickvalues.minors == setdiff(36.0:1:59, d.ytickvalues.values)
+    # IntervalsBetween on user majors, mirrored to the extent
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "merc_reg_intervals"))
+    d = GM.decorations(ax)
+    @test d.xtickvalues.minors == setdiff(-10.0:2:30, -10.0:10:30)
+    @test d.ytickvalues.minors == collect(37.5:5:57.5)
+    # minor attributes reach the plots (#215)
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "issue215"))
+    @test ax.elements[:xminorgrid].color[] == Makie.to_color((:red, 0.3)) && ax.elements[:xminorgrid].linewidth[] == 2
+    @test ax.elements[:yminorgrid].linestyle[] == Makie.to_linestyle(:dash) || ax.yminorgridstyle[] == :dash
+    @test ax.elements[:xminorticks].color[] == Makie.to_color(:red) && ax.elements[:xminorticks].linewidth[] == 2
+    d = GM.decorations(ax)
+    @test all(i -> norm(d.minor_stubs.lon[i + 1] - d.minor_stubs.lon[i]) ≈ 8, 1:2:(length(d.minor_stubs.lon) - 1))
+end
+
+@testset "minors off by default and byte-identical when hidden" begin
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "merc_reg"))
+    @test !ax.xminorgridvisible[] && !ax.yminorgridvisible[] && !ax.xminorticksvisible[] && !ax.yminorticksvisible[]
+    @test ax.xminorticks[] === Makie.automatic && ax.yminorticks[] === Makie.automatic
+    d = GM.decorations(ax)
+    # the positions exist, nothing is computed or drawn for them
+    @test !isempty(d.xtickvalues.minors) && isempty(d.minor_graticule) && isempty(d.minor_exits)
+    @test isempty(d.minor_stubs.lon) && isempty(d.minor_stubs.lat)
+    @test isempty(phase8_violations("merc_reg", d, (; lon = false, lat = false)))
+    plain = render_bytes(fig)
+    # switching the minors on and off again renders the same bytes
+    ax.xminorgridvisible = true; ax.yminorgridvisible = true; ax.xminorticksvisible = true; ax.yminorticksvisible = true
+    Makie.update_state_before_display!(fig)
+    d = GM.decorations(ax)
+    @test !isempty(d.minor_graticule) && !isempty(d.minor_stubs.lon)
+    shown = render_bytes(fig)
+    @test shown != plain
+    ax.xminorgridvisible = false; ax.yminorgridvisible = false; ax.xminorticksvisible = false; ax.yminorticksvisible = false
+    Makie.update_state_before_display!(fig)
+    @test isempty(GM.decorations(ax).minor_graticule)
+    @test render_bytes(fig) == plain
+    # a minor finder with the grid hidden draws nothing either
+    fig2, ax2 = build_case(decoration_case(DECORATION_CASES, "merc_reg"); xminorticks = IntervalsBetween(5), yminorticks = [36.0, 37.0])
+    @test render_bytes(fig2) == plain
+    # and one family may show while the other stays hidden
+    fig3, ax3 = build_case(decoration_case(DECORATION_CASES, "merc_reg"); xminorgridvisible = true)
+    d3 = GM.decorations(ax3)
+    @test all(l -> l.family == :lon, d3.minor_graticule) && !isempty(d3.minor_graticule)
+    @test isempty(phase8_violations("merc_reg_x", d3, (; lon = true, lat = false)))
+    # hidedecorations! covers the minor branches, and keeps them on request
+    fig4, ax4 = build_case(decoration_case(DECORATION_CASES, "merc_reg_minor"))
+    hidexdecorations!(ax4; minorgrid = false)
+    @test ax4.xminorgridvisible[] && !ax4.xminorticksvisible[] && !ax4.xgridvisible[]
+    hidedecorations!(ax4)
+    @test !ax4.xminorgridvisible[] && !ax4.yminorgridvisible[] && !ax4.xminorticksvisible[] && !ax4.yminorticksvisible[]
+    Makie.update_state_before_display!(fig4)
+    @test isempty(GM.decorations(ax4).minor_graticule)
+    @test !ax4.elements[:xminorgrid].visible[] && !ax4.elements[:yminorticks].visible[]
+end
+
+@testset "fancy band alternates on minor exits" begin
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "merc_reg_fancy"))
+    d0 = GM.decorations(ax)
+    n0 = length(d0.bands.polygons)
+    ax.xminorticksvisible = true; ax.yminorticksvisible = true
+    d1 = GM.decorations(ax)
+    @test length(d1.bands.polygons) > n0
+    @test isempty(frame_band("merc_reg_fancy_minor", d1))
+    @test isempty(d1.pixels.stubs[:lon]) && isempty(d1.minor_stubs.lon)
+    # a minor grid alone does not segment the band: only visible minor ticks do
+    ax.xminorticksvisible = false; ax.yminorticksvisible = false
+    ax.xminorgridvisible = true; ax.yminorgridvisible = true
+    d2 = GM.decorations(ax)
+    @test length(d2.bands.polygons) == n0 && !isempty(d2.minor_graticule)
+end
+
+@testset "most_projections with minors" begin
+    for c in MOST_PROJECTION_CASES
+        fig, ax = try
+            build_case(c; coastlines = false, MINOR_ATTRS...)
+        catch e
+            @warn "skipping $(c.name): $(sprint(showerror, e))"
+            continue
+        end
+        d = GM.decorations(ax)
+        @testset "$(c.name)" begin
+            v = phase8_violations(c.name, d)
+            @test isempty(v)
+            isempty(v) || foreach(println, v)
+        end
+    end
+end
+
+@testset "mask outside the frame" begin
+    # the mask covers the rect minus the map body, over the plots and under the frame
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "lcc_title"))
+    d = GM.decorations(ax)
+    @test ax.maskoutside[] && haskey(ax.elements, :mask) && ax.elements[:mask].visible[]
+    @test length(d.mask) == 1 && length(d.mask[1].interiors) == 1
+    @test Makie.to_color(ax.elements[:mask].color[]) == Makie.to_color(ax.backgroundcolor[])
+    @test ax.elements[:mask].parent === ax.scene
+    z(k) = Makie.zvalue2d(ax.elements[k])
+    @test z(:background) < z(:xgrid) < 0 < z(:mask) < z(:bands) < z(:spine) < z(:xticklabels) < z(:xinteriorlabels)
+    ax.gridbehind = false
+    @test 0 < z(:mask) < z(:xgrid)
+    ax.gridbehind = true
+    for c in (decoration_case(DECORATION_CASES, "lcc_title"), decoration_case(DECORATION_CASES, "ortho"),
+              decoration_case(DECORATION_CASES, "robin150"), decoration_case(DECORATION_CASES, "issue388"))
+        v = nothing_outside_frame(c)
+        @test isempty(v)
+        isempty(v) || foreach(println, v)
+    end
+    # with the mask off the marker shows: the old behaviour
+    c = decoration_case(DECORATION_CASES, "lcc_title_nomask")
+    @test !c.attrs.maskoutside
+    v = nothing_outside_frame(c)
+    @test isempty(v)
+    isempty(v) || foreach(println, v)
+    fig, ax = build_case(c)
+    @test isempty(GM.decorations(ax).mask) && !ax.elements[:mask].visible[]
+    # a frame that is the viewport has no mask: the same bytes with the mask on and off
+    for name in ("merc_reg", "zoom3", "merc_reg_fancy")
+        fig1, ax1 = build_case(decoration_case(DECORATION_CASES, name))
+        d1 = GM.decorations(ax1)
+        @test all(==(:viewport), GM.edge_tags(d1.frame)) && isempty(d1.mask)
+        @test outside_frame_pixel(d1) === nothing
+        fig2, ax2 = build_case(decoration_case(DECORATION_CASES, name); maskoutside = false)
+        @test render_bytes(fig1) == render_bytes(fig2)
+    end
+    # the mask survives hidedecorations!, and follows the attribute live
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "lcc_title"))
+    hidedecorations!(ax)
+    @test ax.maskoutside[] && ax.elements[:mask].visible[] && !isempty(GM.decorations(ax).mask)
+    ax.maskoutside = false
+    @test !ax.elements[:mask].visible[] && isempty(GM.decorations(ax).mask)
+    ax.maskoutside = true
+    @test ax.elements[:mask].visible[] && !isempty(GM.decorations(ax).mask)
+    # the mask polygons: the inflated rect with every map loop as a hole; a hole loop of the frame is filled
+    lp = Point2d[(0, 0), (10, 0), (10, 10), (0, 10)]
+    hole = Point2d[(3, 3), (3, 6), (6, 6), (6, 3)]           # clockwise: a region the map does not cover
+    fr = GM.Frame([lp, hole], [fill(:limb, 4), fill(:limb, 4)], [ones(Int, 4), ones(Int, 4)])
+    polys = GM.mask_polygons(fr, Rect2d(-5, -5, 20, 20))
+    @test length(polys) == 2
+    @test length(polys[1].interiors) == 1 && collect(polys[1].interiors[1]) == lp
+    @test all(p -> p[1] <= -5 || p[1] >= 15 || p[2] <= -5 || p[2] >= 15, polys[1].exterior)
+    @test Set(polys[2].exterior) == Set(hole) && isempty(polys[2].interiors)
+    @test isempty(GM.mask_polygons(GM.Frame([lp], [fill(:viewport, 4)], [zeros(Int, 4)]), Rect2d(0, 0, 10, 10)))
+    @test length(GM.mask_polygons(GM.Frame(), Rect2d(0, 0, 10, 10))) == 1
+    # the halo and the mask share the background colour and never meet: interior
+    # labels lie on the map, the mask lies off it, and the labels stay legible
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "laea_polar_nolimits"))
+    d = GM.decorations(ax)
+    @test !isempty(d.mask) && !isempty(interior_drawn(d, :lat))
+    @test Makie.to_color(ax.elements[:yinteriorhalo].color[]) == Makie.to_color(ax.elements[:mask].color[]) == Makie.to_color(ax.backgroundcolor[])
+    img = colorbuffer(fig; px_per_unit = 1)
+    bg = Makie.Colors.RGB(Makie.to_color(ax.backgroundcolor[]))
+    for (k, i) in enumerate(d.pixels.kept)
+        GM.isinterior(d.labels[i]) || continue
+        b = d.pixels.boxes[k]
+        @test all(c -> GM.inside_loops(d.pixels.frame, c), GM.corners(b))
+        x0, x1 = extrema(c[1] for c in GM.corners(b)); y0, y1 = extrema(c[2] for c in GM.corners(b))
+        inked = count(px -> Makie.Colors.colordiff(Makie.Colors.RGB(pixel_color(img, px)), bg) > 10,
+            (Point2d(x, y) for x in floor(x0):ceil(x1), y in floor(y0):ceil(y1)))
+        @test inked > 0
+    end
+    px = outside_frame_pixel(d)
+    @test px !== nothing && Makie.Colors.colordiff(Makie.Colors.RGB(pixel_color(img, px)), bg) < 1
+    # a dark theme: the mask, the halo and the background follow it
+    with_theme(theme_dark()) do
+        f, a = build_case(decoration_case(DECORATION_CASES, "lcc_title"))
+        @test Makie.to_color(a.backgroundcolor[]) == Makie.to_color(Makie.theme(:backgroundcolor)[]) != Makie.to_color(:white)
+        @test Makie.to_color(a.elements[:mask].color[]) == Makie.to_color(a.elements[:background].color[]) == Makie.to_color(a.backgroundcolor[])
+        @test isempty(nothing_outside_frame(decoration_case(DECORATION_CASES, "lcc_title")))
+    end
+end

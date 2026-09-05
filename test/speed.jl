@@ -36,19 +36,23 @@ function timed(f)
     return median(@elapsed(f(k)) for k in 3:(RUNS + 2))
 end
 
-"Level 3 (zoom / pan): a new limits rectangle, read through to the labels and the bound."
+"Level 3 (zoom / pan): a new limits rectangle, read through to the labels, the bound, the minor exits and the mask."
 function pan!(ax, r0, k)
     w = widths(r0)
     ax.targetlimits[] = Rect2d(minimum(r0) .+ (0.01k) .* w, w .* (1 + 0.002k))
     ax.graph[:labels][]
     ax.graph[:protrusion_bound][]
+    ax.graph[:minor_exits][]
+    ax.graph[:mask_polygons][]
     return nothing
 end
 
-"Level 4 (resize): a new viewport, read through to the pixels."
+"Level 4 (resize): a new viewport, read through to the pixels, the minor stubs and the band."
 function resize_view!(ax, vp0, k)
     ComputePipeline.update!(ax.graph; viewport = Rect2i(minimum(vp0), widths(vp0) .+ (k % 2, (k + 1) % 2)))
     ax.graph[:pixels][]
+    ax.graph[:xminorstubs][]
+    ax.graph[:bands][]
     return nothing
 end
 
@@ -60,7 +64,8 @@ budget4 = LEVEL4_BUDGET_S * factor * 2
 
 @testset "speed" begin
     println(rpad("case", 22), lpad("level 3", 10), lpad("level 4", 10), lpad("PROJ/pan", 10), lpad("alloc/pan", 12))
-    for c in vcat(BASELINE_CASES, ISSUE_CASES)
+    # the minor cases run with their minor grid and ticks visible
+    for c in vcat(BASELINE_CASES, ISSUE_CASES, MINOR_CASES)
         fig, ax = build_case(c; coastlines = false)
         r0 = ax.targetlimits[]
         vp0 = ax.scene.viewport[]

@@ -13,10 +13,14 @@ each stage is computed once per change of its inputs and pulled on demand:
     3  spine              ← frame                      → lines!(spine)
     3  extent             ← frame, transform, view, finallimits
     3  carriers           ← view, transform, finallimits, extent, viewport, frame (a pole line caps the longitude interval)
-    3  xtickvalues        ← xticks, extent, carriers, xticklabelsize   (ytickvalues likewise)
+    3  xtickvalues        ← xticks, xminorticks, extent, carriers, xticklabelsize   (ytickvalues likewise; majors and minors)
     3  graticule          ← x/ytickvalues, view, transform, finallimits, extent  → lines!(grid)
+    3  minor_graticule    ← x/ytickvalues, view, transform, finallimits, extent, x/yminorgridvisible, x/yminorticksvisible
+                            (the minor lines of a family, computed only while its minor grid or minor ticks show) → lines!(minor grid)
     2  rim_pieces         ← view                       (rim(view), for exit angles on the sphere)
     3  exits              ← graticule, frame, finallimits, rim_pieces
+    3  minor_exits        ← minor_graticule, frame, finallimits, rim_pieces   (stubs and band boundaries, never labels)
+    3  mask_polygons      ← frame, finallimits, maskoutside   → poly!(mask): the rect minus the map body, in the background colour
     3  crossings          ← carriers, x/ytickvalues, view, transform, finallimits, carriermeridian, carrierparallel
                             (where each graticule line meets the carrier lines interior labels sit beside)
     3  x/yinterior_size   ← interiorlabelsize, x/yticklabelsize   (0.8 × the family's size when automatic) → text! fontsize
@@ -32,8 +36,11 @@ each stage is computed once per change of its inputs and pulled on demand:
     4  pixels             ← frame, graticule, labels, projectionview, viewport, tick attributes, framestyle,
                             ticklabelmingap, ticklabelcollisions       → text! (frame and interior), linesegments! (no stubs when fancy),
                                                                          lines!(spine_px); the crowding report
-    4  bands              ← frame, exits, finallimits, ticklabelminangle, projectionview, viewport, framestyle, framewidth, framecolors
-                                                                       → poly!(band_polygons; color = band_colors)
+    4  bands              ← frame, exits, minor_exits, x/yminorticksvisible, finallimits, ticklabelminangle, projectionview, viewport,
+                            framestyle, framewidth, framecolors        → poly!(band_polygons; color = band_colors); the band alternates on
+                                                                         minor exits too while minor ticks show
+    4  minor_stubs        ← minor_exits, frame, finallimits, projectionview, viewport, ticklabelminangle, x/yaxisposition,
+                            minor tick sizes / aligns / visibility, band → linesegments! (no stubs when fancy)
     4  x/ylabel_position  ← viewport, protrusion_bound, fixed_reach, axislabels   → text!(xlabel), text!(ylabel)
 
 `lonlat_limits` is the user's lon/lat limit rectangle (the whole sphere by
@@ -71,7 +78,11 @@ function _rimless_bbox(view::SphereRegion, t, lonlat::Rect2d)
     return _bbox(xs, ys)
 end
 
-"The tick values of one direction, with the labels the user supplied beside them (or `nothing`)."
+"""
+The tick values of one direction, with the labels the user supplied beside
+them (or `nothing`), and the `minors`: the finder's paired minor step, or the
+`x/yminorticks` finder's values, none coinciding with a major.
+"""
 struct TickSet
     values::Vector{Float64}
     labels::Union{Nothing, Vector{String}}
@@ -86,13 +97,15 @@ function _pixel_scale(viewport, lims::Rect2d)
 end
 
 """
-    _tickset(finder, ext, carrier, px_scale, fontsize, family; cap = Inf)
+    _tickset(finder, minorticks, ext, carrier, px_scale, fontsize, family; cap = Inf)
 
 The tick set of one direction.  `cap` is a second dest-space length the labels
 must also fit along (a pole line, where meridian labels land on a
 pseudocylindrical map); the interval is sized to the shorter of the two.
+`minorticks` is `automatic` for the finder's paired minors, or a Makie minor
+tick specification over the majors.
 """
-function _tickset(finder, ext::Extent, carrier::Carrier, px_scale, fontsize, family::Symbol; cap::Real = Inf)
+function _tickset(finder, minorticks, ext::Extent, carrier::Carrier, px_scale, fontsize, family::Symbol; cap::Real = Inf)
     range = family === :lon ? lon_range(ext) : lat_range(ext)
     carrier_px = carrier.length * px_scale
     if carrier.span > 0 && carrier_px > 0
@@ -109,7 +122,7 @@ function _tickset(finder, ext::Extent, carrier::Carrier, px_scale, fontsize, fam
             [ext.lat_lo - 1e-9 <= v <= ext.lat_hi + 1e-9 for v in vals]
         vals = vals[keep]
     end
-    return TickSet(vals, labels, minors === nothing ? Float64[] : minors)
+    return TickSet(vals, labels, minor_tickvalues(minorticks, minors, vals, range; wrap = family === :lon))
 end
 
 _lon_in_range(v, lo, hi) = (w = mod(v - lo, 360.0); w <= hi - lo + 1e-9 || w >= 360 - 1e-9)
@@ -150,7 +163,7 @@ function build_graph!(ax::GeoAxis)
     ComputePipeline.add_input!(g, :viewport, scene.viewport)
     ComputePipeline.add_input!(g, :projectionview, scene.camera.projectionview)
     ComputePipeline.add_input!(g, :fonts, Makie.to_value(theme(ax.blockscene, :fonts)))
-    for k in (:xticks, :yticks, :xtickformat, :ytickformat, :xticklabelalign, :yticklabelalign,
+    for k in (:xticks, :yticks, :xminorticks, :yminorticks, :xtickformat, :ytickformat, :xticklabelalign, :yticklabelalign,
               :xticklabelfont, :yticklabelfont, :interiorlabels, :carriermeridian, :carrierparallel, :framecolors,
               :interiorlabelsize, :interiorlabelrotation)
         ComputePipeline.add_input!(boxed, g, k, getproperty(ax, k))
@@ -159,7 +172,9 @@ function build_graph!(ax::GeoAxis)
               :xticksvisible, :yticksvisible, :xtickalign, :ytickalign, :xticklabelrotation, :yticklabelrotation,
               :xticklabelsvisible, :yticklabelsvisible, :xaxisposition, :yaxisposition,
               :ticklabelminangle, :ticklabelmingap, :ticklabelcollisions, :ticklabelreport,
-              :framestyle, :framewidth, :xlabelpadding, :ylabelpadding)
+              :framestyle, :framewidth, :xlabelpadding, :ylabelpadding,
+              :xminorgridvisible, :yminorgridvisible, :xminorticksvisible, :yminorticksvisible,
+              :xminorticksize, :yminorticksize, :xminortickalign, :yminortickalign, :maskoutside)
         ComputePipeline.add_input!(g, k, getproperty(ax, k))
     end
     for k in (:xlabelrotation, :ylabelrotation)
@@ -219,11 +234,11 @@ function build_graph!(ax::GeoAxis)
         # meridian labels land on a pole line when the frame has one: size to it
         (; lon = c.lon, lat = c.lat, px_scale = _pixel_scale(vp, rect), pole_length = pole_line_length(f, ext))
     end
-    ComputePipeline.map!(g, [:xticks, :extent, :carriers, :xticklabelsize], :xtickvalues) do finder, ext, c, size
-        _tickset(finder, ext, c.lon, c.px_scale, size, :lon; cap = c.pole_length)
+    ComputePipeline.map!(g, [:xticks, :xminorticks, :extent, :carriers, :xticklabelsize], :xtickvalues) do finder, minor, ext, c, size
+        _tickset(finder, minor, ext, c.lon, c.px_scale, size, :lon; cap = c.pole_length)
     end
-    ComputePipeline.map!(g, [:yticks, :extent, :carriers, :yticklabelsize], :ytickvalues) do finder, ext, c, size
-        _tickset(finder, ext, c.lat, c.px_scale, size, :lat)
+    ComputePipeline.map!(g, [:yticks, :yminorticks, :extent, :carriers, :yticklabelsize], :ytickvalues) do finder, minor, ext, c, size
+        _tickset(finder, minor, ext, c.lat, c.px_scale, size, :lat)
     end
     ComputePipeline.map!(g, [:xtickvalues, :ytickvalues, :view, :transform, :finallimits, :extent],
                          [:graticule, :xgrid_points, :ygrid_points]) do xt, yt, view, t, lims, ext
@@ -235,6 +250,22 @@ function build_graph!(ax::GeoAxis)
     end
     ComputePipeline.map!(g, [:graticule, :frame, :finallimits, :rim_pieces], :exits) do lines, f, lims, pieces
         exits(lines, f, Rect2d(lims), pieces)
+    end
+    # the minor lines of a family cost nothing while nothing shows them
+    ComputePipeline.map!(g, [:xtickvalues, :ytickvalues, :view, :transform, :finallimits, :extent,
+                             :xminorgridvisible, :yminorgridvisible, :xminorticksvisible, :yminorticksvisible],
+                         [:minor_graticule, :xminorgrid_points, :yminorgrid_points]) do xt, yt, view, t, lims, ext, xg, yg, xs, ys
+        rect = Rect2d(lims)
+        tol = frame_tolerance(rect)
+        lon = (xg || xs) ? graticule_lines(:lon, xt.minors, view, t, rect, ext; tol) : GraticuleLine[]
+        lat = (yg || ys) ? graticule_lines(:lat, yt.minors, view, t, rect, ext; tol) : GraticuleLine[]
+        (vcat(lon, lat), graticule_points(lon), graticule_points(lat))
+    end
+    ComputePipeline.map!(g, [:minor_graticule, :frame, :finallimits, :rim_pieces], :minor_exits) do lines, f, lims, pieces
+        exits(lines, f, Rect2d(lims), pieces; minor = true)
+    end
+    ComputePipeline.map!(g, [:frame, :finallimits, :maskoutside], :mask_polygons) do f, lims, mask
+        mask ? mask_polygons(f, Rect2d(lims)) : Polygon{2, Float64}[]
     end
     # where each graticule line meets the carrier lines interior labels sit beside
     ComputePipeline.map!(g, [:carriers, :xtickvalues, :ytickvalues, :view, :transform, :finallimits,
@@ -319,16 +350,31 @@ function build_graph!(ax::GeoAxis)
     end
     # the fancy band, swept along the frame in pixels between consecutive tick
     # exits, with a corner cell in the background colour at every run corner
-    ComputePipeline.map!(g, [:frame, :exits, :finallimits, :ticklabelminangle, :projectionview, :viewport, :band, :framecolors],
-                         [:bands, :band_polygons, :band_colors]) do f, ex, lims, minangle, pv, vp, band, colors
+    ComputePipeline.map!(g, [:frame, :exits, :minor_exits, :xminorticksvisible, :yminorticksvisible, :finallimits,
+                             :ticklabelminangle, :projectionview, :viewport, :band, :framecolors],
+                         [:bands, :band_polygons, :band_colors]) do f, ex, mex, xmv, ymv, lims, minangle, pv, vp, band, colors
         band > 0 || return (FrameBands(), Vector{Point2d}[], RGBAf[])
         m = PixelMap(pv, vp)
         loops = [Point2d[m(p) for p in lp] for lp in f.loops]
-        epx = [(e.loop, e.edge, m(e.p)) for e in band_exits(ex, Rect2d(lims), minangle)]
+        # visible minor ticks segment the band too
+        marks = vcat(ex, Exit[e for e in mex if (e.family === :lon ? xmv : ymv)])
+        epx = [(e.loop, e.edge, m(e.p)) for e in band_exits(marks, Rect2d(lims), minangle)]
         cols = RGBAf[Makie.to_color(c) for c in colors]
         b = frame_bands(loops, f.tags, f.source, epx, band, cols; outward = pixel_orientation(m))
         bg = cols[min(2, end)]
         (b, vcat(b.polygons, b.cells), vcat(b.colors, fill(bg, length(b.cells))))
+    end
+    # minor stubs: shorter ticks at the minor exits, none on a fancy frame
+    ComputePipeline.map!(g, [:minor_exits, :frame, :finallimits, :projectionview, :viewport, :ticklabelminangle,
+                             :xaxisposition, :yaxisposition, :xminorticksize, :yminorticksize, :xminortickalign, :yminortickalign,
+                             :xminorticksvisible, :yminorticksvisible, :band],
+                         [:xminorstubs, :yminorstubs]) do mex, f, lims, pv, vp, minangle, xpos, ypos, xs, ys, xa, ya, xv, yv, band
+        (band == 0 && !isempty(mex)) || return (Point2d[], Point2d[])
+        m = PixelMap(pv, vp)
+        fpx = [Point2d[m(p) for p in lp] for lp in f.loops]
+        stubs = minor_stubs(mex, fpx, m, Rect2d(lims), minangle, xpos, ypos,
+            (; lon = (; size = xs, align = xa, visible = xv), lat = (; size = ys, align = ya, visible = yv)))
+        (stubs[:lon], stubs[:lat])
     end
     # the axis labels sit outside the tick reach on their side of the viewport
     ComputePipeline.map!(g, [:viewport, :protrusion_bound, :fixed_reach, :axislabels],
@@ -347,9 +393,11 @@ end
     decorations(ax::GeoAxis) -> NamedTuple
 
 The axis' current decoration state, read back from the graph: the dest-space
-`frame`, `extent`, tick sets, `graticule`, `exits`, `labels`, the protrusion
-`bound` (the tick reach), the pixel-space `pixels`, and `suppressed` (every
-tick not drawn, with its reason, from both levels), with `targetlimits`,
+`frame`, `extent`, tick sets (majors and minors), `graticule`, `exits`,
+`labels`, the protrusion `bound` (the tick reach), the pixel-space `pixels`,
+and `suppressed` (every tick not drawn, with its reason, from both levels),
+the `minor_graticule`, `minor_exits` and pixel `minor_stubs` (empty while
+minors are hidden), the `mask` polygons, with `targetlimits`,
 `finallimits`, `view`, `transform`, `viewport`, the carrier `crossings`, the
 `interiorlabels` mode with the resolved `interiorlabelsize` per family and
 `interiorlabelrotation`, the `framestyle` and the fancy `bands` beside them.
@@ -369,9 +417,17 @@ decorations(ax::GeoAxis) = (;
     yticks = ax.graph[:yticks][],
     xtickvalues = ax.graph[:xtickvalues][],
     ytickvalues = ax.graph[:ytickvalues][],
+    xminorticks = ax.graph[:xminorticks][],
+    yminorticks = ax.graph[:yminorticks][],
     carriers = ax.graph[:carriers][],
     graticule = ax.graph[:graticule][],
+    minor_graticule = ax.graph[:minor_graticule][],
     exits = ax.graph[:exits][],
+    minor_exits = ax.graph[:minor_exits][],
+    minor_stubs = (; lon = ax.graph[:xminorstubs][], lat = ax.graph[:yminorstubs][]),
+    xminorticksvisible = ax.xminorticksvisible[],
+    yminorticksvisible = ax.yminorticksvisible[],
+    mask = ax.graph[:mask_polygons][],
     labels = ax.graph[:labels][],
     bound = ax.graph[:protrusion_bound][],
     pixels = ax.graph[:pixels][],

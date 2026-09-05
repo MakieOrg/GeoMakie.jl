@@ -1,5 +1,5 @@
 #=
-# The spine and the fancy band
+# The spine, the fancy band, and the mask
 
 The spine is the frame drawn as a stroke, in the block scene in pixel space
 (as Makie's `Axis` draws its spines), so the whole stroke is visible where the
@@ -21,6 +21,12 @@ single run (an orthographic limb, a polar limit circle) has no corners and
 alternates all the way round; two colours cannot alternate around an odd
 number of exits, so its closing band is split at the middle, and that one
 boundary is not at an exit and is recorded as such.
+
+The mask is the limits rectangle minus the map body, filled in the axis
+background colour and drawn over the plots: the axis scene clips plots to the
+rectangular viewport, so on a frame that is not the viewport (a lon/lat-limited
+region, a limb, a pseudocylindrical outline) data beyond the frame would
+otherwise be drawn out to the rectangle, over the tick labels.
 =#
 
 const BAND_MERGE_PX = 1.0       # band boundaries closer than this are one boundary
@@ -301,4 +307,48 @@ function frame_bands(loops::Vector{Vector{Point2d}}, exits, width::Real, colors:
     tags = [fill(:limb, length(lp)) for lp in loops]
     srcs = [ones(Int, length(lp)) for lp in loops]
     return frame_bands(loops, tags, srcs, exits, width, colors; outward)
+end
+
+# ---- the mask -----------------------------------------------------------------
+
+"How far the mask's outer ring reaches past the limits rectangle, as a fraction of the extent (the scene clips it away)."
+const MASK_INFLATE = 0.05
+
+"Twice the signed area of a closed loop: positive when counter-clockwise."
+function _signed_area2(lp::Vector{Point2d})
+    n = length(lp)
+    return sum(lp[i][1] * lp[mod1(i + 1, n)][2] - lp[mod1(i + 1, n)][1] * lp[i][2] for i in 1:n; init = 0.0)
+end
+
+"""
+    mask_polygons(frame, rect) -> Vector{Polygon{2, Float64}}
+
+The region of the limits rectangle `rect` outside the map body, as polygons
+in dest space: the rectangle (inflated by `MASK_INFLATE`, so a frame edge on
+the rectangle never coincides with the mask's outer ring; the scene clips the
+excess) with every map loop of the frame as a hole, plus every hole loop of
+the frame (a region the map does not cover, wound clockwise) filled on its
+own.  Empty when the frame is the rectangle itself (every edge `:viewport`),
+so the mask is a no-op there; the whole rectangle when the frame has no loop
+(the rectangle lies off the map).
+"""
+function mask_polygons(fr::Frame, rect::Rect2d)
+    out = Polygon{2, Float64}[]
+    (!isempty(fr.loops) && all(t -> t === :viewport, edge_tags(fr))) && return out
+    w = widths(rect)
+    d = MASK_INFLATE * max(maximum(w), 1e-300)
+    x0, y0 = minimum(rect) .- d
+    x1, y1 = maximum(rect) .+ d
+    ring = Point2d[(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    holes = Vector{Point2d}[]
+    for lp in fr.loops
+        length(lp) >= 3 || continue
+        if _signed_area2(lp) >= 0
+            push!(holes, copy(lp))
+        else
+            push!(out, Polygon(reverse(lp)))
+        end
+    end
+    pushfirst!(out, isempty(holes) ? Polygon(ring) : Polygon(ring, holes))
+    return out
 end

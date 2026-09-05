@@ -320,6 +320,9 @@ every graticule line is tangent to an orthographic limb there and a planar
 angle would call all of them grazing.  On a `:pole` edge the angle is 90° (a
 pole line is a parallel drawn as a line), and on a `:viewport` edge it is the
 planar angle between the last chord and the straight edge.
+
+`minor` marks the exit of a minor graticule line: a stub and a band boundary,
+never a label.
 """
 struct Exit
     family::Symbol
@@ -332,9 +335,10 @@ struct Exit
     angle::Float64
     tangent::Vec2d
     sphere::Vec3d
+    minor::Bool
 end
-Exit(family, value, p, loop, edge, tag, normal, angle, tangent) =
-    Exit(family, value, p, loop, edge, tag, normal, angle, tangent, NO_SPHERE_POINT)
+Exit(family, value, p, loop, edge, tag, normal, angle, tangent, sphere::Vec3d = NO_SPHERE_POINT) =
+    Exit(family, value, p, loop, edge, tag, normal, angle, tangent, sphere, false)
 
 "Outward unit normal of the edge `a → b` of a loop traversed with the map on its left."
 function outward_normal(a, b)
@@ -455,7 +459,8 @@ function sphere_angle(family::Symbol, value::Real, q, pieces::Vector{RimPiece}, 
     return rad2deg(asin(clamp(norm(_cross3(tg, tr)) / (ng * nr), 0.0, 1.0)))
 end
 
-function _exit_at(l::GraticuleLine, k::Int, atstart::Bool, fr::Frame, idx::FrameIndex, tol, pieces::Vector{RimPiece})
+function _exit_at(l::GraticuleLine, k::Int, atstart::Bool, fr::Frame, idx::FrameIndex, tol, pieces::Vector{RimPiece};
+                  minor::Bool = false)
     pc = l.pieces[k]
     n = length(pc)
     n >= 2 || return nothing
@@ -483,16 +488,18 @@ function _exit_at(l::GraticuleLine, k::Int, atstart::Bool, fr::Frame, idx::Frame
         sa = sphere_angle(l.family, l.value, sp, pieces, fr.source[loop][edge])
         sa === nothing || (angle = sa)
     end
-    return Exit(l.family, l.value, p, loop, edge, tag, nrm, angle, tangent, sp)
+    return Exit(l.family, l.value, p, loop, edge, tag, nrm, angle, tangent, sp, minor)
 end
 
 """
-    exits(lines, frame, rect, pieces = RimPiece[]) -> Vector{Exit}
+    exits(lines, frame, rect, pieces = RimPiece[]; minor = false) -> Vector{Exit}
 
 Every piece endpoint that lies on the frame.  `pieces` is `rim(view)`, used to
-measure exit angles on the sphere.
+measure exit angles on the sphere; `minor` marks the exits as those of minor
+lines.
 """
-function exits(lines::Vector{GraticuleLine}, fr::Frame, rect::Rect2d, pieces::Vector{RimPiece} = RimPiece[])
+function exits(lines::Vector{GraticuleLine}, fr::Frame, rect::Rect2d, pieces::Vector{RimPiece} = RimPiece[];
+               minor::Bool = false)
     out = Exit[]
     isempty(fr.loops) && return out
     idx = FrameIndex(fr, rect)
@@ -500,7 +507,7 @@ function exits(lines::Vector{GraticuleLine}, fr::Frame, rect::Rect2d, pieces::Ve
     for l in lines, k in eachindex(l.pieces)
         l.closed[k] && continue
         for atstart in (true, false)
-            e = _exit_at(l, k, atstart, fr, idx, tol, pieces)
+            e = _exit_at(l, k, atstart, fr, idx, tol, pieces; minor)
             e === nothing || push!(out, e)
         end
     end

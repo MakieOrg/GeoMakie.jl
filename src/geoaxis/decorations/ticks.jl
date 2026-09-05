@@ -35,7 +35,8 @@ end
 The default tick finder of `GeoAxis`.  The major step is the first `ladder`
 entry not finer than `target_em` ems of carrier length per label; if that
 leaves fewer than `floor` lines the ladder is walked finer.  `minors` pairs a
-minor step with each major step (consumed once minor grids are drawn).
+minor step with each major step: the positions of the minor graticule and
+minor ticks when `x/yminorticks` is `automatic`.
 """
 Base.@kwdef struct GeographicTicks
     ladder::Vector{Float64} = GEOGRAPHIC_LADDER
@@ -116,9 +117,12 @@ function tickvalues(f::LadderTicks, ext::Tuple, carrier_px::Real, fontsize::Real
         majors = ladder_multiples(major, lo, hi)
     end
     minor = get(f.minors, major, nothing)
-    minors = minor === nothing ? Float64[] : setdiff(ladder_multiples(minor, lo, hi), majors)
+    minors = minor === nothing ? Float64[] :
+        span >= 360 - 1e-9 ? ladder_multiples(minor, -180.0 + 1e-9, 180.0) : ladder_multiples(minor, lo, hi)
     wrap && (majors = unique!(wrap_longitude.(majors)))
     wrap && (minors = unique!(wrap_longitude.(minors)))
+    sorted = sort(majors)
+    filter!(v -> !_is_major(v, sorted), minors)
     return (majors, minors)
 end
 
@@ -144,6 +148,33 @@ end
 "Tick labels supplied with the values, or `nothing`."
 ticklabels_of(::Any) = nothing
 ticklabels_of(tl::Tuple{<:AbstractVector, <:AbstractVector}) = String[string(s) for s in tl[2]]
+
+"Is `v` one of the sorted `majors` (to a nanodegree)?"
+_is_major(v, majors) = (i = searchsortedfirst(majors, v - 1e-9); i <= length(majors) && abs(majors[i] - v) <= 1e-9)
+
+"""
+    minor_tickvalues(minorticks, paired, majors, (lo, hi); wrap = false) -> Vector{Float64}
+
+The minor tick values of one direction: `paired` (the finder's own minors,
+`nothing` for a finder without any) when `minorticks` is `automatic`, else
+Makie's `get_minor_tickvalues` of `minorticks` (an `IntervalsBetween`, or a
+vector of values) over the sorted `majors` within `lo..hi`.  Minors fill the
+extent as they do on `Axis`: between consecutive majors, and beyond the
+outermost ones at the same spacing (`IntervalsBetween`'s `mirror`).  A minor
+that coincides with a major is dropped, so no position is drawn twice.
+"""
+function minor_tickvalues(minorticks, paired, majors::Vector{Float64}, ext::Tuple; wrap::Bool = false)
+    lo, hi = float(ext[1]), float(ext[2])
+    vals = if minorticks isa Makie.Automatic
+        paired === nothing ? Float64[] : convert(Vector{Float64}, paired)
+    else
+        raw = Makie.get_minor_tickvalues(minorticks, identity, sort(majors), lo, hi)
+        Float64[round(float(v); digits = 9) for v in raw if lo - 1e-9 <= v <= hi + 1e-9]
+    end
+    wrap && (vals = wrap_longitude.(vals))
+    sorted = sort(wrap ? wrap_longitude.(majors) : majors)
+    return unique!(Float64[v for v in vals if !_is_major(v, sorted)])
+end
 
 # Makie's own interface, so the finders also work on an `Axis` (no pixel
 # information there: about eight lines per direction).

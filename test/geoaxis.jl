@@ -158,6 +158,8 @@ end
     @test ax.xgridcolor[] == a.xgridcolor[] && ax.ygridcolor[] == a.ygridcolor[]
     @test ax.xminorgridcolor[] == a.xminorgridcolor[]
     @test ax.framestyle[] === :plain && ax.gridbehind[]
+    @test Makie.to_color(ax.backgroundcolor[]) == Makie.to_color(a.backgroundcolor[]) && ax.maskoutside[]
+    @test !ax.xminorgridvisible[] && !ax.xminorticksvisible[] && ax.xminorticks[] === Makie.automatic
 end
 
 @testset "hidedecorations! parity" begin
@@ -173,6 +175,12 @@ end
     @test ax.ylabelvisible[] && ax.yticklabelsvisible[]
     hideydecorations!(ax; ticklabels = false, ticks = false)
     @test !ax.ylabelvisible[] && ax.yticklabelsvisible[] && ax.yticksvisible[] && !ax.ygridvisible[]
+    # the minor branches, as on Axis
+    ax.xminorgridvisible = true; ax.xminorticksvisible = true; ax.yminorgridvisible = true; ax.yminorticksvisible = true
+    hidexdecorations!(ax; minorgrid = false)
+    @test ax.xminorgridvisible[] && !ax.xminorticksvisible[]
+    hideydecorations!(ax; minorticks = false)
+    @test !ax.yminorgridvisible[] && ax.yminorticksvisible[]
     # hidedecorations! zeroes every protrusion but the title's
     hidedecorations!(ax)
     Makie.update_state_before_display!(fig)

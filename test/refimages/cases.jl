@@ -38,6 +38,12 @@ const EXTRA_RENDERS = [
     "issue349_row" => () -> build_issue349()[1],
     # issue 268: a grid of GeoAxes packs like a grid of Axes
     "issue268_grid" => () -> build_issue268()[1],
+    # the mask (Phase 8): markers straddling the frame are cut at it, under the spine and the labels
+    "lcc_title_scatter" => () -> begin
+        fig, ax = build_case(decoration_case(DECORATION_CASES, "lcc_title"))
+        scatter!(ax, [-125.0, -68.0, -95.0, -95.0], [50.0, 50.0, 21.0, 52.0]; markersize = 40, color = :orange)
+        fig
+    end,
     # issue 281: the exact space after tight_ticklabel_spacing! on a limb
     "ortho_tight" => () -> begin
         fig, ax = build_case(decoration_case(DECORATION_CASES, "ortho"))

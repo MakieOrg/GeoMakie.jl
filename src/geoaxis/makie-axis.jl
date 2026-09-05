@@ -529,14 +529,15 @@ function Makie.limits!(ax::GeoAxis, xlims, ylims)
 end
 
 """
-    hidexdecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true)
+    hidexdecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true, minorgrid = true, minorticks = true)
 
 Hide the x (longitude) decorations: the axis label, the tick labels, the
-tick marks and the graticule.  Keyword arguments keep a kind visible, as on
-`Axis`.  The spine stays; `hidespines!` removes it.
+tick marks, the graticule and the minor graticule and ticks.  Keyword
+arguments keep a kind visible, as on `Axis`.  The spine and the mask outside
+the frame stay; `hidespines!` removes the spine, `maskoutside = false` the mask.
 """
 function Makie.hidexdecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true,
-    grid = true,#= minorgrid = true, minorticks = true=#)
+    grid = true, minorgrid = true, minorticks = true)
     if label
         ax.xlabelvisible[] = false
     end
@@ -549,24 +550,25 @@ function Makie.hidexdecorations!(ax::GeoAxis; label = true, ticklabels = true, t
     if grid
         ax.xgridvisible[] = false
     end
-    #=if minorgrid
+    if minorgrid
         ax.xminorgridvisible[] = false
     end
     if minorticks
         ax.xminorticksvisible[] = false
-    end=#
+    end
     return
 end
 
 """
-    hideydecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true)
+    hideydecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true, minorgrid = true, minorticks = true)
 
 Hide the y (latitude) decorations: the axis label, the tick labels, the
-tick marks and the graticule.  Keyword arguments keep a kind visible, as on
-`Axis`.  The spine stays; `hidespines!` removes it.
+tick marks, the graticule and the minor graticule and ticks.  Keyword
+arguments keep a kind visible, as on `Axis`.  The spine and the mask outside
+the frame stay; `hidespines!` removes the spine, `maskoutside = false` the mask.
 """
 function Makie.hideydecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true,
-    grid = true,#= minorgrid = true, minorticks = true=#)
+    grid = true, minorgrid = true, minorticks = true)
     if label
         ax.ylabelvisible[] = false
     end
@@ -579,17 +581,17 @@ function Makie.hideydecorations!(ax::GeoAxis; label = true, ticklabels = true, t
     if grid
         ax.ygridvisible[] = false
     end
-    #=if minorgrid
+    if minorgrid
         ax.yminorgridvisible[] = false
     end
     if minorticks
         ax.yminorticksvisible[] = false
-    end=#
+    end
     return
 end
 
 """
-    hidedecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true)
+    hidedecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true, minorgrid = true, minorticks = true)
 
 Hide the decorations of both directions; see `hidexdecorations!`.  With
 everything hidden the axis reserves no layout space beyond its title.

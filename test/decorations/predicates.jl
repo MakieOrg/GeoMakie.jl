@@ -425,7 +425,9 @@ function frame_band(name, d)
         return out
     end
     m = GM.PixelMap(d.projectionview, d.viewport)
-    marks = [m(e.p) for e in GM.band_exits(d.exits, d.finallimits, d.ticklabelminangle)]
+    # visible minor ticks segment the band as well
+    minor = [e for e in d.minor_exits if (e.family === :lon ? d.xminorticksvisible : d.yminorticksvisible)]
+    marks = [m(e.p) for e in GM.band_exits(vcat(d.exits, minor), d.finallimits, d.ticklabelminangle)]
     allb = reduce(vcat, b.boundaries; init = Point2d[])
     length(b.polygons) == length(allb) == length(b.colors) == length(b.loop) == length(b.run) ||
         push!(out, Violation(name, :frame_band, "$(length(b.polygons)) bands for $(length(allb)) boundaries"))
@@ -644,3 +646,136 @@ end
 
 "Every Phase 7 predicate on one built axis."
 phase7_violations(name, ax; tight::Bool = false) = vcat(layout_no_collision(name, [ax]), layout_protrusions(name, ax; tight))
+
+# ---- Phase 8: minor graticule, minor ticks, and the mask ---------------------------
+
+"""
+Per family: no minor coincides with a major, every minor lies within the
+visible extent, the minor positions are distinct and sorted, and with the
+finder's own minors (`x/yminorticks = automatic` on a ladder finder) every
+major and minor is a multiple of the paired minor step of the chosen major
+step, so the minors fill the extent between consecutive majors (and beyond
+the outermost ones) at one spacing.  The drawn minor lines are exactly the
+minor positions when the family's minor grid or ticks show, none otherwise;
+every minor exit is marked `minor`; no label and no carrier is a minor.
+"""
+function minors_between_majors(name, d, shown = (; lon = true, lat = true))
+    out = Violation[]
+    for (family, ts, finder, mt) in ((:lon, d.xtickvalues, d.xticks, d.xminorticks), (:lat, d.ytickvalues, d.yticks, d.yminorticks))
+        majors = sort(ts.values); minors = ts.minors
+        lo, hi = family === :lon ? GM.lon_range(d.extent) : GM.lat_range(d.extent)
+        # ascending along the extent: a longitude run may drop once where it crosses the antimeridian
+        drops = count(i -> minors[i + 1] < minors[i], 1:(length(minors) - 1))
+        allunique(minors) && drops <= (family === :lon && !d.extent.full_turn ? 1 : 0) ||
+            push!(out, Violation(name, :minors_between_majors, "$family minors are not sorted and distinct"))
+        for m in minors
+            any(v -> abs(v - m) <= 1e-9, majors) &&
+                push!(out, Violation(name, :minors_between_majors, "$family minor $m is a major"))
+            inside = family === :lon && d.extent.full_turn ? (-180 < m <= 180) :
+                family === :lon ? GM._lon_in_range(m, lo, hi) : (lo - 1e-9 <= m <= hi + 1e-9)
+            inside || push!(out, Violation(name, :minors_between_majors, "$family minor $m outside extent $((lo, hi))"))
+        end
+        if mt isa Makie.Automatic && finder isa GM.LadderTicks && length(majors) >= 2 && !isempty(minors)
+            step = minimum(diff(majors))
+            minor = get(finder.minors, step, nothing)
+            minor === nothing && (push!(out, Violation(name, :minors_between_majors, "$family major step $step has no paired minor")); continue)
+            for v in vcat(majors, minors)
+                abs(v / minor - round(v / minor)) < 1e-6 ||
+                    push!(out, Violation(name, :minors_between_majors, "$family $v is not a multiple of the minor step $minor"))
+            end
+            # between two consecutive majors every minor position is present
+            for (a, b) in zip(majors[1:(end - 1)], majors[2:end])
+                b - a > step + 1e-9 && continue        # the wrap gap of a full turn
+                want = round(Int, (b - a) / minor) - 1
+                got = count(m -> a < m < b, minors)
+                got == want || push!(out, Violation(name, :minors_between_majors, "$family has $got minors between $a and $b, expected $want"))
+            end
+        end
+        drawn = Set(l.value for l in d.minor_graticule if l.family == family)
+        if shown[family]
+            issubset(drawn, Set(minors)) ||
+                push!(out, Violation(name, :minors_between_majors, "$family draws minor lines $(setdiff(drawn, minors)) that are not minors"))
+            # a minor is only missing when its line does not project (the major graticule drops such lines too)
+            rect = Rect2d(d.finallimits)
+            for m in minors
+                m in drawn && continue
+                isempty(GM.graticule_lines(family, [m], d.view, d.transform, rect, d.extent; tol = GM.frame_tolerance(rect))) ||
+                    push!(out, Violation(name, :minors_between_majors, "$family minor $m has no minor line"))
+            end
+        else
+            isempty(drawn) || push!(out, Violation(name, :minors_between_majors, "$family draws minor lines while hidden"))
+        end
+    end
+    all(e -> e.minor, d.minor_exits) || push!(out, Violation(name, :minors_between_majors, "a minor exit is not marked minor"))
+    any(e -> e.minor, d.exits) && push!(out, Violation(name, :minors_between_majors, "a major exit is marked minor"))
+    any(l -> l.exit.minor, d.labels) && push!(out, Violation(name, :minors_between_majors, "a minor line is labelled"))
+    for l in d.labels
+        v = l.exit.value; ts = l.exit.family === :lon ? d.xtickvalues : d.ytickvalues
+        v in ts.values || push!(out, Violation(name, :minors_between_majors, "label $(l.text) is not at a major"))
+    end
+    isempty(d.xtickvalues.values) || d.crossings.lat_carrier in d.xtickvalues.values ||
+        push!(out, Violation(name, :minors_between_majors, "the carrier meridian $(d.crossings.lat_carrier) is not a major"))
+    for (p, _) in d.crossings.lon
+        (isempty(d.ytickvalues.values) || p in d.ytickvalues.values || p == 0.0) ||
+            push!(out, Violation(name, :minors_between_majors, "the carrier parallel $p is not a major"))
+    end
+    return out
+end
+
+"Every Phase 8 predicate on one built case."
+phase8_violations(name, d, shown = (; lon = true, lat = true)) = minors_between_majors(name, d, shown)
+
+"The dest-space point under the pixel `px` of the axis (the camera fits `finallimits` to the viewport)."
+function dest_at_pixel(d, px)
+    vp = d.viewport; lims = d.finallimits
+    f = (px .- minimum(vp)) ./ widths(vp)
+    return Point2d(minimum(lims) .+ f .* widths(lims))
+end
+
+"The colour of the rendered figure `img` (from `colorbuffer`, rows from the top) at the figure pixel `px`."
+pixel_color(img, px) = img[clamp(size(img, 1) - round(Int, px[2]), 1, size(img, 1)), clamp(round(Int, px[1]) + 1, 1, size(img, 2))]
+
+"""
+    outside_frame_pixel(d; inset = 12) -> Union{Nothing, Point2d}
+
+A pixel inside the axis viewport but outside the frame, `inset` pixels in
+from the viewport corner farthest from the map body; `nothing` when every
+corner lies on the map (the frame is the viewport).
+"""
+function outside_frame_pixel(d; inset = 12)
+    vp = d.viewport
+    x0, y0 = minimum(vp) .+ inset; x1, y1 = maximum(vp) .- inset
+    best = nothing; bd = 0.0
+    for c in (Point2d(x0, y0), Point2d(x1, y0), Point2d(x1, y1), Point2d(x0, y1))
+        GM.inside_loops(d.pixels.frame, c) && continue
+        dist = minimum(polylines_distance([vcat(lp, [lp[1]])], c) for lp in d.pixels.frame; init = Inf)
+        dist > bd && (best = c; bd = dist)
+    end
+    return bd >= inset ? best : nothing
+end
+
+"""
+Render the case with a marker placed inside the viewport but outside the
+frame: with `maskoutside` (the default) the pixels there are the axis
+background, so nothing plotted beyond the frame reaches the tick labels.
+With `maskoutside = false` the marker shows, so the mask is what hides it.
+"""
+function nothing_outside_frame(c::DecorationCase; kw...)
+    out = Violation[]
+    fig, ax = build_case(c; kw...)
+    d = GM.decorations(ax)
+    px = outside_frame_pixel(d)
+    px === nothing && return out              # the frame is the viewport: nothing to mask
+    scatter!(ax, [dest_at_pixel(d, px)]; source = c.dest, markersize = 30, color = :red, strokewidth = 0, reset_limits = false)
+    Makie.update_state_before_display!(fig)
+    img = colorbuffer(fig; px_per_unit = 1)
+    bg = Makie.to_color(ax.backgroundcolor[])
+    col = pixel_color(img, px)
+    same = Makie.Colors.colordiff(Makie.Colors.RGB(col), Makie.Colors.RGB(bg)) < 1
+    if ax.maskoutside[]
+        same || push!(out, Violation(c.name, :nothing_outside_frame, "pixel $px outside the frame is $col, not the background $bg"))
+    else
+        same && push!(out, Violation(c.name, :nothing_outside_frame, "pixel $px outside the frame is the background with the mask off"))
+    end
+    return out
+end

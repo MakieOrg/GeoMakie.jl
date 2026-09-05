@@ -120,3 +120,40 @@ end
     @test GM.format_tickvalues(Makie.automatic, f, :lon, [10.5], nothing) == ["10°30′E"]
     @test GM.format_tickvalues(Makie.automatic, f, :lat, [-0.5], nothing) == ["0°30′S"]
 end
+
+@testset "minors" begin
+    f = GeographicTicks()
+    # every ladder step carries a paired minor step that divides it
+    for step in f.ladder
+        @test haskey(f.minors, step)
+        m = f.minors[step]
+        @test m < step && abs(step / m - round(step / m)) < 1e-9
+    end
+    # the paired minors fill the extent between and beyond the majors, never on one
+    vals, minors = GM.tickvalues(f, (-10, 30), 400, 16)
+    @test vals == [-10.0, 0.0, 10.0, 20.0, 30.0]
+    @test minors == [-8.0, -6.0, -4.0, -2.0, 2.0, 4.0, 6.0, 8.0, 12.0, 14.0, 16.0, 18.0, 22.0, 24.0, 26.0, 28.0]
+    @test isempty(intersect(vals, minors))
+    vals, minors = GM.tickvalues(f, (-9.5, 30.5), 400, 16)
+    @test vals == [0.0, 10.0, 20.0, 30.0] && first(minors) == -8.0 && last(minors) == 28.0
+    # a full turn: one minor per position, 180 once (as a major), never -180
+    vals, minors = GM.tickvalues(f, (-180, 180), 600, 16; wrap = true)
+    @test all(v -> -180 < v <= 180, minors) && isempty(intersect(vals, minors))
+    @test length(minors) == length(unique(minors))
+    @test 180.0 in vals && !(180.0 in minors) && !(-180.0 in minors)
+    # `automatic` takes the paired minors; a finder without any gives none
+    @test GM.minor_tickvalues(Makie.automatic, minors, vals, (-180, 180); wrap = true) == minors
+    @test GM.minor_tickvalues(Makie.automatic, nothing, [0.0, 10.0], (0, 10)) == Float64[]
+    # IntervalsBetween on user majors: Makie's values, mirrored past the ends, none on a major
+    m = GM.minor_tickvalues(IntervalsBetween(2), nothing, [0.0, 10.0, 20.0], (-5, 25))
+    @test m == [-5.0, 5.0, 15.0, 25.0]
+    m = GM.minor_tickvalues(IntervalsBetween(5, false), nothing, [0.0, 10.0], (0, 10))
+    @test m == [2.0, 4.0, 6.0, 8.0]
+    # a vector of values is used as given, minus the majors and what lies outside the extent
+    @test GM.minor_tickvalues([2.5, 5.0, 10.0, 12.5], nothing, [0.0, 10.0], (0, 11)) == [2.5, 5.0]
+    # the arc-minute ladder pairs minutes with minutes
+    a = ArcMinuteTicks()
+    @test a.minors[30 / 60] == 10 / 60 && a.minors[1.0] == 30 / 60
+    vals, minors = GM.tickvalues(a, (10, 11), 800, 16)
+    @test !isempty(minors) && isempty(intersect(vals, minors)) && all(v -> 10 <= v <= 11, minors)
+end

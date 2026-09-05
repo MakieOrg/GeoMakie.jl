@@ -631,18 +631,28 @@ function place(exits::Vector{Exit}, fr::Frame, rect::Rect2d, lines::Vector{Grati
 end
 
 """
+    stub_exits(exits, rect, minangle, xaxisposition, yaxisposition) -> Vector{Exit}
+
+The exits a tick may mark: those the family rule admits on the given axis
+positions, never a convergent pole point or a grazing exit.
+"""
+function stub_exits(exits::Vector{Exit}, rect::Rect2d, minangle::Real, xaxisposition::Symbol, yaxisposition::Symbol)
+    extent = max(maximum(widths(rect)), 1e-300)
+    convergent = convergent_exits(exits, ON_FRAME_FRAC * extent; poletol = POLE_CONVERGE_FRAC * extent)
+    return Exit[e for (k, e) in enumerate(exits)
+                if admits(e, xaxisposition, yaxisposition) && !(k in convergent) && e.angle >= minangle]
+end
+
+"""
     band_exits(exits, rect, minangle) -> Vector{Exit}
 
 The exits that mark the frame for the `:fancy` band: the family that varies
 along a straight edge (longitudes on horizontal viewport edges, latitudes on
 vertical ones, whichever side the labels are on), both families elsewhere,
-never a convergent pole point or a grazing exit.
+never a convergent pole point or a grazing exit.  Minor exits, when given,
+segment the band like major ones.
 """
-function band_exits(exits::Vector{Exit}, rect::Rect2d, minangle::Real)
-    extent = max(maximum(widths(rect)), 1e-300)
-    convergent = convergent_exits(exits, ON_FRAME_FRAC * extent; poletol = POLE_CONVERGE_FRAC * extent)
-    return Exit[e for (k, e) in enumerate(exits) if admits(e, :both, :both) && !(k in convergent) && e.angle >= minangle]
-end
+band_exits(exits::Vector{Exit}, rect::Rect2d, minangle::Real) = stub_exits(exits, rect, minangle, :both, :both)
 
 function _edge_middle_distance(fr::Frame, e::Exit, extent)
     lp = fr.loops[e.loop]
@@ -725,6 +735,32 @@ function pixel_direction(m::PixelMap, p, d)
     n = norm(q)
     n <= 1e-300 && return Vec2d(0, 0)
     return Vec2d(q / n)
+end
+
+"""
+    minor_stubs(exits, frame_px, m, rect, minangle, xaxisposition, yaxisposition, ticks) -> Dict{Symbol, Vector{Point2d}}
+
+The minor tick stubs per family, as segment endpoint pairs in pixels: one at
+every minor exit the family rule admits (as for major ticks, `stub_exits`),
+of the family's `(size, align, visible)` in `ticks`.  `m` maps dest to
+pixels; a stub whose outer end lands on the map (the far side of a cut) is
+not drawn.
+"""
+function minor_stubs(exits::Vector{Exit}, fpx::Vector{Vector{Point2d}}, m::PixelMap, rect::Rect2d, minangle::Real,
+                     xaxisposition::Symbol, yaxisposition::Symbol, ticks)
+    stubs = Dict{Symbol, Vector{Point2d}}(:lon => Point2d[], :lat => Point2d[])
+    scale = 1e-3 * max(maximum(widths(rect)), 1e-300)
+    for e in stub_exits(exits, rect, minangle, xaxisposition, yaxisposition)
+        tk = ticks[e.family]
+        tk.visible || continue
+        p = m(e.p)
+        u = norm(e.normal) > 1e-300 ? pixel_direction(m, e.p, e.normal * (scale / norm(e.normal))) : Vec2d(0, 0)
+        start = Point2d(p - u * (tk.align * tk.size))
+        stop = Point2d(start + u * tk.size)
+        inside_loops(fpx, stop) && continue
+        push!(stubs[e.family], start, stop)
+    end
+    return stubs
 end
 
 """

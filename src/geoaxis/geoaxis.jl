@@ -200,6 +200,10 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         framecolors = (:black, :white)
         "Draw the graticule behind the plots (`true`, as `Axis` draws its grid) or in front of them."
         gridbehind::Bool = true
+        "The axis background colour: fills the axis area, the mask outside the frame, and the interior label halo when `interiorlabelhalocolor` is `automatic`."
+        backgroundcolor = @inherit(:backgroundcolor, :white)
+        "Cover whatever plots draw outside the frame (between the map body and the rectangular viewport) with the background colour, so data beyond a lon/lat-limited frame or a limb never runs under the tick labels.  A no-op when the frame is the viewport rectangle."
+        maskoutside::Bool = true
         "Controls if the x grid lines are visible."
         xgridvisible::Bool = true
         "Controls if the y grid lines are visible."
@@ -226,8 +230,8 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         xminortickwidth::Float64 = 1f0
         "The tick color of x minor ticks"
         xminortickcolor::RGBAf = :black
-        "The tick locator for the x minor ticks"
-        xminorticks = IntervalsBetween(2)
+        "The x (longitude) minor ticks: `automatic` is the paired minor step of a `GeographicTicks` / `ArcMinuteTicks` finder (`10°` majors carry `2°` minors, `30°` carry `10°`, …; none for other finders); an `IntervalsBetween` or a vector of values works too.  Minor lines are never labelled."
+        xminorticks = Makie.automatic
         "Controls if minor ticks on the y axis are visible"
         yminorticksvisible::Bool = false
         "The alignment of y minor ticks on the axis spine"
@@ -238,8 +242,8 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         yminortickwidth::Float64 = 1f0
         "The tick color of y minor ticks"
         yminortickcolor::RGBAf = :black
-        "The tick locator for the y minor ticks"
-        yminorticks = IntervalsBetween(2)
+        "The y (latitude) minor ticks: `automatic` is the paired minor step of a `GeographicTicks` / `ArcMinuteTicks` finder; an `IntervalsBetween` or a vector of values works too.  Minor lines are never labelled."
+        yminorticks = Makie.automatic
         "Controls if the x minor grid lines are visible."
         xminorgridvisible::Bool = false
         "Controls if the y minor grid lines are visible."
@@ -306,7 +310,7 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         interiorlabelrotation = Makie.automatic
         "Draw interior labels over a halo so they stay legible over the graticule and plotted data."
         interiorlabelhalo::Bool = true
-        "The halo colour; `automatic` is the axis background."
+        "The halo colour; `automatic` is the axis `backgroundcolor`."
         interiorlabelhalocolor = Makie.automatic
         "The halo width in pixels."
         interiorlabelhalowidth::Float64 = 4f0
@@ -342,7 +346,19 @@ function Makie.initialize_block!(axis::GeoAxis)
         transform_inv_obs[] = Makie.inverse_transform(trans)
     end
 
-    # The graticule, in dest space from the graph, behind the plots unless asked otherwise.
+    # The background fills the axis area, as on Axis, under everything.
+    backgroundplot = poly!(axis.blockscene, scene.viewport; color=axis.backgroundcolor, strokewidth=0,
+        inspectable=false)
+    translate!(backgroundplot, 0, 0, BACKGROUND_Z)
+
+    # The graticule, in dest space from the graph, behind the plots unless
+    # asked otherwise; the minor lines first, so the major ones draw over them.
+    xminorgridplot = lines!(scene, graph[:xminorgrid_points]; color=axis.xminorgridcolor, linewidth=axis.xminorgridwidth,
+        visible=axis.xminorgridvisible, linestyle=axis.xminorgridstyle, transparency=true, inspectable=false,
+        xautolimits=false, yautolimits=false)
+    yminorgridplot = lines!(scene, graph[:yminorgrid_points]; color=axis.yminorgridcolor, linewidth=axis.yminorgridwidth,
+        visible=axis.yminorgridvisible, linestyle=axis.yminorgridstyle, transparency=true, inspectable=false,
+        xautolimits=false, yautolimits=false)
     longridplot = lines!(scene, graph[:xgrid_points]; color=axis.xgridcolor, linewidth=axis.xgridwidth,
         visible=axis.xgridvisible, linestyle=axis.xgridstyle, transparency=true, inspectable=false,
         xautolimits=false, yautolimits=false)
@@ -351,9 +367,17 @@ function Makie.initialize_block!(axis::GeoAxis)
         xautolimits=false, yautolimits=false)
     on(axis.blockscene, axis.gridbehind; update=true) do behind
         z = behind ? -GRID_Z : GRID_Z
-        translate!(longridplot, 0, 0, z)
-        translate!(latgridplot, 0, 0, z)
+        for p in (xminorgridplot, yminorgridplot, longridplot, latgridplot)
+            translate!(p, 0, 0, z)
+        end
     end
+
+    # The mask: the limits rectangle minus the map body, in the background
+    # colour, over the plots and under the frame, so nothing plotted beyond
+    # the frame reaches the tick labels.  Empty when the frame is the rectangle.
+    maskplot = poly!(scene, graph[:mask_polygons]; color=axis.backgroundcolor, strokewidth=0, visible=axis.maskoutside,
+        inspectable=false, xautolimits=false, yautolimits=false)
+    translate!(maskplot, 0, 0, MASK_Z)
 
     # The spine, the fancy band, tick stubs and labels live in the block scene,
     # in pixels: the block scene is not clipped to the map's viewport, so a
@@ -372,6 +396,12 @@ function Makie.initialize_block!(axis::GeoAxis)
         linewidth=axis.ytickwidth, visible=axis.yticksvisible, inspectable=false)
     translate!(xstubs, 0, 0, TICK_Z)
     translate!(ystubs, 0, 0, TICK_Z)
+    xminorstubs = linesegments!(axis.blockscene, graph[:xminorstubs]; space=:pixel, color=axis.xminortickcolor,
+        linewidth=axis.xminortickwidth, visible=axis.xminorticksvisible, inspectable=false)
+    yminorstubs = linesegments!(axis.blockscene, graph[:yminorstubs]; space=:pixel, color=axis.yminortickcolor,
+        linewidth=axis.yminortickwidth, visible=axis.yminorticksvisible, inspectable=false)
+    translate!(xminorstubs, 0, 0, TICK_Z)
+    translate!(yminorstubs, 0, 0, TICK_Z)
 
     # A user alignment applies as given; the automatic one centres the glyph
     # box on the outward normal, so the position the graph hands out is the centre.
@@ -407,7 +437,7 @@ function Makie.initialize_block!(axis::GeoAxis)
     # Interior labels sit on the map, centred on their own graticule line and
     # turned along it, so they are drawn above the graticule and the plots,
     # over a halo: the same string in the halo colour, stroked, underneath.
-    halocolor = map(axis.blockscene, axis.interiorlabelhalocolor, axis.blockscene.backgroundcolor) do c, bg
+    halocolor = map(axis.blockscene, axis.interiorlabelhalocolor, axis.backgroundcolor) do c, bg
         c isa Makie.Automatic ? Makie.to_color(bg) : Makie.to_color(c)
     end
     halovisible(labelsvisible) = map((h, v) -> h && v, axis.blockscene, axis.interiorlabelhalo, labelsvisible)
@@ -430,12 +460,18 @@ function Makie.initialize_block!(axis::GeoAxis)
 
     elements = Dict{Symbol,Any}()
     setfield!(axis, :elements, elements)
+    elements[:background] = backgroundplot
+    elements[:mask] = maskplot
     elements[:xgrid] = longridplot
     elements[:ygrid] = latgridplot
+    elements[:xminorgrid] = xminorgridplot
+    elements[:yminorgrid] = yminorgridplot
     elements[:spine] = spineplot
     elements[:bands] = bandplot
     elements[:xticks] = xstubs
     elements[:yticks] = ystubs
+    elements[:xminorticks] = xminorstubs
+    elements[:yminorticks] = yminorstubs
     elements[:xticklabels] = lontex
     elements[:yticklabels] = lattex
     elements[:xinteriorlabels] = lonint
@@ -571,10 +607,13 @@ const PROTRUSION_DEPTH_CAP = 8
 "How many times any GeoAxis has written its layout protrusions (a diagnostic read by the tests)."
 const PROTRUSION_WRITES = Ref(0)
 
-# The render order, fixed for every frame style: plots at 0, the graticule
-# behind them (or in front, `gridbehind = false`), then the band, the spine on
-# it, tick stubs, labels, and the interior labels over everything on the map.
+# The render order, fixed for every frame style: the background under all,
+# plots at 0, the graticule behind them (or in front, `gridbehind = false`),
+# the mask over the plots, then the band, the spine on it, tick stubs, labels,
+# and the interior labels over everything on the map.
+const BACKGROUND_Z = -200
 const GRID_Z = 100
+const MASK_Z = 50
 const BAND_Z = 101
 const SPINE_Z = 102
 const TICK_Z = 103
