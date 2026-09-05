@@ -121,29 +121,25 @@ function Makie.reset_limits!(axis::GeoAxis; xauto = true, yauto = true)
     # This is a bit complicated, since the transform function needs x + y, but you may e.g.
     # do `xlimits!(axis, 1, 10)`, so that we don't have y values
     if any(needs_transform)
-        trans = axis.transform_func[]
-        # Fallback to untransformed data limits
-        # TODO, is this always correct?
-        transformed_rect = boundingbox(axis.scene)
-        untransformed_rect = Makie.apply_transform(axis.inv_transform_func[], transformed_rect)
-        fxlim, fylim = Makie.limits(untransformed_rect)
-        fallback_lims = [fxlim..., fylim...]
-        new_lims = [xlims..., ylims...]
-        # Replace values that are already transformed with untransformed values
-        untrans = map(needs_transform, fallback_lims, new_lims) do needs, fallback, new
-            needs ? new : fallback
+        # User limits are a lon/lat quadrangle on the sphere: the view is the
+        # projection's domain cut to it, and the target limits are the bounding
+        # box of that view's projected rim.  Bounds the user left unspecified
+        # span the whole extent in that direction.
+        user_x = needs_transform[1] || needs_transform[2] ? (needs_transform[1] ? xlims[1] : nothing, needs_transform[2] ? xlims[2] : nothing) : nothing
+        user_y = needs_transform[3] || needs_transform[4] ? (needs_transform[3] ? ylims[1] : nothing, needs_transform[4] ? ylims[2] : nothing) : nothing
+        rect = lonlat_limits_rect(axis, user_x, user_y)
+        graph = axis.graph
+        if rect != graph[:lonlat_limits][]
+            ComputePipeline.update!(graph; lonlat_limits = rect)
         end
-        # Now that all values are in source input space, we can transform them again.
-        # We use a rectangle to transform, since that allows us to use Proj's densification.
-        mini, maxi = Makie.apply_transform(trans, Rect2d(Vec2d(untrans[1], untrans[3]), Vec2d(untrans[2] - untrans[1], untrans[4] - untrans[3]))) |> extrema
-        trans_lims = [mini[1], maxi[1], mini[2], maxi[2]]
-        untrans = map(needs_transform, trans_lims, new_lims) do needs, tlim, new
-            needs ? tlim : new
-        end
-        xlims = (untrans[1], untrans[2])
-        ylims = (untrans[3], untrans[4])
+        axis.targetlimits[] = graph[:view_bbox][]
+        return nothing
     end
 
+    graph = axis.graph
+    if graph[:lonlat_limits][] != FULL_LONLAT
+        ComputePipeline.update!(graph; lonlat_limits = FULL_LONLAT)
+    end
     axis.targetlimits[] = Makie.BBox(xlims..., ylims...) # this is in TRANSFORMED space
     nothing
 end
@@ -515,16 +511,35 @@ function Makie.ylims!(ax::GeoAxis, ylims)
     return nothing
 end
 
+"""
+    autolimits!(ax::GeoAxis)
+
+Drop any user limits: the axis returns to the full lon/lat extent of its
+projection (the `:lonlat_limits` input resets to `FULL_LONLAT` in `reset_limits!`).
+"""
+function Makie.autolimits!(ax::GeoAxis)
+    ax.limits[] = (nothing, nothing)
+    return
+end
+
 function Makie.limits!(ax::GeoAxis, xlims, ylims)
     Makie.xlims!(ax, xlims)
     Makie.ylims!(ax, ylims)
     return
 end
 
+"""
+    hidexdecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true, minorgrid = true, minorticks = true)
+
+Hide the x (longitude) decorations: the axis label, the tick labels, the
+tick marks, the graticule and the minor graticule and ticks.  Keyword
+arguments keep a kind visible, as on `Axis`.  The spine and the mask outside
+the frame stay; `hidespines!` removes the spine, `maskoutside = false` the mask.
+"""
 function Makie.hidexdecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true,
-    grid = true,#= minorgrid = true, minorticks = true=#)
+    grid = true, minorgrid = true, minorticks = true)
     if label
-        ax.xticklabelsvisible[] = false
+        ax.xlabelvisible[] = false
     end
     if ticklabels
         ax.xticklabelsvisible[] = false
@@ -535,19 +550,27 @@ function Makie.hidexdecorations!(ax::GeoAxis; label = true, ticklabels = true, t
     if grid
         ax.xgridvisible[] = false
     end
-    #=if minorgrid
+    if minorgrid
         ax.xminorgridvisible[] = false
     end
     if minorticks
         ax.xminorticksvisible[] = false
-    end=#
+    end
     return
 end
 
+"""
+    hideydecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true, minorgrid = true, minorticks = true)
+
+Hide the y (latitude) decorations: the axis label, the tick labels, the
+tick marks, the graticule and the minor graticule and ticks.  Keyword
+arguments keep a kind visible, as on `Axis`.  The spine and the mask outside
+the frame stay; `hidespines!` removes the spine, `maskoutside = false` the mask.
+"""
 function Makie.hideydecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true,
-    grid = true,#= minorgrid = true, minorticks = true=#)
+    grid = true, minorgrid = true, minorticks = true)
     if label
-        ax.yticklabelsvisible[] = false
+        ax.ylabelvisible[] = false
     end
     if ticklabels
         ax.yticklabelsvisible[] = false
@@ -558,24 +581,71 @@ function Makie.hideydecorations!(ax::GeoAxis; label = true, ticklabels = true, t
     if grid
         ax.ygridvisible[] = false
     end
-    #=if minorgrid
+    if minorgrid
         ax.yminorgridvisible[] = false
     end
     if minorticks
         ax.yminorticksvisible[] = false
-    end=#
+    end
     return
 end
 
+"""
+    hidedecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true, minorgrid = true, minorticks = true)
+
+Hide the decorations of both directions; see `hidexdecorations!`.  With
+everything hidden the axis reserves no layout space beyond its title.
+"""
 Makie.hidedecorations!(ax::GeoAxis; kw...) = begin
     hidexdecorations!(ax; kw...)
     hideydecorations!(ax; kw...)
 end
 
+"""
+    tight_ticklabel_spacing!(ax::GeoAxis; passes = 3) -> RectSides{Float32}
+
+Reserve exactly the space the drawn decorations occupy.  The layout
+normally receives a bound computed before the viewport is known, which on a
+curved frame over-reserves by the distance between the outermost label and
+the frame's extreme point.  This measures the drawn label boxes, tick stubs
+and band in pixels, writes that reach in place of the bound, lets the layout
+resize, and repeats up to `passes` times or until the measurement stops
+changing (a rectangular frame settles in one pass).  The measured reach
+stays until the next call, as `ticklabelspace` does on `Axis`.
+"""
+function Makie.tight_ticklabel_spacing!(ax::GeoAxis; passes::Int = 3)
+    g = ax.graph
+    fixed = g[:fixed_reach][]
+    for _ in 1:passes
+        m = measured_reach(g[:pixels][], g[:labels][], g[:band_polygons][], ax.scene.viewport[];
+                           visible = (; lon = g[:xticklabelsvisible][], lat = g[:yticklabelsvisible][]))
+        m == fixed && break
+        fixed = m
+        ComputePipeline.update!(g; fixed_reach = m)
+    end
+    return fixed
+end
+
+"""
+    hidespines!(ax::GeoAxis, spines::Symbol...)
+
+Hide the spine (and a `:fancy` band).  The frame of a map is one closed
+curve, so unlike `Axis` there are no sides to choose: any of `:l`, `:r`,
+`:b`, `:t` hides the whole spine.
+"""
+function Makie.hidespines!(ax::GeoAxis, spines::Symbol... = (:l, :r, :b, :t)...)
+    for s in spines
+        s in (:l, :r, :b, :t) || error("Invalid spine identifier $s. Valid options are :l, :r, :b and :t.")
+    end
+    ax.spinevisible = false
+    return
+end
+
 # Legend API
 
 function Makie.get_plots(ax::GeoAxis)
-    return Makie.get_plots(ax.scene)[3:end] 
+    decorations = Set(values(ax.elements))
+    return filter(p -> !(p in decorations), Makie.get_plots(ax.scene))
 end
 
 function Makie.Legend(fig_or_scene, axis::GeoAxis, title = nothing; merge = false, unique = false, kwargs...)

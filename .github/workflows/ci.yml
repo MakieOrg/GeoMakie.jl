@@ -20,6 +20,7 @@ jobs:
       matrix:
         version:
           - '1'
+          - 'lts'
         os:
           - ubuntu-latest
         arch:
@@ -40,6 +41,15 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
+      # Makie's ReferenceTests is not registered; adding it to the package's
+      # environment makes it loadable inside Pkg.test, which turns on the
+      # reference-image gallery (test/refimages).  Only on the latest Julia,
+      # so the LTS job stays a plain package test.
+      - name: Add ReferenceTests for the reference-image gallery
+        if: matrix.version == '1'
+        run: >
+          julia --project=. -e 'using Pkg;
+          Pkg.add(url = "https://github.com/MakieOrg/Makie.jl", subdir = "ReferenceTests", rev = "a76df399a4ee8631ee3ba6587ca052dd902dfe74")'
       - uses: julia-actions/julia-runtest@v1
         env: 
           DISPLAY: ':0'
@@ -48,8 +58,41 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: test_images
+          name: test_images-${{ matrix.version }}
           path: test_images/
+      - name: Upload reference-image review
+        uses: actions/upload-artifact@v7
+        if: always() && matrix.version == '1'
+        with:
+          name: refimage-review
+          path: test_images/refimages/
+          if-no-files-found: warn
+  refimages:
+    # After a green test run on master, the recorded gallery becomes the
+    # reference set for this minor version: test/refimages/upload.jl attaches
+    # it as reference_images.tar to the release `refimages-<major.minor>`
+    # (created when missing), which compare.jl downloads on every run.
+    name: Upload reference images
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: test_images-1
+          path: test_images/
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+      - name: Upload the recorded gallery to the refimages release
+        run: |
+          julia -e 'using Pkg; Pkg.add(["ghr_jll", "TOML"])'
+          julia test/refimages/upload.jl test_images/refimages/recorded
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   docs:
     name: Build and deploy documentation
     runs-on: ubuntu-latest

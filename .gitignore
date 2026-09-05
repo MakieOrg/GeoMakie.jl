@@ -26,3 +26,10 @@ test_images/
 docs/GeoMakieDocumenterBlocks/Manifest.toml
 .qodo
 **/gmt.history
+
+# Riptide artifacts (cloud-synced)
+.humanlayer/tasks/
+
+# boundary design spikes (TDD program design)
+/scratch/
+/test/refimages/reference_images/

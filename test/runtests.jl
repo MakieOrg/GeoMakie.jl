@@ -8,7 +8,18 @@ Makie.set_theme!(Theme(
 ))
 @testset "GeoMakie" begin
     @testset "Basics" include("basics.jl")
+    @testset "LineSplitting" include("linesplitting.jl")
     @testset "MeshImage" include("meshimage.jl")
     @testset "GeoAxis" include("geoaxis.jl")
     @testset "GlobeAxis" include("globeaxis.jl")
+    @testset "Boundary" include("boundary/runtests.jl")
+    @testset "Frame" include("frame/runtests.jl")
+    @testset "Decorations" include("decorations/runtests.jl")
+    @testset "Speed" include("speed.jl")
+    # the gallery needs Makie's ReferenceTests (not registered; see docs/src/introduction.md)
+    if Base.find_package("ReferenceTests") !== nothing
+        @testset "Reference images" include("refimages/runtests.jl")
+    else
+        @info "ReferenceTests is not installed: the reference-image gallery (test/refimages) is skipped"
+    end
 end

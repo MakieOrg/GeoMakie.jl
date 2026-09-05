@@ -25,6 +25,8 @@ using GeometryBasics: Polygon, MultiPolygon
 using Geodesy
 using Proj
 import GeoFormatTypes
+using ComputePipeline
+using Makie: Observables
 
 export GeoInterface
 
@@ -50,15 +52,30 @@ include("conversions.jl")
 include("data.jl")
 include("utils.jl")
 include("geodesy.jl")
-include("geoticks.jl")
 include("projection.jl")
 
-include("geoaxis.jl")
-include("makie-axis.jl")
+# The boundary of a projection on the unit sphere, and the decorations built on it.
+include("geoaxis/boundary/arcs.jl")
+include("geoaxis/boundary/regions.jl")
+include("geoaxis/boundary/analytic.jl")
+include("geoaxis/boundary/identify.jl")
+include("geoaxis/boundary/probe.jl")
+include("geoaxis/boundary/boundary.jl")
+include("geoaxis/decorations/project.jl")
+include("geoaxis/decorations/frame.jl")
+include("geoaxis/decorations/ticks.jl")
+include("geoaxis/decorations/graticule.jl")
+include("geoaxis/decorations/placement.jl")
+include("geoaxis/decorations/spine.jl")
+include("geoaxis/decorations/layout.jl")
+
+include("geoaxis/geoaxis.jl")
+include("geoaxis/graph.jl")
+include("geoaxis/makie-axis.jl")
 
 # some basic recipes
 include("mesh_image.jl")
-include("linesplitting.jl")
+include("geoaxis/linesplitting.jl")
 
 include("sphere/unit_sphere_transforms.jl")
 include("sphere/icosphere.jl")
@@ -73,6 +90,7 @@ export Proj
 export FileIO
 
 export GeoAxis, automatic
+export GeographicTicks, ArcMinuteTicks
 export datalims, datalims!
 @deprecate datalims Makie.autolimits
 @deprecate datalims! Makie.reset_limits!

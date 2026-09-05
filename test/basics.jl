@@ -34,8 +34,8 @@ end
 end
 
 @testset "Line Splitting" begin
-    @test split(GeoMakie.coastlines(),"+lon_0=-160") isa Vector
     ga = @test_nowarn GeoAxis(Figure();dest = "+proj=wintri +lon_0=-160")
+    @test split(GeoMakie.coastlines(), ga) isa Vector
     @test GeoMakie.coastlines(ga) isa Observable
     @test GeoMakie.coastlines(ga)[] isa AbstractVector
 end

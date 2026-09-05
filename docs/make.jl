@@ -28,6 +28,7 @@ examples = String[
     "basic.jl",
     # "new.jl",
     "axis_config.jl",
+    "frame_styles.jl",
     "italy.jl",
     "histogram.jl",
     "contours.jl",

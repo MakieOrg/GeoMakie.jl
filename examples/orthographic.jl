@@ -16,6 +16,12 @@ ga = GeoAxis(
 sp = surface!(ga, lons, lats, zeros(size(field)); color=field, shading = NoShading, colormap=:rainbow_bgyrm_35_85_c69_n256)
 cb = Colorbar(fig[1, 2], sp)
 fig
+# The frame is the limb of the globe.  The meridians all converge at the two
+# poles on the limb, so they are labelled inside the map, beside the outermost
+# parallel along which every label fits (see `interiorlabels` and
+# `carrierparallel`; the labels take the x tick label colour), while the
+# parallels meet the limb at a clean angle and are labelled there.  The surface
+# is cut at the limb and everything it would draw beyond it is masked.
 # We can also draw some coastlines here, and make sure they're always above the surface:
 lp = lines!(
     ga, GeoMakie.coastlines(); 

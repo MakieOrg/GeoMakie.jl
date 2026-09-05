@@ -28,10 +28,14 @@ removed if necessary.
 
 =#
 
+"How many points have been pushed through a `Proj.Transformation`; read by `test/speed.jl`."
+const PROJ_CALLS = Ref(0)
+
 function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecTypes{N,T} where {N, T <: Number}
     if all(isnan.(pt))
         return V(NaN)
     end
+    PROJ_CALLS[] += 1
     # this is to catch errors - show the point which was invalid
     # and then catch it.
     try
@@ -54,7 +58,7 @@ function Makie.apply_transform(f::Proj.Transformation, r::Rect2{T}) where {T}
     xmax, ymax = maximum(r)
 
     if isapprox(xmin, -180, rtol = 1e-4)
-        xmin - -180e0
+        xmin = -180e0
     end
     if isapprox(xmax, 180; rtol = 1e-4)
         xmax = 180e0
