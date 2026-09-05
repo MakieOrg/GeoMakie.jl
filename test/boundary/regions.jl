@@ -82,9 +82,14 @@ end
     lon1 = GM.xyz_to_lonlat(GM.arcpoint(pieces[1], pieces[1].t1))[1]
     @test lon0 > -180 && lon1 < 180
     @test (lon0 + 180) ≈ (180 - lon1) atol = 1e-9
-    # a meridian on the seam itself stays whole
+    # a meridian on the seam itself is emitted twice, once each side of the
+    # seam (rotated ±SEAM_EPS about the axis, like the rim's own pieces)
     seam = GM.make_arc(GM._cross3(GM._dir(180), GM.ZHAT), 0.0, GM._dir(180), -pi / 2, pi / 2)
-    @test length(GM.clip(cut, seam)) == 1
+    sides = GM.clip(cut, seam)
+    @test length(sides) == 2
+    side_lons = [GM.xyz_to_lonlat(GM.arcpoint(a, 0.5 * (a.t0 + a.t1)))[1] for a in sides]
+    @test all(l -> abs(abs(l) - 180) < 2 * rad2deg(GM.SEAM_EPS), side_lons)
+    @test prod(sign, side_lons) < 0
     # nothing survives outside
     @test isempty(GM.clip(GM.Cap(10.0), GM.full_circle(GM.ZHAT, sind(-40))))
 end

@@ -14,4 +14,5 @@ Makie.set_theme!(Theme(
     @testset "Boundary" include("boundary/runtests.jl")
     @testset "Frame" include("frame/runtests.jl")
     @testset "Decorations" include("decorations/runtests.jl")
+    @testset "Speed" include("speed.jl")
 end

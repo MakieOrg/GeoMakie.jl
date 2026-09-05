@@ -90,3 +90,37 @@ end
 
     @test a1.scene.viewport[] == a2.scene.viewport[]
 end
+@testset "Tick specifications reach the labels" begin
+    function labels_of(; kw...)
+        fig = Figure(size = (600, 400))
+        ax = GeoAxis(fig[1, 1]; dest = "+proj=merc", limits = ((-10, 30), (35, 60)), kw...)
+        Makie.update_state_before_display!(fig)
+        d = GeoMakie.decorations(ax)
+        return d.pixels.strings[:lon], d.pixels.strings[:lat], ax
+    end
+    # (values, labels)
+    lon, lat, _ = labels_of(; xticks = ([0, 10, 20], ["zero", "ten", "twenty"]))
+    @test Set(lon) == Set(["zero", "ten", "twenty"])
+    # a formatter function
+    lon, _, _ = labels_of(; xtickformat = vs -> ["<$(round(Int, v))>" for v in vs])
+    @test !isempty(lon) && all(s -> occursin(r"^<-?\d+>$", s), lon)
+    # a format string
+    lon, _, _ = labels_of(; xtickformat = "{:.1f}")
+    @test !isempty(lon) && all(s -> occursin(r"^-?\d+\.\d$", s), lon)
+    # any Makie finder
+    lon, _, _ = labels_of(; xticks = Makie.WilkinsonTicks(5))
+    @test !isempty(lon) && all(s -> endswith(s, '°') || endswith(s, 'E') || endswith(s, 'W'), lon)
+    # a range
+    lon, _, _ = labels_of(; xticks = -180:2:180)
+    @test length(unique(lon)) == length(-10:2:30)
+    # the default formatter prints hemispheres
+    lon, lat, _ = labels_of()
+    @test "0°" in lon && "10°E" in lon && "10°W" in lon && "35°N" in lat
+    # empty ticks: no labels, no error (#150)
+    lon, lat, ax = labels_of(; xticks = Float64[])
+    @test isempty(lon) && !isempty(lat)
+    @test ax.layoutobservables.protrusions[].top == 0
+    # the defaults are the geographic finder
+    fig = Figure(); ax = GeoAxis(fig[1, 1])
+    @test ax.xticks[] isa GeographicTicks && ax.yticks[] isa GeographicTicks
+end

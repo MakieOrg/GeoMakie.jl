@@ -52,7 +52,6 @@ include("conversions.jl")
 include("data.jl")
 include("utils.jl")
 include("geodesy.jl")
-include("geoaxis/geoticks.jl")
 include("projection.jl")
 
 # The boundary of a projection on the unit sphere, and the decorations built on it.
@@ -64,6 +63,9 @@ include("geoaxis/boundary/probe.jl")
 include("geoaxis/boundary/boundary.jl")
 include("geoaxis/decorations/project.jl")
 include("geoaxis/decorations/frame.jl")
+include("geoaxis/decorations/ticks.jl")
+include("geoaxis/decorations/graticule.jl")
+include("geoaxis/decorations/placement.jl")
 
 include("geoaxis/geoaxis.jl")
 include("geoaxis/graph.jl")
@@ -86,6 +88,7 @@ export Proj
 export FileIO
 
 export GeoAxis, automatic
+export GeographicTicks, ArcMinuteTicks
 export datalims, datalims!
 @deprecate datalims Makie.autolimits
 @deprecate datalims! Makie.reset_limits!

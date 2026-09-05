@@ -214,7 +214,13 @@ Sub-arcs of `arc` whose interior is inside `r` (`want = true`) or outside it
 seam, and interval ends that lie on a cut seam are inset by `SEAM_EPS` (in
 angle, capped at `MAX_INSET` in parameter) so their projection is unambiguous.
 """
-function _split(r::SphereRegion, a::CircleArc, want::Bool)
+function _split(r::SphereRegion, a::CircleArc, want::Bool; seamcheck::Bool = true)
+    # `seamcheck`: a great circle in a cut's seam plane is emitted once per side
+    # (graticule lines); the rim itself never doubles (`seamcheck = false`).
+    if seamcheck && a.cosθ == 0
+        w = _coincident_seam(r, a)
+        w === nothing || return _split_on_seam(r, a, want, w)
+    end
     cs = crossings!(Crossing[], r, a)
     sort!(cs; by = first)
     # merge near-coincident crossings; a cut wins
@@ -263,6 +269,48 @@ end
 
 "The parts of `arc` lying inside `r`."
 clip(r::SphereRegion, a::CircleArc) = _split(r, a, true)
+
+"The cut wedge whose seam plane contains the great-circle arc `a`, or `nothing`."
+function _coincident_seam(w::Wedge, a::CircleArc)
+    w.tag == :cut || return nothing
+    n = _cross3(w.axis, w.seam)
+    return abs(_dot3(a.axis, n)) >= 1 - 1e-9 ? w : nothing
+end
+_coincident_seam(::Union{Zone, SpherePolygon}, ::CircleArc) = nothing
+function _coincident_seam(r::Union{Intersection, RegionUnion}, a::CircleArc)
+    for part in r.parts
+        w = _coincident_seam(part, a)
+        w === nothing || return w
+    end
+    return nothing
+end
+
+"""
+A great-circle arc lying in a cut's seam plane is split where it passes the
+wedge axis; the part on the seam half-meridian is emitted once per side
+(rotated `±SEAM_EPS` about the axis, like the rim's own pieces), the rest once.
+"""
+function _split_on_seam(r::SphereRegion, a::CircleArc, want::Bool, w::Wedge)
+    ts = Float64[a.t0, a.t1]
+    for p in (w.axis, -w.axis)
+        t = a.t0 + mod(arc_azimuth(a, p) - a.t0, 2pi)
+        a.t0 + 1e-9 < t < a.t1 - 1e-9 && push!(ts, t)
+    end
+    sort!(ts)
+    out = CircleArc[]
+    for i in 1:(length(ts) - 1)
+        sub = CircleArc(a.axis, a.u, a.v, a.cosθ, ts[i], ts[i + 1])
+        mid = arcpoint(sub, 0.5 * (ts[i] + ts[i + 1]))
+        if _dot3(mid, w.seam) >= 0
+            for side in (1, -1)
+                append!(out, _split(r, rotate(sub, rotation_about(w.axis, side * SEAM_EPS)), want; seamcheck = false))
+            end
+        else
+            append!(out, _split(r, sub, want; seamcheck = false))
+        end
+    end
+    return out
+end
 
 # ---- rim -------------------------------------------------------------------
 
@@ -320,7 +368,7 @@ function _rim!(out, r::Intersection, counter::Ref{Int})
             if isempty(others)
                 push!(pieces, piece)
             else
-                for a in _split(Intersection(others), piece.arc, true)
+                for a in _split(Intersection(others), piece.arc, true; seamcheck = false)
                     push!(pieces, RimPiece(a, piece.tag, piece.part, piece.side))
                 end
             end
@@ -348,7 +396,7 @@ function _rim!(out, r::RegionUnion, counter::Ref{Int})
             if piece.tag == :cut || isempty(others)
                 push!(out, piece)
             else
-                for a in _split(RegionUnion(others), piece.arc, false)
+                for a in _split(RegionUnion(others), piece.arc, false; seamcheck = false)
                     push!(out, RimPiece(a, piece.tag, piece.part, piece.side))
                 end
             end

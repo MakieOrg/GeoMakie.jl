@@ -125,3 +125,115 @@ end
     @test length(Makie.get_plots(ax)) == 1
     @test haskey(ax.elements, :spine)
 end
+
+# ---- Phase 3: ticks, graticule and labels ------------------------------------
+
+@testset "ticks, graticule and labels" begin
+    for c in vcat(BASELINE_CASES, ISSUE_CASES)
+        fig, ax = build_case(c)
+        d = GM.decorations(ax)
+        @testset "$(c.name)" begin
+            v = phase3_violations(c.name, d)
+            @test isempty(v)
+            isempty(v) || foreach(println, v)
+            @test !isempty(d.labels)
+            @test !isempty(d.pixels.kept)
+            # every family has grid lines and the stubs are one segment per drawn exit
+            @test any(l -> l.family == :lon, d.graticule) && any(l -> l.family == :lat, d.graticule)
+            @test iseven(length(d.pixels.stubs[:lon])) && iseven(length(d.pixels.stubs[:lat]))
+            # a dest-space bound exists and is what the layout received
+            @test all(>=(0), (d.bound.left, d.bound.right, d.bound.top, d.bound.bottom))
+            @test ax.layoutobservables.protrusions[].left == d.bound.left
+            @test ax.layoutobservables.protrusions[].bottom == d.bound.bottom
+        end
+    end
+end
+
+@testset "floors" begin
+    for (name, floor) in FLOORS
+        c = decoration_case(DECORATION_CASES, name)
+        fig, ax = build_case(c)
+        d = GM.decorations(ax)
+        @testset "$name" begin
+            for (what, ok) in floor(d)
+                @test ok
+                ok || println(name, ": ", what, " failed; lon=", drawn_labels(d, :lon), " lat=", drawn_labels(d, :lat))
+            end
+        end
+    end
+end
+
+@testset "determinism" begin
+    for name in ("eqearth", "ortho", "merc_reg", "igh", "issue388")
+        @test isempty(determinism(decoration_case(DECORATION_CASES, name)))
+    end
+end
+
+# Frames Phase 2 could not get right (PROJ's inverse of these is unusable:
+# cass folds the sphere onto a sliver, adams_ws2 comes back as a line), so
+# placement against them is not judged yet.
+const PATHOLOGICAL_FRAMES = Set(["most_cass", "most_adams_ws2"])
+
+@testset "most_projections decorate" begin
+    for c in MOST_PROJECTION_CASES
+        fig, ax = try
+            build_case(c; coastlines = false)
+        catch e
+            @warn "skipping $(c.name): $(sprint(showerror, e))"
+            continue
+        end
+        d = GM.decorations(ax)
+        @testset "$(c.name)" begin
+            v = phase3_violations(c.name, d)
+            if c.name in PATHOLOGICAL_FRAMES
+                @test_broken isempty(v)
+            else
+                @test isempty(v)
+                isempty(v) || foreach(println, v)
+            end
+        end
+    end
+end
+
+@testset "attribute semantics" begin
+    c = decoration_case(BASELINE_CASES, "merc_reg")
+    # the pad is the gap between tick end and glyph box; the tick is drawn on the frame
+    fig, ax = build_case(c; xticklabelpad = 20.0, xticksize = 10.0)
+    d = GM.decorations(ax)
+    for (k, i) in enumerate(d.pixels.kept)
+        l = d.labels[i]
+        l.exit.family == :lon || continue
+        @test l.offset == 30.0
+        b = d.pixels.boxes[k]; n = d.pixels.normals[k]; e = d.pixels.exits[k]
+        @test (b.centre - e) ⋅ n ≈ 30.0 + GM.half_extent(b, n)
+    end
+    # hidden ticks: the pad alone separates label and frame, and no stubs are drawn
+    fig, ax = build_case(c; xticksvisible = false, xticklabelpad = 7.0)
+    d = GM.decorations(ax)
+    @test all(l -> l.exit.family != :lon || l.offset == 7.0, d.labels)
+    @test isempty(d.pixels.stubs[:lon]) && !isempty(d.pixels.stubs[:lat])
+    # xlabelpadding does not move the tick labels
+    fig, ax0 = build_case(c)
+    fig, ax1 = build_case(c; xlabelpadding = 40.0)
+    @test GM.decorations(ax0).pixels.positions == GM.decorations(ax1).pixels.positions
+    # rotation is honoured
+    fig, ax = build_case(c; xticklabelrotation = pi / 4)
+    d = GM.decorations(ax)
+    @test all(l -> l.exit.family != :lon || l.rotation == pi / 4, d.labels)
+    @test ax.elements[:xticklabels].rotation[] == Makie.to_rotation(pi / 4)
+    # a user alignment overrides the derived one
+    fig, ax = build_case(c; xticklabelalign = (:left, :bottom))
+    d = GM.decorations(ax)
+    @test all(l -> l.exit.family != :lon || (l.align == (:left, :bottom) && !l.auto_align), d.labels)
+    @test ax.elements[:xticklabels].align[] == (:left, :bottom)
+    # the formatter is honoured
+    fig, ax = build_case(c; xtickformat = vs -> ["<$(round(Int, v))>" for v in vs])
+    d = GM.decorations(ax)
+    @test all(s -> startswith(s, '<') && endswith(s, '>'), drawn_labels(d, :lon))
+    # hidden labels leave no protrusion on their sides
+    fig, ax = build_case(c)
+    hidedecorations!(ax)
+    Makie.update_state_before_display!(fig)
+    p = ax.layoutobservables.protrusions[]
+    @test p.left == 0 && p.right == 0 && p.bottom == 0
+end

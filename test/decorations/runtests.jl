@@ -7,5 +7,6 @@ include("cases.jl")
 include("predicates.jl")
 
 @testset "Decorations" begin
+    include("ticks.jl")
     include("suite.jl")
 end

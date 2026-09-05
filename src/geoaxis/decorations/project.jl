@@ -62,13 +62,13 @@ end
 _seed_segments(arc::CircleArc) = clamp(ceil(Int, arclength(arc) / deg2rad(SEED_SEGMENT_DEG)), SEED_SEGMENTS...)
 
 """
-    adaptive_project(t, arc; tol, max_depth = MAX_DEPTH, min_depth = MIN_DEPTH) -> Vector{Point2d}
+    adaptive_project(t, arc; tol, max_depth = MAX_DEPTH, min_depth = MIN_DEPTH, dropnan = true) -> Vector{Point2d}
 
 Dest-space polyline of `arc` in the direction of increasing parameter, refined
 until the chord midpoint deviation is under `tol`.  Non-finite samples are
-dropped.
+dropped unless `dropnan = false`, which keeps them as `NaN` breaks.
 """
-function adaptive_project(t, arc::CircleArc; tol::Real, max_depth::Integer = MAX_DEPTH, min_depth::Integer = MIN_DEPTH)
+function adaptive_project(t, arc::CircleArc; tol::Real, max_depth::Integer = MAX_DEPTH, min_depth::Integer = MIN_DEPTH, dropnan::Bool = true)
     n = _seed_segments(arc)
     ts = range(arc.t0, arc.t1; length = n + 1)
     ps = Vector{Point2d}(undef, n + 1)
@@ -82,7 +82,7 @@ function adaptive_project(t, arc::CircleArc; tol::Real, max_depth::Integer = MAX
         _refine!(out, t, arc, ts[i], ps[i], ts[i + 1], ps[i + 1], float(tol), 0, max_depth, min_depth)
         push!(out, ps[i + 1])
     end
-    return filter(_finite2, out)
+    return dropnan ? filter(_finite2, out) : out
 end
 
 function _refine!(out, t, arc, ta, pa, tb, pb, tol, depth, max_depth, min_depth)

@@ -28,10 +28,14 @@ removed if necessary.
 
 =#
 
+"How many points have been pushed through a `Proj.Transformation`; read by `test/speed.jl`."
+const PROJ_CALLS = Ref(0)
+
 function Makie.apply_transform(t::Proj.Transformation, pt::V) where V <: VecTypes{N,T} where {N, T <: Number}
     if all(isnan.(pt))
         return V(NaN)
     end
+    PROJ_CALLS[] += 1
     # this is to catch errors - show the point which was invalid
     # and then catch it.
     try
