@@ -579,6 +579,21 @@ Makie.hidedecorations!(ax::GeoAxis; kw...) = begin
     hideydecorations!(ax; kw...)
 end
 
+"""
+    hidespines!(ax::GeoAxis, spines::Symbol...)
+
+Hide the spine (and a `:fancy` band).  The frame of a map is one closed
+curve, so unlike `Axis` there are no sides to choose: any of `:l`, `:r`,
+`:b`, `:t` hides the whole spine.
+"""
+function Makie.hidespines!(ax::GeoAxis, spines::Symbol... = (:l, :r, :b, :t)...)
+    for s in spines
+        s in (:l, :r, :b, :t) || error("Invalid spine identifier $s. Valid options are :l, :r, :b and :t.")
+    end
+    ax.spinevisible = false
+    return
+end
+
 # Legend API
 
 function Makie.get_plots(ax::GeoAxis)

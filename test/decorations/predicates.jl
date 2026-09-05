@@ -361,3 +361,62 @@ end
 
 "Every Phase 5 predicate on one built case."
 phase5_violations(name, d) = interior_labels(name, d)
+
+# ---- Phase 6: the fancy band and the grid's z-order -----------------------------
+
+"""
+On a `:fancy` frame every tick exit is a band boundary (within a pixel), every
+boundary is at an exit except the one a loop may add to keep two colours
+alternating around an odd count, and no two consecutive bands of a loop
+share a colour.  A `:plain` frame has no bands.
+"""
+function frame_band(name, d)
+    out = Violation[]
+    b = d.bands
+    if d.framestyle !== :fancy
+        isempty(b.polygons) || push!(out, Violation(name, :frame_band, "a plain frame has $(length(b.polygons)) bands"))
+        return out
+    end
+    m = GM.PixelMap(d.projectionview, d.viewport)
+    epx = [m(e.p) for e in d.exits]
+    allb = reduce(vcat, b.boundaries; init = Point2d[])
+    length(b.polygons) == length(allb) == length(b.colors) ||
+        push!(out, Violation(name, :frame_band, "$(length(b.polygons)) bands for $(length(allb)) boundaries"))
+    for (e, p) in zip(d.exits, epx)
+        minimum(norm(p - q) for q in allb; init = Inf) <= 1.0 + 1e-6 ||
+            push!(out, Violation(name, :frame_band, "exit $(e.family) $(e.value) at $p is not a band boundary"))
+    end
+    for (k, pts) in enumerate(b.boundaries)
+        for (i, q) in enumerate(pts)
+            i == b.extra[k] && continue
+            minimum(norm(p - q) for p in epx; init = Inf) <= 1.0 + 1e-6 ||
+                push!(out, Violation(name, :frame_band, "boundary $i of loop $k at $q is not at an exit"))
+        end
+        cols = b.colors[b.loop .== k]
+        n = length(cols)
+        for i in 1:n
+            (n >= 2 && cols[i] == cols[mod1(i + 1, n)]) &&
+                push!(out, Violation(name, :frame_band, "bands $i and $(mod1(i + 1, n)) of loop $k share a colour"))
+        end
+    end
+    for (i, poly) in enumerate(b.polygons)
+        (length(poly) >= 4 && all(p -> all(isfinite, p), poly)) ||
+            push!(out, Violation(name, :frame_band, "band $i is degenerate"))
+    end
+    return out
+end
+
+"The graticule is drawn behind `plot` when `gridbehind` is set, in front of it otherwise."
+function grid_behind(name, ax, plot)
+    out = Violation[]
+    z = Makie.zvalue2d(plot)
+    for k in (:xgrid, :ygrid)
+        zg = Makie.zvalue2d(ax.elements[k])
+        ok = ax.gridbehind[] ? zg < z : zg > z
+        ok || push!(out, Violation(name, :grid_behind, "$k at z = $zg, plot at z = $z, gridbehind = $(ax.gridbehind[])"))
+    end
+    return out
+end
+
+"Every Phase 6 predicate on one built case."
+phase6_violations(name, d) = frame_band(name, d)

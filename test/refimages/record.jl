@@ -5,12 +5,12 @@
 include("cases.jl")
 
 mkpath(RECORDED_DIR)
-for c in REFIMAGE_CASES
-    path = joinpath(RECORDED_DIR, c.name * ".png")
+for (name, render) in all_renders()
+    path = joinpath(RECORDED_DIR, name * ".png")
     try
-        save(path, render_case(c))
+        save(path, render())
         println("recorded ", path)
     catch e
-        @error "could not record $(c.name)" exception = (e, catch_backtrace())
+        @error "could not record $name" exception = (e, catch_backtrace())
     end
 end

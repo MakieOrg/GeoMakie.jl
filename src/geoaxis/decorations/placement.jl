@@ -429,8 +429,9 @@ end
 One label per admitted exit, and one interior label per line that never gets
 one.  `attrs` carries per-family `(labels, size, font, pad, ticksize,
 ticksvisible, rotation, align)` under `:lon` and `:lat`, `fonts`,
-`xaxisposition`, `yaxisposition`, `minangle`, and `interior = (mode, px_scale,
-mingap)`; `crossings` has the carrier crossings (`lat` for the carrier
+`xaxisposition`, `yaxisposition`, `minangle`, `band` (the fancy band's width
+in pixels, `0` for a plain frame), and `interior = (mode, px_scale, mingap)`;
+`crossings` has the carrier crossings (`lat` for the carrier
 meridian, `lon` per candidate parallel).  The suppressed list names every exit
 that was not admitted, every tick value with no exit, and every interior
 label that found no place.
@@ -459,7 +460,8 @@ function place(exits::Vector{Exit}, fr::Frame, rect::Rect2d, lines::Vector{Grati
         text = fa.labels[e.value]
         font = Makie.to_font(attrs.fonts, fa.font)
         half = text_half_extents(text, font, fa.size)
-        offset = (fa.ticksvisible ? fa.ticksize : 0.0) + fa.pad
+        # a fancy band replaces the tick stubs: labels clear the band instead
+        offset = (attrs.band > 0 ? attrs.band : (fa.ticksvisible ? fa.ticksize : 0.0)) + fa.pad
         auto = fa.align isa Makie.Automatic
         align = auto ? (:center, :center) : fa.align
         # distance from the middle of the edge, in units of the extent
@@ -486,15 +488,16 @@ function _edge_middle_distance(fr::Frame, e::Exit, extent)
 end
 
 """
-    protrusion_bound(labels, visible) -> RectSides{Float32}
+    protrusion_bound(labels, visible; base = 0) -> RectSides{Float32}
 
 Per side, the most any frame label pushes past its exit toward that side
 (tick, pad and glyph box), taking the exit to sit on that side of the limits
-rectangle.  Interior labels are on the map and reserve nothing.  `visible`
-maps family to label visibility.
+rectangle, and at least `base` (the fancy band's width, which lies outside
+the frame on every side).  Interior labels are on the map and reserve
+nothing.  `visible` maps family to label visibility.
 """
-function protrusion_bound(labels::Vector{TickLabel}, visible)
-    left = right = bottom = top = 0.0
+function protrusion_bound(labels::Vector{TickLabel}, visible; base::Real = 0.0)
+    left = right = bottom = top = float(base)
     for l in labels
         isinterior(l) && continue
         visible[l.exit.family] || continue
@@ -538,6 +541,14 @@ function (m::PixelMap)(p)
     c = m.pv * Makie.Vec4d(p[1], p[2], 0.0, 1.0)
     w = c[4] == 0 ? 1.0 : c[4]
     return Point2d(m.origin .+ (Vec2d(c[1], c[2]) ./ w .+ 1.0) .* 0.5 .* m.size)
+end
+
+"`1` when the map keeps its orientation in pixels (the map stays on the left of a frame loop), `-1` when it is mirrored."
+function pixel_orientation(m::PixelMap)
+    o = m(Point2d(0, 0))
+    ux = m(Point2d(1, 0)) - o
+    uy = m(Point2d(0, 1)) - o
+    return ux[1] * uy[2] - ux[2] * uy[1] < 0 ? -1 : 1
 end
 
 "A dest direction as a pixel direction (unit length)."

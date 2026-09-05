@@ -183,28 +183,39 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         xtickcolor::RGBAf = RGBf(0, 0, 0)
         "The color of the ytick marks."
         ytickcolor::RGBAf = RGBf(0, 0, 0)
+        # The spine and grid take their defaults from the `Axis` theme when one is
+        # set (`Theme(Axis = (spinecolor = :red,))`, `theme_dark()`), so a GeoAxis
+        # matches the Axis beside it; a `GeoAxis` theme entry or a keyword still wins.
         "The width of the axis spine (the frame of the map)."
-        spinewidth::Float64 = 1f0
+        spinewidth::Float64 = Makie.inherit(scene, (:Axis, :spinewidth), 1f0)
         "Controls if the axis spine is visible."
         spinevisible::Bool = true
         "The color of the axis spine."
-        spinecolor::RGBAf = :black
+        spinecolor::RGBAf = Makie.inherit(scene, (:Axis, :spinecolor), :black)
+        "How the frame is drawn: `:plain` is a single stroke on the frame; `:fancy` adds a band of `framewidth` pixels outside it, alternating between `framecolors` at every tick, on any frame shape."
+        framestyle::Symbol = :plain
+        "The width in pixels of the `:fancy` band."
+        framewidth::Float64 = 6f0
+        "The colours the `:fancy` band alternates between."
+        framecolors = (:black, :white)
+        "Draw the graticule behind the plots (`true`, as `Axis` draws its grid) or in front of them."
+        gridbehind::Bool = true
         "Controls if the x grid lines are visible."
         xgridvisible::Bool = true
         "Controls if the y grid lines are visible."
         ygridvisible::Bool = true
         "The width of the x grid lines."
-        xgridwidth::Float64 = 1f0
+        xgridwidth::Float64 = Makie.inherit(scene, (:Axis, :xgridwidth), 1f0)
         "The width of the y grid lines."
-        ygridwidth::Float64 = 1f0
+        ygridwidth::Float64 = Makie.inherit(scene, (:Axis, :ygridwidth), 1f0)
         "The color of the x grid lines."
-        xgridcolor::RGBAf = RGBAf(0, 0, 0, 0.5)
+        xgridcolor::RGBAf = Makie.inherit(scene, (:Axis, :xgridcolor), RGBAf(0, 0, 0, 0.12))
         "The color of the y grid lines."
-        ygridcolor::RGBAf = RGBAf(0.0, 0, 0, 0.5)
+        ygridcolor::RGBAf = Makie.inherit(scene, (:Axis, :ygridcolor), RGBAf(0, 0, 0, 0.12))
         "The linestyle of the x grid lines."
-        xgridstyle = nothing
+        xgridstyle = Makie.inherit(scene, (:Axis, :xgridstyle), nothing)
         "The linestyle of the y grid lines."
-        ygridstyle = nothing
+        ygridstyle = Makie.inherit(scene, (:Axis, :ygridstyle), nothing)
         "Controls if minor ticks on the x axis are visible"
         xminorticksvisible::Bool = false
         "The alignment of x minor ticks on the axis spine"
@@ -238,9 +249,9 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         "The width of the y minor grid lines."
         yminorgridwidth::Float64 = 1f0
         "The color of the x minor grid lines."
-        xminorgridcolor::RGBAf = RGBAf(0, 0, 0, 0.05)
+        xminorgridcolor::RGBAf = Makie.inherit(scene, (:Axis, :xminorgridcolor), RGBAf(0, 0, 0, 0.05))
         "The color of the y minor grid lines."
-        yminorgridcolor::RGBAf = RGBAf(0, 0, 0, 0.05)
+        yminorgridcolor::RGBAf = Makie.inherit(scene, (:Axis, :yminorgridcolor), RGBAf(0, 0, 0, 0.05))
         "The linestyle of the x minor grid lines."
         xminorgridstyle = nothing
         "The linestyle of the y minor grid lines."
@@ -327,27 +338,36 @@ function Makie.initialize_block!(axis::GeoAxis)
         transform_inv_obs[] = Makie.inverse_transform(trans)
     end
 
-    # The graticule, in dest space from the graph.
+    # The graticule, in dest space from the graph, behind the plots unless asked otherwise.
     longridplot = lines!(scene, graph[:xgrid_points]; color=axis.xgridcolor, linewidth=axis.xgridwidth,
         visible=axis.xgridvisible, linestyle=axis.xgridstyle, transparency=true, inspectable=false,
         xautolimits=false, yautolimits=false)
-    translate!(longridplot, 0, 0, 100)
     latgridplot = lines!(scene, graph[:ygrid_points]; color=axis.ygridcolor, linewidth=axis.ygridwidth,
         visible=axis.ygridvisible, linestyle=axis.ygridstyle, transparency=true, inspectable=false,
         xautolimits=false, yautolimits=false)
-    translate!(latgridplot, 0, 0, 100)
+    on(axis.blockscene, axis.gridbehind; update=true) do behind
+        z = behind ? -GRID_Z : GRID_Z
+        translate!(longridplot, 0, 0, z)
+        translate!(latgridplot, 0, 0, z)
+    end
 
-    # The spine: the frame of the map, drawn in dest space from the decoration graph.
-    spineplot = lines!(scene, graph[:spine]; color=axis.spinecolor, linewidth=axis.spinewidth,
-        visible=axis.spinevisible, inspectable=false, xautolimits=false, yautolimits=false)
-    translate!(spineplot, 0, 0, 101)
+    # The spine, the fancy band, tick stubs and labels live in the block scene,
+    # in pixels: the block scene is not clipped to the map's viewport, so a
+    # spine on the viewport edge keeps its whole stroke and labels sit outside.
+    bandsvisible = map((v, s) -> v && s === :fancy, axis.blockscene, axis.spinevisible, axis.framestyle)
+    bandplot = poly!(axis.blockscene, graph[:band_polygons]; color=graph[:band_colors], space=:pixel,
+        strokecolor=axis.spinecolor, strokewidth=axis.spinewidth, visible=bandsvisible, inspectable=false)
+    translate!(bandplot, 0, 0, BAND_Z)
+    spineplot = lines!(axis.blockscene, graph[:spine_px]; space=:pixel, color=axis.spinecolor, linewidth=axis.spinewidth,
+        visible=axis.spinevisible, inspectable=false)
+    translate!(spineplot, 0, 0, SPINE_Z)
 
-    # Tick stubs and labels live in the block scene, in pixels, so they can sit
-    # outside the map's viewport.
     xstubs = linesegments!(axis.blockscene, graph[:xstubs]; space=:pixel, color=axis.xtickcolor,
         linewidth=axis.xtickwidth, visible=axis.xticksvisible, inspectable=false)
     ystubs = linesegments!(axis.blockscene, graph[:ystubs]; space=:pixel, color=axis.ytickcolor,
         linewidth=axis.ytickwidth, visible=axis.yticksvisible, inspectable=false)
+    translate!(xstubs, 0, 0, TICK_Z)
+    translate!(ystubs, 0, 0, TICK_Z)
 
     # A user alignment applies as given; the automatic one centres the glyph
     # box on the outward normal, so the position the graph hands out is the centre.
@@ -377,6 +397,8 @@ function Makie.initialize_block!(axis::GeoAxis)
         visible=axis.yticklabelsvisible,
         inspectable=false,
     )
+    translate!(lontex, 0, 0, LABEL_Z)
+    translate!(lattex, 0, 0, LABEL_Z)
 
     # Interior labels sit on the map, so they are drawn above the graticule and
     # the plots, over a halo: the same string in the halo colour, stroked, underneath.
@@ -404,6 +426,7 @@ function Makie.initialize_block!(axis::GeoAxis)
     elements[:xgrid] = longridplot
     elements[:ygrid] = latgridplot
     elements[:spine] = spineplot
+    elements[:bands] = bandplot
     elements[:xticks] = xstubs
     elements[:yticks] = ystubs
     elements[:xticklabels] = lontex
@@ -489,7 +512,14 @@ end
 "How deep the protrusion → layout → viewport → protrusion chain may re-enter before it is cut."
 const PROTRUSION_DEPTH_CAP = 8
 
-"z of the interior labels: above the graticule (100) and the spine (101), so they read over the map."
+# The render order, fixed for every frame style: plots at 0, the graticule
+# behind them (or in front, `gridbehind = false`), then the band, the spine on
+# it, tick stubs, labels, and the interior labels over everything on the map.
+const GRID_Z = 100
+const BAND_Z = 101
+const SPINE_Z = 102
+const TICK_Z = 103
+const LABEL_Z = 104
 const INTERIOR_LABEL_Z = 200
 
 function compute_protrusions(bound, title, titlesize, titlegap, titlevisible,

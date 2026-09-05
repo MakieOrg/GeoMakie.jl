@@ -44,7 +44,14 @@ const VARIANT_CASES = DecorationCase[
     DecorationCase("laea_polar_c90", "+proj=laea +lat_0=90 +lon_0=0", nothing, (; carriermeridian = 90)),
 ]
 
-const DECORATION_CASES = vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES, MOST_PROJECTION_CASES)
+# The fancy frame on a rectangle, a limb and a pseudocylindrical outline.
+const FANCY_CASES = DecorationCase[
+    DecorationCase("merc_reg_fancy", "+proj=merc", ((-10, 30), (35, 60)), (; framestyle = :fancy)),
+    DecorationCase("ortho_fancy", "+proj=ortho +lon_0=-20 +lat_0=30", nothing, (; framestyle = :fancy)),
+    DecorationCase("robin150_fancy", "+proj=robin +lon_0=150", nothing, (; framestyle = :fancy)),
+]
+
+const DECORATION_CASES = vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES, FANCY_CASES, MOST_PROJECTION_CASES)
 
 decoration_case(cases::Vector{DecorationCase}, name::AbstractString) = cases[findfirst(c -> c.name == name, cases)]
 

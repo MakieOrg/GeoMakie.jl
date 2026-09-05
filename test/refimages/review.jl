@@ -11,12 +11,15 @@ function write_review(path = joinpath(REFIMAGE_DIR, "review.html"))
         ".case{border:1px solid #ccc;padding:0.5em}.case img{display:block;max-width:600px}",
         ".case h3{margin:0 0 0.3em 0;font-size:1em}.case code{font-size:0.8em;color:#555}</style></head><body>")
     println(io, "<h1>GeoAxis decorations: recorded reference images</h1><div class=\"grid\">")
-    for c in REFIMAGE_CASES
-        img = joinpath("recorded", c.name * ".png")
+    for (name, _) in all_renders()
+        img = joinpath("recorded", name * ".png")
         exists = isfile(joinpath(REFIMAGE_DIR, img))
-        println(io, "<div class=\"case\"><h3>", c.name, "</h3><code>", c.dest,
-            c.limits === nothing ? "" : " limits=" * string(c.limits), "</code>")
-        exists ? println(io, "<img src=\"", img, "\" alt=\"", c.name, "\">") : println(io, "<p><em>not recorded</em></p>")
+        i = findfirst(c -> c.name == name, REFIMAGE_CASES)
+        desc = i === nothing ? "extra render" : REFIMAGE_CASES[i].dest *
+            (REFIMAGE_CASES[i].limits === nothing ? "" : " limits=" * string(REFIMAGE_CASES[i].limits)) *
+            (isempty(REFIMAGE_CASES[i].attrs) ? "" : " " * string(REFIMAGE_CASES[i].attrs))
+        println(io, "<div class=\"case\"><h3>", name, "</h3><code>", desc, "</code>")
+        exists ? println(io, "<img src=\"", img, "\" alt=\"", name, "\">") : println(io, "<p><em>not recorded</em></p>")
         println(io, "</div>")
     end
     println(io, "</div></body></html>")

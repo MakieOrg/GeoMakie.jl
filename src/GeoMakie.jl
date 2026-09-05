@@ -66,6 +66,7 @@ include("geoaxis/decorations/frame.jl")
 include("geoaxis/decorations/ticks.jl")
 include("geoaxis/decorations/graticule.jl")
 include("geoaxis/decorations/placement.jl")
+include("geoaxis/decorations/spine.jl")
 
 include("geoaxis/geoaxis.jl")
 include("geoaxis/graph.jl")

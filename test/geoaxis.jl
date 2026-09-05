@@ -127,3 +127,35 @@ end
     fig = Figure(); ax = GeoAxis(fig[1, 1])
     @test ax.xticks[] isa GeographicTicks && ax.yticks[] isa GeographicTicks
 end
+
+@testset "hidespines! and the Axis theme" begin
+    fig = Figure(); ax = GeoAxis(fig[1, 1])
+    @test haskey(ax.elements, :spine) && ax.elements[:spine].visible[]
+    hidespines!(ax)
+    @test !ax.elements[:spine].visible[] && !ax.elements[:bands].visible[]
+    @test_throws ErrorException hidespines!(ax, :x)
+    # hidedecorations! leaves the spine, as on Axis
+    fig = Figure(); ax = GeoAxis(fig[1, 1])
+    hidedecorations!(ax)
+    @test ax.elements[:spine].visible[]
+    # the Axis theme reaches the spine and the grid
+    with_theme(Theme(Axis = (spinecolor = :red, spinewidth = 3, xgridcolor = :blue, ygridstyle = :dash))) do
+        f = Figure(); ax = GeoAxis(f[1, 1])
+        @test ax.spinecolor[] == Makie.to_color(:red) && ax.elements[:spine].color[] == Makie.to_color(:red)
+        @test ax.spinewidth[] == 3 && ax.elements[:spine].linewidth[] == 3
+        @test ax.xgridcolor[] == Makie.to_color(:blue) && ax.elements[:xgrid].color[] == Makie.to_color(:blue)
+        @test ax.ygridstyle[] == :dash
+    end
+    # a GeoAxis theme entry, then a keyword, still win over the Axis theme
+    with_theme(Theme(Axis = (spinecolor = :red,), GeoAxis = (spinecolor = :green,))) do
+        f = Figure()
+        @test GeoAxis(f[1, 1]).spinecolor[] == Makie.to_color(:green)
+        @test GeoAxis(f[1, 2]; spinecolor = :blue).spinecolor[] == Makie.to_color(:blue)
+    end
+    # without a theme the defaults are the Axis defaults (#339)
+    f = Figure(); ax = GeoAxis(f[1, 1]); a = Axis(f[1, 2])
+    @test ax.spinecolor[] == a.leftspinecolor[] && ax.spinewidth[] == a.spinewidth[]
+    @test ax.xgridcolor[] == a.xgridcolor[] && ax.ygridcolor[] == a.ygridcolor[]
+    @test ax.xminorgridcolor[] == a.xminorgridcolor[]
+    @test ax.framestyle[] === :plain && ax.gridbehind[]
+end

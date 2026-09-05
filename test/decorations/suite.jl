@@ -402,3 +402,107 @@ end
         end
     end
 end
+
+# ---- Phase 6: spine styles, grid z-order, and theme colours -------------------
+
+@testset "fancy frame" begin
+    for c in FANCY_CASES
+        fig, ax = build_case(c)
+        d = GM.decorations(ax)
+        @testset "$(c.name)" begin
+            v = vcat(phase3_violations(c.name, d), phase4_violations(c.name, d), phase5_violations(c.name, d),
+                phase6_violations(c.name, d))
+            @test isempty(v)
+            isempty(v) || foreach(println, v)
+            @test !isempty(d.bands.polygons) && ax.elements[:bands].visible[]
+            # the band's edges mark the ticks: no stubs, and labels clear the band instead
+            @test isempty(d.pixels.stubs[:lon]) && isempty(d.pixels.stubs[:lat])
+            @test all(l -> GM.isinterior(l) || l.offset == ax.framewidth[] + (l.exit.family == :lon ? ax.xticklabelpad[] : ax.yticklabelpad[]), d.labels)
+            # the band lies outside the frame on every side, so every side reserves at least its width
+            @test min(d.bound.left, d.bound.right, d.bound.top, d.bound.bottom) >= ax.framewidth[]
+            # every band lies outside the map body: a band is the inner polyline followed by
+            # the outer one reversed, so its first and last points straddle the strip's thickness
+            for poly in d.bands.polygons
+                @test !GM.inside_loops(d.pixels.frame, 0.5 * (poly[1] + poly[end]))
+            end
+        end
+    end
+    # a plain frame draws no band, and the style switches live
+    fig, ax = build_case(decoration_case(BASELINE_CASES, "merc_reg"))
+    d = GM.decorations(ax)
+    @test isempty(d.bands.polygons) && isempty(frame_band("merc_reg", d)) && !ax.elements[:bands].visible[]
+    stubs = length(d.pixels.stubs[:lon])
+    @test stubs > 0
+    ax.framestyle = :fancy
+    d = GM.decorations(ax)
+    @test !isempty(d.bands.polygons) && ax.elements[:bands].visible[] && isempty(d.pixels.stubs[:lon])
+    @test isempty(frame_band("merc_reg", d))
+    ax.framestyle = :plain
+    d = GM.decorations(ax)
+    @test isempty(d.bands.polygons) && length(d.pixels.stubs[:lon]) == stubs
+    # framewidth and framecolors are honoured
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "merc_reg_fancy"); framewidth = 12.0, framecolors = (:red, :blue))
+    d = GM.decorations(ax)
+    @test Set(d.bands.colors) == Set([Makie.to_color(:red), Makie.to_color(:blue)])
+    @test min(d.bound.left, d.bound.right, d.bound.top, d.bound.bottom) >= 12
+    @test all(l -> GM.isinterior(l) || l.offset >= 12, d.labels)
+    # hidespines! takes the band with the spine
+    hidespines!(ax)
+    @test !ax.elements[:spine].visible[] && !ax.elements[:bands].visible[]
+end
+
+@testset "band sweep" begin
+    black, white = Makie.to_color(:black), Makie.to_color(:white)
+    lp = Point2d[(0, 0), (100, 0), (100, 50), (0, 50)]
+    # three exits: two colours cannot alternate around an odd count, so the
+    # closing band is split and the extra boundary is recorded
+    ex = [(1, 1, Point2d(30, 0)), (1, 1, Point2d(60, 0)), (1, 3, Point2d(40, 50))]
+    b = GM.frame_bands([lp], ex, 5.0, [black, white])
+    @test length(b.polygons) == 4 && length(b.boundaries[1]) == 4 && b.extra[1] != 0
+    @test all(b.colors[i] != b.colors[mod1(i + 1, 4)] for i in 1:4)
+    @test all(b.loop .== 1)
+    for poly in b.polygons, p in poly
+        @test !(0 < p[1] < 100 && 0 < p[2] < 50)
+        @test -5.0001 <= p[1] <= 105.0001 && -5.0001 <= p[2] <= 55.0001
+    end
+    # four exits: no split needed, and every boundary is an exit
+    ex4 = vcat(ex, [(1, 3, Point2d(70, 50))])
+    b4 = GM.frame_bands([lp], ex4, 5.0, [black, white])
+    @test length(b4.polygons) == 4 && b4.extra[1] == 0
+    @test Set(b4.boundaries[1]) == Set(Point2d[(30, 0), (60, 0), (40, 50), (70, 50)])
+    # an exit on a corner: the band starting there owns the corner square
+    exc = [(1, 1, Point2d(0, 0)), (1, 2, Point2d(100, 0)), (1, 3, Point2d(100, 50)), (1, 4, Point2d(0, 50))]
+    bc = GM.frame_bands([lp], exc, 5.0, [black, white])
+    @test length(bc.polygons) == 4
+    @test Point2d(-5, -5) in bc.polygons[1] && Point2d(105, -5) in bc.polygons[2]
+    @test all(poly -> length(unique(poly)) == length(poly), bc.polygons)
+    # exits within a pixel are one boundary; a loop with no exit is one band
+    bm = GM.frame_bands([lp], [(1, 1, Point2d(30, 0)), (1, 1, Point2d(30.5, 0))], 5.0, [black, white])
+    @test length(bm.polygons) == 1
+    b0 = GM.frame_bands([lp], Tuple{Int, Int, Point2d}[], 5.0, [black, white])
+    @test length(b0.polygons) == 1 && b0.extra[1] == 1
+    # a mirrored loop (map on the right) is offset the other way
+    bmir = GM.frame_bands([lp], ex4, 5.0, [black, white]; outward = -1)
+    @test all(p -> 0 - 1e-9 <= p[1] <= 100 + 1e-9 && 0 - 1e-9 <= p[2] <= 50 + 1e-9, Iterators.flatten(bmir.polygons))
+end
+
+@testset "grid z-order and render order" begin
+    fig, ax = build_case(decoration_case(BASELINE_CASES, "merc_reg"))
+    sc = scatter!(ax, [10.0], [45.0])
+    @test isempty(grid_behind("merc_reg", ax, sc))
+    @test Makie.zvalue2d(ax.elements[:xgrid]) < Makie.zvalue2d(sc) < Makie.zvalue2d(ax.elements[:spine])
+    ax.gridbehind = false
+    @test isempty(grid_behind("merc_reg", ax, sc))
+    @test Makie.zvalue2d(ax.elements[:xgrid]) > Makie.zvalue2d(sc)
+    ax.gridbehind = true
+    @test isempty(grid_behind("merc_reg", ax, sc))
+    # the render order is fixed: graticule, plots, band, spine, ticks, labels, interior labels
+    z(k) = Makie.zvalue2d(ax.elements[k])
+    @test z(:ygrid) < 0 < z(:bands) < z(:spine) < z(:xticks) == z(:yticks) < z(:xticklabels) == z(:yticklabels) < z(:xinteriorlabels)
+    # the spine is drawn in the block scene in pixels, so the axis viewport does not clip it
+    @test ax.elements[:spine].parent === ax.blockscene && ax.elements[:bands].parent === ax.blockscene
+    @test ax.elements[:spine].space[] === :pixel
+    # its points are the frame in pixels, closed
+    sp = ax.graph[:spine_px][]
+    @test sp[1] == sp[end] && sp[1] == GM.decorations(ax).pixels.frame[1][1]
+end
