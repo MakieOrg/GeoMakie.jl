@@ -35,11 +35,13 @@ const MOST_PROJECTION_CASES = DecorationCase[
     for dest in MOST_PROJECTIONS
 ]
 
-# Attribute variants: the axis positions on a rectangular frame.
+# Attribute variants: the axis positions on a rectangular frame, and the
+# interior-label column moved to another carrier meridian.
 const VARIANT_CASES = DecorationCase[
     DecorationCase("merc_reg_top", "+proj=merc", ((-10, 30), (35, 60)), (; xaxisposition = :top)),
     DecorationCase("merc_reg_right", "+proj=merc", ((-10, 30), (35, 60)), (; yaxisposition = :right)),
     DecorationCase("merc_reg_both", "+proj=merc", ((-10, 30), (35, 60)), (; xaxisposition = :both, yaxisposition = :both)),
+    DecorationCase("laea_polar_c90", "+proj=laea +lat_0=90 +lon_0=0", nothing, (; carriermeridian = 90)),
 ]
 
 const DECORATION_CASES = vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES, MOST_PROJECTION_CASES)
@@ -56,8 +58,24 @@ function build_case(c::DecorationCase; size = (600, 400), coastlines::Bool = tru
     return fig, ax
 end
 
-"The strings drawn for one family, in drawing order."
+"The strings drawn on the frame for one family, in drawing order."
 drawn_labels(d, family::Symbol) = d.pixels.strings[family]
+
+"The interior labels drawn for one family."
+interior_drawn(d, family::Symbol) = [l for l in d.labels[d.pixels.kept] if GeoMakie.isinterior(l) && l.exit.family == family]
+
+"""
+Every drawn graticule line of `family` has exactly one interior label, all on
+one carrier (`carrier` when given).
+"""
+function interior_once(d, family::Symbol, carrier = nothing)
+    lines = Set(l.value for l in d.graticule if l.family == family)
+    ls = interior_drawn(d, family)
+    vals = [l.exit.value for l in ls]
+    carriers = unique(l.carrier for l in ls)
+    return Set(vals) == lines && length(vals) == length(lines) && length(carriers) == 1 &&
+        (carrier === nothing || carriers[1] == carrier)
+end
 
 # Floors: what a case must show at 600 x 400 with the default finder.  Each
 # entry maps a case name to a function of the decorations returning a vector
@@ -81,6 +99,26 @@ const FLOORS = Dict{String, Function}(
     "moll" => d -> [
         ("nothing drawn at the pole points", isempty(drawn_labels(d, :lon))),
         ("pole exits are reported convergent", count(s -> s.reason == :convergent && s.family == :lon, d.suppressed) >= 3),
+        ("every meridian is labelled once on one carrier parallel", interior_once(d, :lon)),
+        ("no interior latitude labels", isempty(interior_drawn(d, :lat))),
+    ],
+    # closed parallels: one interior label each, down the carrier meridian
+    "laea_polar_nolimits" => d -> [
+        ("every parallel is labelled once on the central meridian", interior_once(d, :lat, 0.0)),
+        ("no interior longitude labels", isempty(interior_drawn(d, :lon))),
+    ],
+    "stere_polar" => d -> [
+        ("every parallel is labelled once on the central meridian", interior_once(d, :lat, 0.0)),
+        ("no interior longitude labels", isempty(interior_drawn(d, :lon))),
+    ],
+    # "45°S" is too wide to sit between its parallel and the equator on the side
+    "laea_polar_c90" => d -> [
+        ("the column moves to the 90°E meridian", Set(l.text for l in interior_drawn(d, :lat)) == Set(["0°", "45°N"]) &&
+            all(l -> l.carrier == 90.0, interior_drawn(d, :lat))),
+        ("the parallel that does not fit is reported", any(s -> s.kind == :interior && s.value == -45.0, d.suppressed)),
+    ],
+    "merc_reg" => d -> [
+        ("no interior labels", isempty(interior_drawn(d, :lon)) && isempty(interior_drawn(d, :lat))),
     ],
     # a 0..3° view: every whole degree is a tick with both endpoints, at the
     # step each direction's room allows (the taller direction may go to 0.5°)

@@ -558,3 +558,104 @@ function central_meridian(t)
     id === nothing && return 0.0
     return get(id.params, :lon_0, 0.0)
 end
+
+# ---- carrier crossings, for interior labels ---------------------------------
+
+const TANGENT_STEP_DEG = 0.01           # finite-difference step for a graticule tangent in dest space
+const TANGENT_JUMP_FRAC = 1e-2          # a difference longer than this × extent crossed a seam
+
+"""
+    CarrierCrossing
+
+Where a graticule line meets a carrier line of the other family: the line's
+`family` and `value`, the `carrier`'s value, the point in dest space, and the
+unit dest-space tangents of the carrier and of the line there.  An interior
+label hangs from one of these.
+"""
+struct CarrierCrossing
+    family::Symbol
+    value::Float64
+    carrier::Float64
+    p::Point2d
+    ctangent::Vec2d
+    ltangent::Vec2d
+end
+
+"""
+    _lonlat_tangent(t, lon, lat, dlon, dlat, extent) -> Union{Nothing, Vec2d}
+
+Unit dest-space direction of the lon/lat curve through `(lon, lat)` along
+`(dlon, dlat)`: a central difference, falling back to one-sided ones; a
+difference that jumped across a seam or vanished is rejected.
+"""
+function _lonlat_tangent(t, lon, lat, dlon, dlat, extent)
+    lat0, lat1 = clamp(lat - dlat, -90.0, 90.0), clamp(lat + dlat, -90.0, 90.0)
+    p1 = project_lonlat(t, lon - dlon, lat0)
+    p2 = project_lonlat(t, lon + dlon, lat1)
+    p0 = project_lonlat(t, lon, lat)
+    limit = TANGENT_JUMP_FRAC * extent
+    for (a, b) in ((p1, p2), (p0, p2), (p1, p0))
+        (_finite2(a) && _finite2(b)) || continue
+        d = b - a
+        n = norm(d)
+        (n > 0 && n < limit) || continue
+        return Vec2d(d / n)
+    end
+    return nothing
+end
+
+"""
+    carrier_crossings(family, values, carrier, view, t, rect) -> Vector{CarrierCrossing}
+
+The crossings of the `family` lines at `values` with the carrier line of the
+other family at `carrier`, keeping those inside the view and the rect.
+"""
+function carrier_crossings(family::Symbol, values, carrier::Real, view::SphereRegion, t, rect::Rect2d)
+    out = CarrierCrossing[]
+    extent = max(maximum(widths(rect)), 1e-300)
+    tol = ON_FRAME_FRAC * extent
+    x0, y0 = minimum(rect) .- tol
+    x1, y1 = maximum(rect) .+ tol
+    δ = TANGENT_STEP_DEG
+    for v in values
+        lon, lat = family === :lon ? (float(v), float(carrier)) : (float(carrier), float(v))
+        abs(lat) >= 90 - 1e-9 && continue
+        contains(view, lonlat_to_xyz(lon, lat)) || continue
+        p = project_lonlat(t, lon, lat)
+        _finite2(p) || continue
+        (x0 <= p[1] <= x1 && y0 <= p[2] <= y1) || continue
+        along_parallel = _lonlat_tangent(t, lon, lat, δ, 0.0, extent)
+        along_meridian = _lonlat_tangent(t, lon, lat, 0.0, δ, extent)
+        (along_parallel === nothing || along_meridian === nothing) && continue
+        ct, lt = family === :lon ? (along_parallel, along_meridian) : (along_meridian, along_parallel)
+        push!(out, CarrierCrossing(family, float(v), float(carrier), p, ct, lt))
+    end
+    return out
+end
+
+_lon_distance(a, b) = (d = mod(a - b, 360.0); min(d, 360.0 - d))
+
+"""
+    label_carriers(xvals, yvals, lon_mid, lat_mid, carriermeridian, carrierparallel) -> (; meridian, parallels)
+
+The carrier meridian interior latitude labels sit beside (the drawn meridian
+nearest the central one, `lon_mid`, unless the user named one) and the
+candidate carrier parallels for interior longitude labels in preference
+order: outermost first, south before north (only the user's when named).
+`lat_mid` stands in when no parallel is drawn.
+"""
+function label_carriers(xvals, yvals, lon_mid::Real, lat_mid::Real, carriermeridian, carrierparallel)
+    meridian = if carriermeridian isa Makie.Automatic
+        isempty(xvals) ? float(lon_mid) : float(xvals[argmin([_lon_distance(v, lon_mid) for v in xvals])])
+    else
+        float(carriermeridian)
+    end
+    parallels = if carrierparallel isa Makie.Automatic
+        cands = Float64[float(v) for v in yvals if abs(v) < 90 - 1e-9]
+        isempty(cands) && push!(cands, float(lat_mid))
+        sort!(cands; by = v -> (-abs(v), v))
+    else
+        Float64[float(carrierparallel)]
+    end
+    return (; meridian, parallels)
+end

@@ -210,8 +210,9 @@ end
             v = phase4_violations(c.name, d)
             @test isempty(v)
             isempty(v) || foreach(println, v)
-            # the report accounts for every exit that did not become a drawn label
-            @test length(d.pixels.kept) + count(s -> s.reason != :noexit, d.suppressed) == length(d.exits)
+            # the report accounts for every exit that did not become a drawn frame label
+            @test count(!GM.isinterior, d.labels[d.pixels.kept]) +
+                count(s -> s.kind == :frame && s.reason != :noexit, d.suppressed) == length(d.exits)
         end
     end
     # issue 388: no longitude label sits in the latitude column, and the zero
@@ -287,4 +288,117 @@ end
     Makie.update_state_before_display!(fig)
     p = ax.layoutobservables.protrusions[]
     @test p.left == 0 && p.right == 0 && p.bottom == 0
+end
+
+# ---- Phase 5: interior labels -------------------------------------------------
+
+const REGIONAL_CASES = ("merc_reg", "zoom3", "lcc", "issue234", "issue388", "merc_reg_top", "merc_reg_right", "merc_reg_both")
+const INTERIOR_CASES = ("laea_polar_nolimits", "stere_polar", "moll", "igh", "ob_tran")
+
+@testset "interior labels" begin
+    for c in vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES)
+        fig, ax = build_case(c)
+        d = GM.decorations(ax)
+        @testset "$(c.name)" begin
+            v = phase5_violations(c.name, d)
+            @test isempty(v)
+            isempty(v) || foreach(println, v)
+            # an interior label is drawn through its own plots, never the frame ones
+            for family in (:lon, :lat)
+                @test length(d.pixels.interior_strings[family]) == length(interior_drawn(d, family))
+                @test length(d.pixels.strings[family]) == count(l -> !GM.isinterior(l) && l.exit.family == family, d.labels[d.pixels.kept])
+            end
+            # interior labels reserve no layout space
+            @test d.bound == GM.protrusion_bound(filter(!GM.isinterior, d.labels), (; lon = true, lat = true))
+            # every line with neither a frame candidate nor a frame-rule drop is drawn inside or reported
+            framed = Set((l.exit.family, l.exit.value) for l in d.labels if !GM.isinterior(l))
+            blocked = Set((s.family, s.value) for s in d.suppressed if s.kind == :frame && s.reason in (:family, :grazing))
+            inside = Set((l.exit.family, l.exit.value) for l in interior_drawn(d, :lon)) ∪ Set((l.exit.family, l.exit.value) for l in interior_drawn(d, :lat))
+            reported = Set((s.family, s.value) for s in d.suppressed if s.kind == :interior)
+            for l in d.graticule
+                key = (l.family, l.value)
+                (key in framed || key in blocked) && continue
+                @test key in inside || key in reported
+            end
+        end
+    end
+    # regional maps: every line reaches the frame, so nothing is drawn inside
+    for name in REGIONAL_CASES
+        fig, ax = build_case(decoration_case(DECORATION_CASES, name))
+        d = GM.decorations(ax)
+        @test !any(GM.isinterior, d.labels)
+        @test !any(s -> s.kind == :interior, d.suppressed)
+    end
+    # the switch removes them and every other predicate still passes
+    for name in INTERIOR_CASES
+        c = decoration_case(DECORATION_CASES, name)
+        fig, ax = build_case(c; interiorlabels = false)
+        d = GM.decorations(ax)
+        @testset "$name without interior labels" begin
+            @test !any(GM.isinterior, d.labels)
+            @test isempty(d.pixels.interior_strings[:lon]) && isempty(d.pixels.interior_strings[:lat])
+            v = vcat(phase3_violations(name, d), phase4_violations(name, d))
+            @test isempty(v)
+            isempty(v) || foreach(println, v)
+        end
+    end
+    # the carrier meridian moves the polar column.  On the 90°E meridian the
+    # labels' width runs radially, and "45°S" no longer fits between its own
+    # parallel and the equator (28 px apart at this size), so that one is
+    # reported rather than drawn.
+    fig, ax0 = build_case(decoration_case(DECORATION_CASES, "laea_polar_nolimits"))
+    fig, ax90 = build_case(decoration_case(DECORATION_CASES, "laea_polar_c90"))
+    d0, d90 = GM.decorations(ax0), GM.decorations(ax90)
+    @test Set(l.text for l in interior_drawn(d0, :lat)) == Set(["45°S", "0°", "45°N"])
+    @test Set(l.text for l in interior_drawn(d90, :lat)) == Set(["0°", "45°N"])
+    @test [(s.value, s.reason) for s in d90.suppressed if s.kind == :interior] == [(-45.0, :crossed)]
+    @test all(l -> l.carrier == 0.0, interior_drawn(d0, :lat)) && all(l -> l.carrier == 90.0, interior_drawn(d90, :lat))
+    @test d0.pixels.interior_positions[:lat] != d90.pixels.interior_positions[:lat]
+    # the column on the 90°E meridian lies to the right of the pole, the default one below it
+    pole = d0.pixels.frame[1] |> pts -> Point2d(sum(pts) / length(pts))
+    @test all(p -> p[1] > pole[1] + 5, d90.pixels.interior_positions[:lat])
+    @test all(p -> p[2] < pole[2] - 5, d0.pixels.interior_positions[:lat])
+    # a named carrier parallel is used as given
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "moll"); carrierparallel = 45)
+    d = GM.decorations(ax)
+    @test !isempty(interior_drawn(d, :lon)) && all(l -> l.carrier == 45.0, interior_drawn(d, :lon))
+    @test isempty(phase5_violations("moll_c45", d))
+    # :all forces an interior label onto lines that do reach the frame
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "merc_reg"); interiorlabels = :all)
+    d = GM.decorations(ax)
+    @test !isempty(interior_drawn(d, :lon)) && !isempty(interior_drawn(d, :lat))
+    @test !isempty(drawn_labels(d, :lon)) && !isempty(drawn_labels(d, :lat))
+    v = vcat(phase3_violations("merc_reg_all", d), phase4_violations("merc_reg_all", d), phase5_violations("merc_reg_all", d))
+    @test isempty(v)
+    isempty(v) || foreach(println, v)
+    # the halo: its own plots under the labels, in the background colour unless told otherwise
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "laea_polar_nolimits"))
+    @test haskey(ax.elements, :yinteriorlabels) && haskey(ax.elements, :yinteriorhalo)
+    @test ax.elements[:yinteriorhalo].color[] == Makie.to_color(ax.blockscene.backgroundcolor[])
+    @test ax.elements[:yinteriorhalo].strokewidth[] == ax.interiorlabelhalowidth[]
+    @test ax.elements[:yinteriorhalo].visible[]
+    ax.interiorlabelhalo = false
+    @test !ax.elements[:yinteriorhalo].visible[]
+    ax.interiorlabelhalocolor = :red
+    @test ax.elements[:yinteriorhalo].color[] == Makie.to_color(:red)
+    @test ax.elements[:yinteriorlabels].text[] == d0.pixels.interior_strings[:lat]
+    hideydecorations!(ax)
+    @test !ax.elements[:yinteriorlabels].visible[]
+end
+
+@testset "most_projections interior labels" begin
+    for c in MOST_PROJECTION_CASES
+        fig, ax = try
+            build_case(c; coastlines = false)
+        catch e
+            @warn "skipping $(c.name): $(sprint(showerror, e))"
+            continue
+        end
+        d = GM.decorations(ax)
+        @testset "$(c.name)" begin
+            v = phase5_violations(c.name, d)
+            @test isempty(v)
+            isempty(v) || foreach(println, v)
+        end
+    end
 end

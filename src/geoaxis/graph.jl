@@ -17,11 +17,13 @@ each stage is computed once per change of its inputs and pulled on demand:
     3  graticule          ← x/ytickvalues, view, transform, finallimits, extent  → lines!(grid)
     2  rim_pieces         ← view                       (rim(view), for exit angles on the sphere)
     3  exits              ← graticule, frame, finallimits, rim_pieces
-    3  labels, suppressed ← exits, frame, finallimits, formats, fonts, sizes, pads, tick sizes, rotations, aligns,
-                            x/yaxisposition, ticklabelminangle
+    3  crossings          ← carriers, x/ytickvalues, view, transform, finallimits, carriermeridian, carrierparallel
+                            (where each graticule line meets the carrier lines interior labels sit beside)
+    3  labels, suppressed ← exits, frame, finallimits, graticule, crossings, carriers, formats, fonts, sizes, pads,
+                            tick sizes, rotations, aligns, x/yaxisposition, ticklabelminangle, ticklabelmingap, interiorlabels
     3  protrusion_bound   ← labels, x/yticklabelsvisible                → layoutobservables.protrusions (bridged)
     4  pixels             ← frame, graticule, labels, projectionview, viewport, tick attributes,
-                            ticklabelmingap, ticklabelcollisions       → text!, linesegments!; the crowding report
+                            ticklabelmingap, ticklabelcollisions       → text! (frame and interior), linesegments!; the crowding report
 
 `lonlat_limits` is the user's lon/lat limit rectangle (the whole sphere by
 default); `reset_limits!` writes it.  Level 3 reads the viewport only to
@@ -128,7 +130,7 @@ function build_graph!(ax::GeoAxis)
     ComputePipeline.add_input!(g, :projectionview, scene.camera.projectionview)
     ComputePipeline.add_input!(g, :fonts, Makie.to_value(theme(ax.blockscene, :fonts)))
     for k in (:xticks, :yticks, :xtickformat, :ytickformat, :xticklabelalign, :yticklabelalign,
-              :xticklabelfont, :yticklabelfont)
+              :xticklabelfont, :yticklabelfont, :interiorlabels, :carriermeridian, :carrierparallel)
         ComputePipeline.add_input!(boxed, g, k, getproperty(ax, k))
     end
     for k in (:xticklabelsize, :yticklabelsize, :xticklabelpad, :yticklabelpad, :xticksize, :yticksize,
@@ -192,23 +194,34 @@ function build_graph!(ax::GeoAxis)
     ComputePipeline.map!(g, [:graticule, :frame, :finallimits, :rim_pieces], :exits) do lines, f, lims, pieces
         exits(lines, f, Rect2d(lims), pieces)
     end
-    ComputePipeline.map!(g, [:exits, :frame, :finallimits, :xtickvalues, :ytickvalues, :xticks, :yticks,
+    # where each graticule line meets the carrier lines interior labels sit beside
+    ComputePipeline.map!(g, [:carriers, :xtickvalues, :ytickvalues, :view, :transform, :finallimits,
+                             :carriermeridian, :carrierparallel], :crossings) do c, xt, yt, view, t, lims, cm, cp
+        rect = Rect2d(lims)
+        lc = label_carriers(xt.values, yt.values, c.lat.value, c.lon.value, cm, cp)
+        lat = carrier_crossings(:lat, yt.values, lc.meridian, view, t, rect)
+        lon = [(p, carrier_crossings(:lon, xt.values, p, view, t, rect)) for p in lc.parallels]
+        (; lat_carrier = lc.meridian, lat, lon)
+    end
+    ComputePipeline.map!(g, [:exits, :frame, :finallimits, :graticule, :crossings, :carriers,
+                             :xtickvalues, :ytickvalues, :xticks, :yticks,
                              :xtickformat, :ytickformat, :fonts,
                              :xticklabelsize, :yticklabelsize, :xticklabelfont, :yticklabelfont,
                              :xticklabelpad, :yticklabelpad, :xticksize, :yticksize, :xticksvisible, :yticksvisible,
                              :xticklabelrotation, :yticklabelrotation, :xticklabelalign, :yticklabelalign,
-                             :xaxisposition, :yaxisposition, :ticklabelminangle],
-                         [:labels, :suppressed]) do ex, f, lims, xt, yt, xticks, yticks, xfmt, yfmt, fonts,
+                             :xaxisposition, :yaxisposition, :ticklabelminangle, :ticklabelmingap, :interiorlabels],
+                         [:labels, :suppressed]) do ex, f, lims, lines, crossings, c, xt, yt, xticks, yticks, xfmt, yfmt, fonts,
                                      xsize, ysize, xfont, yfont, xpad, ypad, xtsize, ytsize, xtvis, ytvis,
-                                     xrot, yrot, xalign, yalign, xpos, ypos, minangle
+                                     xrot, yrot, xalign, yalign, xpos, ypos, minangle, mingap, interior
         attrs = (;
             lon = (; labels = _label_table(xt, xfmt, xticks, :lon), size = xsize, font = xfont, pad = xpad,
                      ticksize = xtsize, ticksvisible = xtvis, rotation = xrot, align = xalign),
             lat = (; labels = _label_table(yt, yfmt, yticks, :lat), size = ysize, font = yfont, pad = ypad,
                      ticksize = ytsize, ticksvisible = ytvis, rotation = yrot, align = yalign),
             fonts, xaxisposition = xpos, yaxisposition = ypos, minangle,
+            interior = (; mode = interior, px_scale = c.px_scale, mingap),
         )
-        place(ex, f, Rect2d(lims), attrs)
+        place(ex, f, Rect2d(lims), lines, crossings, attrs)
     end
     ComputePipeline.map!(g, [:labels, :xticklabelsvisible, :yticklabelsvisible], :protrusion_bound) do labels, xv, yv
         protrusion_bound(labels, (; lon = xv, lat = yv))
@@ -220,6 +233,7 @@ function build_graph!(ax::GeoAxis)
                              :xticksize, :yticksize, :xtickalign, :ytickalign, :xticksvisible, :yticksvisible,
                              :ticklabelmingap, :ticklabelcollisions, :ticklabelreport, :ticklabelminangle],
                          [:pixels, :xlabel_positions, :xlabel_strings, :ylabel_positions, :ylabel_strings,
+                          :xinterior_positions, :xinterior_strings, :yinterior_positions, :yinterior_strings,
                           :xstubs, :ystubs]) do f, lines, labels, sup3, pv, vp, xts, yts, xta, yta, xtv, ytv,
                                                 mingap, collisions, report, minangle
         px = pixels(f, lines, labels, pv, vp,
@@ -232,7 +246,9 @@ function build_graph!(ax::GeoAxis)
             last_report[] = msg
             isempty(msg) || report_suppressions(vcat(sup3, px.suppressed), report, mingap, minangle)
         end
-        (px, px.positions[:lon], px.strings[:lon], px.positions[:lat], px.strings[:lat], px.stubs[:lon], px.stubs[:lat])
+        (px, px.positions[:lon], px.strings[:lon], px.positions[:lat], px.strings[:lat],
+         px.interior_positions[:lon], px.interior_strings[:lon], px.interior_positions[:lat], px.interior_strings[:lat],
+         px.stubs[:lon], px.stubs[:lat])
     end
 
     setfield!(ax, :graph, g)
@@ -248,7 +264,8 @@ The axis' current decoration state, read back from the graph: the dest-space
 `frame`, `extent`, tick sets, `graticule`, `exits`, `labels`, the protrusion
 `bound`, the pixel-space `pixels`, and `suppressed` (every tick not drawn,
 with its reason, from both levels), with `targetlimits`, `finallimits`,
-`view`, `transform` and `viewport` beside them.
+`view`, `transform`, `viewport`, the carrier `crossings` and the
+`interiorlabels` mode beside them.
 """
 decorations(ax::GeoAxis) = (;
     frame = ax.graph[:frame][],
@@ -271,6 +288,8 @@ decorations(ax::GeoAxis) = (;
     viewport = ax.scene.viewport[],
     xaxisposition = ax.xaxisposition[],
     yaxisposition = ax.yaxisposition[],
+    crossings = ax.graph[:crossings][],
+    interiorlabels = ax.interiorlabels[],
 )
 
 """

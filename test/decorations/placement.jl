@@ -119,11 +119,11 @@ end
     @test !isempty(g)
     @test occursin("grazing angle; controlled by `ticklabelminangle`, currently 60.0°", GM.suppression_report(d60.suppressed, 2.0, 60.0))
     # a meridian lying on a cut seam (igh's 180°) leaves at 0° where it is not
-    # also a pole point, and is never labelled
+    # also a pole point, and is never labelled on the frame
     fig, ax = build_case(decoration_case(DECORATION_CASES, "igh"))
     di = GM.decorations(ax)
-    @test all(s -> s.reason in (:grazing, :convergent), filter(s -> s.family == :lon && s.value == 180.0, di.suppressed))
-    @test !any(l -> l.exit.family == :lon && l.exit.value == 180.0, di.labels[di.pixels.kept])
+    @test all(s -> s.reason in (:grazing, :convergent), filter(s -> s.family == :lon && s.value == 180.0 && s.kind == :frame, di.suppressed))
+    @test !any(l -> !GM.isinterior(l) && l.exit.family == :lon && l.exit.value == 180.0, di.labels[di.pixels.kept])
     @test any(e -> e.family == :lon && e.value == 180.0 && e.angle < 1, di.exits)
 end
 
@@ -143,5 +143,86 @@ end
         @test (b.right > 0) == (:right in wanty) && (b.left > 0) == (:left in wanty)
         # the rejected exits are in the report
         @test count(s -> s.reason == :family, d.suppressed) == length(d.exits) - length(d.labels)
+    end
+end
+
+# ---- Phase 5: interior labels -------------------------------------------------
+
+@testset "boxes against lines" begin
+    b = GM.OBox(Point2d(0, 0), Vec2d(10, 5), 0.0)
+    @test GM.segment_crosses_box(b, Point2d(-20, 0), Point2d(20, 0))
+    @test !GM.segment_crosses_box(b, Point2d(-20, 6), Point2d(20, 6))
+    @test GM.segment_crosses_box(b, Point2d(0, 0), Point2d(0, 0))          # a point inside
+    @test GM.segment_crosses_box(b, Point2d(9, 4), Point2d(30, 30))        # one end inside
+    # a rotated box: a segment inside the axis-aligned bounds but clear of the box
+    r = GM.OBox(Point2d(0, 0), Vec2d(10, 2), pi / 4)
+    @test !GM.segment_crosses_box(r, Point2d(-8, 8), Point2d(-4, 4))
+    @test GM.segment_crosses_box(r, Point2d(-8, 8), Point2d(8, 8))         # clips the far corner at (5.7, 8.5)
+    @test GM.segment_crosses_box(r, Point2d(-8, -8), Point2d(8, 8))
+    pts = [Point2d(-20, 0), Point2d(-5, 0), Point2d(NaN, NaN), Point2d(5, 0), Point2d(20, 0)]
+    @test GM.polyline_crosses_box(b, pts, GM._aabb(pts))                   # the second run enters the box
+    far = [Point2d(-20, 10), Point2d(20, 10)]
+    @test !GM.polyline_crosses_box(b, far, GM._aabb(far))
+    square = [Point2d[Point2d(-50, -50), Point2d(50, -50), Point2d(50, 50), Point2d(-50, 50)]]
+    @test GM.box_within_loops(b, square)
+    @test !GM.box_within_loops(GM.OBox(Point2d(45, 0), Vec2d(10, 5), 0.0), square)   # straddles the edge
+    @test !GM.box_within_loops(GM.OBox(Point2d(70, 0), Vec2d(10, 5), 0.0), square)   # outside
+    hole = [square[1], Point2d[Point2d(-5, -5), Point2d(5, -5), Point2d(5, 5), Point2d(-5, 5)]]
+    @test !GM.box_within_loops(b, hole)
+    @test GM.box_within_loops(GM.OBox(Point2d(30, 30), Vec2d(5, 5), 0.0), hole)
+end
+
+@testset "interior placements" begin
+    # a parallel crossing the carrier meridian below the pole: the carrier runs
+    # up (+y), the parallel runs right (+x)
+    x = GM.CarrierCrossing(:lat, 45.0, 0.0, Point2d(0, -50), Vec2d(0, 1), Vec2d(1, 0))
+    half = Vec2d(10, 5)
+    centre(mode) = GM.interior_box(x, mode, half, 2.0, 0.0).centre
+    @test centre((1, 0)) ≈ Point2d(12, -50)         # beside the carrier, straddling its own line
+    @test centre((-1, 0)) ≈ Point2d(-12, -50)
+    @test centre((0, -1)) ≈ Point2d(0, -43)         # on the carrier, poleward of its line
+    @test centre((0, 1)) ≈ Point2d(0, -57)
+    @test centre((1, -1)) ≈ Point2d(12, -43)        # the quadrant
+    @test GM.INTERIOR_MODES[1] == (1, 0)
+    # the carriers: the drawn meridian nearest the central one, parallels outermost first, south before north
+    lc = GM.label_carriers([180.0, -135.0, -90.0, -45.0, 0.0, 45.0, 90.0, 135.0], [-60.0, -30.0, 0.0, 30.0, 60.0, 90.0], 10.0, 0.0, Makie.automatic, Makie.automatic)
+    @test lc.meridian == 0.0
+    @test lc.parallels == [-60.0, 60.0, -30.0, 30.0, 0.0]
+    @test GM.label_carriers([0.0, 90.0], [0.0], 170.0, 0.0, Makie.automatic, Makie.automatic).meridian == 90.0   # wrap-aware
+    @test GM.label_carriers(Float64[], Float64[], 12.0, 3.0, Makie.automatic, Makie.automatic) == (; meridian = 12.0, parallels = [3.0])
+    @test GM.label_carriers([0.0], [0.0], 0.0, 0.0, 90, -30) == (; meridian = 90.0, parallels = [-30.0])
+end
+
+@testset "interior candidates on an axis" begin
+    # closed parallels: one candidate each, the frame record still names the missing exit
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "laea_polar_nolimits"))
+    d = GM.decorations(ax)
+    ints = filter(GM.isinterior, d.labels)
+    @test Set(l.exit.value for l in ints) == Set(l.value for l in d.graticule if l.family == :lat)
+    @test all(l -> l.exit.tag == :interior && l.exit.family == :lat && isnan(l.offset) == false && l.offset == ax.yticklabelpad[], ints)
+    @test all(l -> l.priority[2] == 0.0, ints)
+    # (the pole tick at 90° has no exit either, and no line to label)
+    @test Set(s.value for s in d.suppressed if s.kind == :frame && s.reason == :noexit && s.family == :lat) ⊇ Set(l.exit.value for l in ints)
+    # every crossing sits on the carrier meridian at its parallel
+    for x in d.crossings.lat
+        ll = Makie.apply_transform(Makie.inverse_transform(d.transform), x.p)
+        @test abs(ll[1] - x.carrier) < 1e-6 && abs(ll[2] - x.value) < 1e-6
+        @test norm(x.ctangent) ≈ 1 && norm(x.ltangent) ≈ 1
+    end
+    # meridians converging to a pole point: the candidate parallels are the drawn ones
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "moll"))
+    d = GM.decorations(ax)
+    @test first.(d.crossings.lon) == [-45.0, 45.0, 0.0]
+    @test all(xs -> length(xs[2]) == length(d.xtickvalues.values), d.crossings.lon)
+    ints = filter(GM.isinterior, d.labels)
+    @test length(ints) == length(d.xtickvalues.values)
+    # the report names an interior label that finds no place
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "moll"); yticklabelsize = 60.0, xticklabelsize = 60.0, ticklabelcollisions = false)
+    d = GM.decorations(ax)
+    sup = [s for s in d.suppressed if s.kind == :interior]
+    if !isempty(sup)
+        @test all(s -> s.reason in (:crossed, :outside, :collision, :nocrossing), sup)
+        msg = GM.suppression_report(d.suppressed, 2.0, 20.0)
+        any(s -> s.reason in (:crossed, :outside), sup) && @test occursin("interior labels skipped", msg)
     end
 end

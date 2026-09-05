@@ -283,6 +283,19 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         "Where the crowding report goes when labels are skipped: `:debug`, `:info` or `:none`."
         ticklabelreport::Symbol = :debug
 
+        "Label graticule lines that never reach the frame (closed parallels, meridians converging to a pole point) inside the map, beside a carrier line.  `:all` gives every line an interior label as well as its frame label; `false` draws none."
+        interiorlabels = true
+        "The meridian interior latitude labels sit beside.  `automatic` is the drawn meridian nearest the central one."
+        carriermeridian = Makie.automatic
+        "The parallel interior longitude labels sit beside.  `automatic` is the outermost drawn parallel along which every label finds a place clear of the frame, other graticule lines and its neighbours; the equator when none does."
+        carrierparallel = Makie.automatic
+        "Draw interior labels over a halo so they stay legible over the graticule and plotted data."
+        interiorlabelhalo::Bool = true
+        "The halo colour; `automatic` is the axis background."
+        interiorlabelhalocolor = Makie.automatic
+        "The halo width in pixels."
+        interiorlabelhalowidth::Float64 = 4f0
+
     end
 end
 
@@ -365,6 +378,27 @@ function Makie.initialize_block!(axis::GeoAxis)
         inspectable=false,
     )
 
+    # Interior labels sit on the map, so they are drawn above the graticule and
+    # the plots, over a halo: the same string in the halo colour, stroked, underneath.
+    halocolor = map(axis.blockscene, axis.interiorlabelhalocolor, axis.blockscene.backgroundcolor) do c, bg
+        c isa Makie.Automatic ? Makie.to_color(bg) : Makie.to_color(c)
+    end
+    halovisible(labelsvisible) = map((h, v) -> h && v, axis.blockscene, axis.interiorlabelhalo, labelsvisible)
+    interior_text!(positions, strings, align, rotation, font, color, fontsize, visible) = begin
+        halo = text!(axis.blockscene, positions; text=strings, space=:pixel, align, rotation, font, fontsize,
+            color=halocolor, strokecolor=halocolor, strokewidth=axis.interiorlabelhalowidth,
+            visible=halovisible(visible), inspectable=false)
+        translate!(halo, 0, 0, INTERIOR_LABEL_Z)
+        label = text!(axis.blockscene, positions; text=strings, space=:pixel, align, rotation, font, fontsize,
+            color, visible, inspectable=false)
+        translate!(label, 0, 0, INTERIOR_LABEL_Z + 1)
+        (halo, label)
+    end
+    lonhalo, lonint = interior_text!(graph[:xinterior_positions], graph[:xinterior_strings], xalign,
+        axis.xticklabelrotation, axis.xticklabelfont, axis.xticklabelcolor, axis.xticklabelsize, axis.xticklabelsvisible)
+    lathalo, latint = interior_text!(graph[:yinterior_positions], graph[:yinterior_strings], yalign,
+        axis.yticklabelrotation, axis.yticklabelfont, axis.yticklabelcolor, axis.yticklabelsize, axis.yticklabelsvisible)
+
     elements = Dict{Symbol,Any}()
     setfield!(axis, :elements, elements)
     elements[:xgrid] = longridplot
@@ -374,6 +408,10 @@ function Makie.initialize_block!(axis::GeoAxis)
     elements[:yticks] = ystubs
     elements[:xticklabels] = lontex
     elements[:yticklabels] = lattex
+    elements[:xinteriorlabels] = lonint
+    elements[:yinteriorlabels] = latint
+    elements[:xinteriorhalo] = lonhalo
+    elements[:yinteriorhalo] = lathalo
 
     # The title sits above whatever the decorations push out at the top, so
     # the bound is handed to Makie's title placement as an always-on top protrusion.
@@ -450,6 +488,9 @@ end
 
 "How deep the protrusion → layout → viewport → protrusion chain may re-enter before it is cut."
 const PROTRUSION_DEPTH_CAP = 8
+
+"z of the interior labels: above the graticule (100) and the spine (101), so they read over the map."
+const INTERIOR_LABEL_Z = 200
 
 function compute_protrusions(bound, title, titlesize, titlegap, titlevisible,
     subtitle, subtitlevisible, subtitlesize, subtitlegap, titlelineheight, subtitlelineheight,

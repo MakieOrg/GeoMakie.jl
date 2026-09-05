@@ -100,11 +100,12 @@ function exact_values(name, d)
     return out
 end
 
-"No drawn label's glyph box reaches into the map body, and nothing is drawn that was suppressed."
+"No drawn frame label's glyph box reaches into the map body, and nothing is drawn that was suppressed."
 function nothing_inside(name, d)
     out = Violation[]
     px = d.pixels
     for (k, b) in enumerate(px.boxes)
+        GM.isinterior(d.labels[px.kept[k]]) && continue
         GM.box_inside_map(b, px.frame) &&
             push!(out, Violation(name, :nothing_inside, "label $(px.strings) box $k at $(b.centre) is inside the map"))
     end
@@ -125,6 +126,7 @@ function placement_on_normal(name, d)
     px = d.pixels
     for (k, i) in enumerate(px.kept)
         l = d.labels[i]
+        GM.isinterior(l) && continue
         b = px.boxes[k]; e = px.exits[k]; n = px.normals[k]
         lp = px.frame[l.exit.loop]
         ea = lp[l.exit.edge]; eb = lp[mod1(l.exit.edge + 1, length(lp))]
@@ -297,3 +299,65 @@ function phase4_violations(name, d)
     return vcat(family_rule(name, d), no_ambiguity(name, d), no_overlap(name, d),
         crowding_zero_with_default_finder(name, d), every_absent_tick_reported(name, d))
 end
+
+# ---- Phase 5: interior labels -------------------------------------------------
+
+"The pixel pieces of every graticule line as `(family, value, piece)`, in the order `pixels` stores them."
+function graticule_pieces_px(d)
+    out = Tuple{Symbol, Float64, Vector{Point2d}}[]
+    for family in (:lon, :lat)
+        k = 0
+        for l in d.graticule
+            l.family == family || continue
+            for _ in l.pieces
+                k += 1
+                push!(out, (family, l.value, d.pixels.graticule[family][k]))
+            end
+        end
+    end
+    return out
+end
+
+"""
+Every drawn interior label belongs to a line with no frame candidate (unless
+interior labels are forced on), hangs from the crossing of its line with its
+carrier, lies wholly on the map, and its box crosses no graticule line but its
+own and its carrier.
+"""
+function interior_labels(name, d)
+    out = Violation[]
+    px = d.pixels
+    framed = Set((l.exit.family, l.exit.value) for l in d.labels if !GM.isinterior(l))
+    pieces = graticule_pieces_px(d)
+    extent = maximum(widths(d.finallimits))
+    for (k, i) in enumerate(px.kept)
+        l = d.labels[i]
+        GM.isinterior(l) || continue
+        b = px.boxes[k]
+        fam, v = l.exit.family, l.exit.value
+        (d.interiorlabels === :all || !((fam, v) in framed)) ||
+            push!(out, Violation(name, :interior_labels, "$(l.text) has a frame candidate"))
+        isfinite(l.carrier) || push!(out, Violation(name, :interior_labels, "$(l.text) has no carrier"))
+        # the anchor is the projection of the crossing of the line with its carrier
+        lon, lat = fam === :lon ? (v, l.carrier) : (l.carrier, v)
+        p = Makie.apply_transform(d.transform, Point2d(lon, lat))
+        (all(isfinite, p) && norm(p - l.anchor) <= 1e-6 * extent) ||
+            push!(out, Violation(name, :interior_labels, "$(l.text) anchor $(l.anchor) is not at ($lon, $lat) = $p on its carrier $(l.carrier)"))
+        GM.box_within_loops(b, px.frame) || push!(out, Violation(name, :interior_labels, "$(l.text) box is not wholly on the map"))
+        other = fam === :lon ? :lat : :lon
+        for (pf, pv, pc) in pieces
+            ((pf, pv) == (fam, v) || (pf, pv) == (other, l.carrier)) && continue
+            GM.polyline_crosses_box(b, pc, GM._aabb(pc)) &&
+                (push!(out, Violation(name, :interior_labels, "$(l.text) box crosses $pf $pv")); break)
+        end
+        # the box clears the crossing by the pad
+        q = GM._to_local(b, px.exits[k])
+        dist = norm(max.(abs.(q) .- b.half, 0.0))
+        dist >= l.offset - 1e-6 ||
+            push!(out, Violation(name, :interior_labels, "$(l.text) box sits $(dist) px from its crossing, within the pad $(l.offset)"))
+    end
+    return out
+end
+
+"Every Phase 5 predicate on one built case."
+phase5_violations(name, d) = interior_labels(name, d)
