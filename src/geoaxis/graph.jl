@@ -11,6 +11,7 @@ each stage is computed once per change of its inputs and pulled on demand:
     2  rim_loops          ← view, ptransform           (the projected, unclipped rim)
     2  view_bbox          ← rim_loops                  → targetlimits (bridged)
     3  frame              ← rim_loops, finallimits
+    3  background_polygons ← frame                     → poly!(background): the map body in destination space
     3  spine              ← frame                      → lines!(spine)
     3  extent             ← frame, ptransform, view, finallimits
     3  carriers           ← view, transform, ptransform, finallimits, extent, viewport, frame (a pole line caps the longitude interval)
@@ -21,7 +22,7 @@ each stage is computed once per change of its inputs and pulled on demand:
     2  rim_pieces         ← view                       (rim(view), for exit angles on the sphere)
     3  exits              ← graticule, frame, finallimits, rim_pieces
     3  minor_exits        ← minor_graticule, frame, finallimits, rim_pieces   (stubs and band boundaries, never labels)
-    3  mask_polygons      ← frame, finallimits, maskoutside   → poly!(mask): the rect minus the map body, in the background colour
+    3  mask_polygons      ← frame, finallimits, maskoutside   → poly!(mask): the rect minus the map body, in the surrounding scene colour
     3  crossings          ← carriers, x/ytickvalues, view, ptransform, finallimits, carriermeridian, carrierparallel
                             (where each graticule line meets the carrier lines interior labels sit beside)
     3  x/yinterior_size   ← interiorlabelsize, x/yticklabelsize   (0.8 × the family's size when automatic) → text! fontsize
@@ -278,6 +279,9 @@ function build_graph!(ax::GeoAxis)
     ComputePipeline.map!(g, [:frame], :spine) do f
         spine_points(f)
     end
+    ComputePipeline.map!(g, [:frame], :background_polygons) do f
+        background_polygons(f)
+    end
     ComputePipeline.map!(g, [:frame, :ptransform, :view, :finallimits], :extent) do f, t, view, lims
         visible_extent(f, t, view, Rect2d(lims))
     end
@@ -450,7 +454,7 @@ The axis' current decoration state, read back from the graph: the world-space
 `labels`, the protrusion `bound` (the tick reach), the pixel-space `pixels`,
 and `suppressed` (every tick not drawn, with its reason, from both levels),
 the `minor_graticule`, `minor_exits` and pixel `minor_stubs` (empty while
-minors are hidden), the `mask` polygons, with `targetlimits`,
+minors are hidden), the `background` and `mask` polygons, with `targetlimits`,
 `finallimits`, `view`, `transform`, `viewport`, the carrier `crossings`, the
 `interiorlabels` mode with the resolved `interiorlabelsize` per family and
 `interiorlabelrotation`, the `framestyle` and the fancy `bands` beside them.
@@ -484,6 +488,7 @@ decorations(ax::GeoAxis) = (;
     minor_stubs = (; lon = ax.graph[:xminorstubs][], lat = ax.graph[:yminorstubs][]),
     xminorticksvisible = ax.xminorticksvisible[],
     yminorticksvisible = ax.yminorticksvisible[],
+    background = ax.graph[:background_polygons][],
     mask = ax.graph[:mask_polygons][],
     labels = ax.graph[:labels][],
     bound = ax.graph[:protrusion_bound][],

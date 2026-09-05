@@ -200,9 +200,9 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         framecolors = (:black, :white)
         "Draw the graticule behind the plots (`true`, as `Axis` draws its grid) or in front of them."
         gridbehind::Bool = true
-        "The axis background colour: fills the axis area, the mask outside the frame, and the interior label halo when `interiorlabelhalocolor` is `automatic`."
+        "The axis background colour: fills the map body bounded by the frame in destination space and the interior label halo when `interiorlabelhalocolor` is `automatic`."
         backgroundcolor = @inherit(:backgroundcolor, :white)
-        "Cover whatever plots draw outside the frame (between the map body and the rectangular viewport) with the background colour, so data beyond a lon/lat-limited frame or a limb never runs under the tick labels.  A no-op when the frame is the viewport rectangle."
+        "Cover whatever plots draw outside the frame (between the map body and the rectangular viewport) with the surrounding scene colour, so data beyond a lon/lat-limited frame or a limb never runs under the tick labels.  A no-op when the frame is the viewport rectangle."
         maskoutside::Bool = true
         "Controls if the x grid lines are visible."
         xgridvisible::Bool = true
@@ -346,16 +346,21 @@ function Makie.initialize_block!(axis::GeoAxis)
         transform_inv_obs[] = Makie.inverse_transform(trans)
     end
 
-    # The background fills the axis area, as on Axis, under everything.
-    backgroundplot = poly!(axis.blockscene, scene.viewport; color=axis.backgroundcolor, strokewidth=0,
-        inspectable=false)
+    # Decoration geometry in the scene is already in world space because the
+    # graph applies the scene model as part of its destination transform.
+    world() = Makie.Transformation()
+
+    # The background is the map body bounded by the frame, in destination
+    # space.  It follows projection, limits and model changes, and sits below
+    # every user plot without colouring the rectangular area outside the map.
+    backgroundplot = poly!(scene, graph[:background_polygons]; color=axis.backgroundcolor, strokewidth=0,
+        inspectable=false, xautolimits=false, yautolimits=false, transformation=world())
     translate!(backgroundplot, 0, 0, BACKGROUND_Z)
 
     # The graticule, in the scene's world space from the graph (the graph
     # applies the scene's model itself, so these plots carry a transformation
     # of their own), behind the plots unless asked otherwise; the minor lines
     # first, so the major ones draw over them.
-    world() = Makie.Transformation()
     xminorgridplot = lines!(scene, graph[:xminorgrid_points]; color=axis.xminorgridcolor, linewidth=axis.xminorgridwidth,
         visible=axis.xminorgridvisible, linestyle=axis.xminorgridstyle, transparency=true, inspectable=false,
         xautolimits=false, yautolimits=false, transformation=world())
@@ -375,10 +380,11 @@ function Makie.initialize_block!(axis::GeoAxis)
         end
     end
 
-    # The mask: the limits rectangle minus the map body, in the background
-    # colour, over the plots and under the frame, so nothing plotted beyond
-    # the frame reaches the tick labels.  Empty when the frame is the rectangle.
-    maskplot = poly!(scene, graph[:mask_polygons]; color=axis.backgroundcolor, strokewidth=0, visible=axis.maskoutside,
+    # The mask: the limits rectangle minus the map body, in the surrounding
+    # scene colour, over the plots and under the frame, so nothing plotted
+    # beyond the frame reaches the tick labels without extending the axis'
+    # own background colour past the frame.  Empty when the frame is the rectangle.
+    maskplot = poly!(scene, graph[:mask_polygons]; color=axis.blockscene.backgroundcolor, strokewidth=0, visible=axis.maskoutside,
         inspectable=false, xautolimits=false, yautolimits=false, transformation=world())
     translate!(maskplot, 0, 0, MASK_Z)
 

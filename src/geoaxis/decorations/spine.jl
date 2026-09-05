@@ -1,5 +1,5 @@
 #=
-# The spine, the fancy band, and the mask
+# The spine, the fancy band, the background, and the mask
 
 The spine is the frame drawn as a stroke, in the block scene in pixel space
 (as Makie's `Axis` draws its spines), so the whole stroke is visible where the
@@ -22,8 +22,10 @@ alternates all the way round; two colours cannot alternate around an odd
 number of exits, so its closing band is split at the middle, and that one
 boundary is not at an exit and is recorded as such.
 
-The mask is the limits rectangle minus the map body, filled in the axis
-background colour and drawn over the plots: the axis scene clips plots to the
+The background is the map body itself, assembled from the frame loops in
+destination space and drawn below all data plots.  The mask is the limits
+rectangle minus that body, filled in the surrounding scene colour and drawn
+over the plots: the axis scene clips plots to the
 rectangular viewport, so on a frame that is not the viewport (a lon/lat-limited
 region, a limb, a pseudocylindrical outline) data beyond the frame would
 otherwise be drawn out to the rectangle, over the tick labels.
@@ -309,7 +311,47 @@ function frame_bands(loops::Vector{Vector{Point2d}}, exits, width::Real, colors:
     return frame_bands(loops, tags, srcs, exits, width, colors; outward)
 end
 
-# ---- the mask -----------------------------------------------------------------
+# ---- the background and mask --------------------------------------------------
+
+"""
+    background_polygons(frame) -> Vector{Polygon{2, Float64}}
+
+The map body bounded by `frame`, as polygons in destination space.  A
+counter-clockwise loop is an exterior; each clockwise loop becomes a hole in
+the smallest exterior that contains it.  Empty and degenerate loops contribute
+nothing.
+"""
+function background_polygons(fr::Frame)
+    exterior_indices = Int[]
+    hole_indices = Int[]
+    areas = Float64[]
+    for (i, lp) in enumerate(fr.loops)
+        area = _signed_area2(lp)
+        push!(areas, area)
+        length(lp) >= 3 || continue
+        if area > 0
+            push!(exterior_indices, i)
+        elseif area < 0
+            push!(hole_indices, i)
+        end
+    end
+
+    holes = [Vector{Point2d}[] for _ in exterior_indices]
+    for hi in hole_indices
+        hp = fr.loops[hi][1]
+        candidates = [k for k in eachindex(exterior_indices) if _pip(fr.loops[exterior_indices[k]], hp)]
+        isempty(candidates) && continue
+        owner = candidates[1]
+        for k in candidates[2:end]
+            abs(areas[exterior_indices[k]]) < abs(areas[exterior_indices[owner]]) && (owner = k)
+        end
+        push!(holes[owner], copy(fr.loops[hi]))
+    end
+
+    return Polygon{2, Float64}[
+        Polygon(copy(fr.loops[i]), holes[k]) for (k, i) in enumerate(exterior_indices)
+    ]
+end
 
 "How far the mask's outer ring reaches past the limits rectangle, as a fraction of the extent (the scene clips it away)."
 const MASK_INFLATE = 0.05
