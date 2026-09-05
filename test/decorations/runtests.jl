@@ -9,4 +9,5 @@ include("predicates.jl")
 @testset "Decorations" begin
     include("ticks.jl")
     include("suite.jl")
+    include("placement.jl")
 end

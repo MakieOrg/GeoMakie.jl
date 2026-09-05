@@ -110,7 +110,7 @@ function nothing_inside(name, d)
     end
     length(px.kept) == length(px.boxes) ||
         push!(out, Violation(name, :nothing_inside, "kept/boxes mismatch"))
-    isempty(intersect(px.kept, first.(px.suppressed))) ||
+    isempty(intersect(px.kept, [s.index for s in px.suppressed])) ||
         push!(out, Violation(name, :nothing_inside, "a suppressed label was drawn"))
     return out
 end
@@ -200,4 +200,100 @@ end
 "Every Phase 3 predicate on one built case."
 function phase3_violations(name, d)
     return vcat(exact_values(name, d), nothing_inside(name, d), placement_on_normal(name, d), graticule_within_frame(name, d))
+end
+
+# ---- Phase 4: family rule and crowding ---------------------------------------
+
+"The drawn labels: `(label, box, exit px, normal px)` per kept index."
+drawn(d) = [(d.labels[i], d.pixels.boxes[k], d.pixels.exits[k], d.pixels.normals[k]) for (k, i) in enumerate(d.pixels.kept)]
+
+"""
+On a straight `:viewport` edge every drawn label is of the family that edge
+admits (longitudes on horizontal edges, latitudes on vertical ones), on a side
+the axis positions name.
+"""
+function family_rule(name, d)
+    out = Violation[]
+    for (l, _, _, _) in drawn(d)
+        e = l.exit
+        e.tag === :viewport || continue
+        side = GM.edge_side(e.normal)
+        horizontal = side === :bottom || side === :top
+        want = horizontal ? :lon : :lat
+        e.family === want ||
+            push!(out, Violation(name, :family_rule, "$(l.text) ($(e.family)) on the $side viewport edge"))
+        pos = horizontal ? d.xaxisposition : d.yaxisposition
+        (pos === :both || pos === side) ||
+            push!(out, Violation(name, :family_rule, "$(l.text) on the $side edge, axis position $pos"))
+    end
+    return out
+end
+
+"""
+No two drawn labels beside each other, pushed out the same way, print the same
+text for different families (`0°` for the equator next to `0°` for the prime
+meridian).  Labels on normals more than 45° apart sit on different sides of a
+corner, where position tells the family, as on an `Axis`.
+"""
+function no_ambiguity(name, d)
+    out = Violation[]
+    ls = drawn(d)
+    for i in eachindex(ls), j in (i + 1):length(ls)
+        a, b = ls[i], ls[j]
+        a[1].text == b[1].text || continue
+        a[1].exit.family == b[1].exit.family && continue
+        a[4] ⋅ b[4] > cosd(45) || continue
+        reach = 2 * max(maximum(a[2].half), maximum(b[2].half))
+        norm(a[3] - b[3]) < reach &&
+            push!(out, Violation(name, :no_ambiguity, "$(a[1].text) drawn for both families at $(a[3])"))
+    end
+    return out
+end
+
+"No two drawn glyph boxes intersect."
+function no_overlap(name, d)
+    out = Violation[]
+    bx = d.pixels.boxes
+    for i in eachindex(bx), j in (i + 1):length(bx)
+        GM.collides(bx[i], bx[j]) &&
+            push!(out, Violation(name, :no_overlap, "$(d.labels[d.pixels.kept[i]].text) and $(d.labels[d.pixels.kept[j]].text) overlap"))
+    end
+    return out
+end
+
+"""
+With a ladder finder no label of a family is dropped for colliding with
+another label of the same family: the finder's interval prevents it.  Two
+families sharing a curved edge may still meet; those drops are resolved by
+priority and reported.
+"""
+function crowding_zero_with_default_finder(name, d)
+    out = Violation[]
+    for s in d.suppressed
+        s.reason === :collision || continue
+        finder = s.family === :lon ? d.xticks : d.yticks
+        finder isa GM.LadderTicks || continue
+        h = d.labels[s.hit].exit
+        h.family === s.family || continue
+        push!(out, Violation(name, :crowding, "$(s.family) $(s.value) dropped against $(s.family) $(h.value)"))
+    end
+    return out
+end
+
+"Every tick value is drawn or in the suppression report."
+function every_absent_tick_reported(name, d)
+    out = Violation[]
+    shown = Set((l.exit.family, l.exit.value) for (l, _, _, _) in drawn(d))
+    reported = Set((s.family, s.value) for s in d.suppressed)
+    for (family, ts) in ((:lon, d.xtickvalues), (:lat, d.ytickvalues)), v in ts.values
+        ((family, v) in shown || (family, v) in reported) ||
+            push!(out, Violation(name, :every_absent_tick_reported, "$family $v is neither drawn nor reported"))
+    end
+    return out
+end
+
+"Every Phase 4 predicate on one built case."
+function phase4_violations(name, d)
+    return vcat(family_rule(name, d), no_ambiguity(name, d), no_overlap(name, d),
+        crowding_zero_with_default_finder(name, d), every_absent_tick_reported(name, d))
 end

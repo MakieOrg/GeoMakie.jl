@@ -6,7 +6,9 @@ struct DecorationCase
     name::String
     dest::String
     limits::Any            # `nothing` or ((lon0, lon1), (lat0, lat1))
+    attrs::NamedTuple      # extra GeoAxis attributes
 end
+DecorationCase(name, dest, limits) = DecorationCase(name, dest, limits, (;))
 
 const BASELINE_CASES = DecorationCase[
     DecorationCase("eqearth", "+proj=eqearth", nothing),
@@ -33,7 +35,14 @@ const MOST_PROJECTION_CASES = DecorationCase[
     for dest in MOST_PROJECTIONS
 ]
 
-const DECORATION_CASES = vcat(BASELINE_CASES, ISSUE_CASES, MOST_PROJECTION_CASES)
+# Attribute variants: the axis positions on a rectangular frame.
+const VARIANT_CASES = DecorationCase[
+    DecorationCase("merc_reg_top", "+proj=merc", ((-10, 30), (35, 60)), (; xaxisposition = :top)),
+    DecorationCase("merc_reg_right", "+proj=merc", ((-10, 30), (35, 60)), (; yaxisposition = :right)),
+    DecorationCase("merc_reg_both", "+proj=merc", ((-10, 30), (35, 60)), (; xaxisposition = :both, yaxisposition = :both)),
+]
+
+const DECORATION_CASES = vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES, MOST_PROJECTION_CASES)
 
 decoration_case(cases::Vector{DecorationCase}, name::AbstractString) = cases[findfirst(c -> c.name == name, cases)]
 
@@ -41,7 +50,7 @@ decoration_case(cases::Vector{DecorationCase}, name::AbstractString) = cases[fin
 function build_case(c::DecorationCase; size = (600, 400), coastlines::Bool = true, attrs...)
     fig = Figure(; size)
     kw = c.limits === nothing ? (;) : (; limits = c.limits)
-    ax = GeoAxis(fig[1, 1]; dest = c.dest, title = c.name, kw..., attrs...)
+    ax = GeoAxis(fig[1, 1]; dest = c.dest, title = c.name, kw..., c.attrs..., attrs...)
     coastlines && lines!(ax, GeoMakie.coastlines())
     Makie.update_state_before_display!(fig)
     return fig, ax
@@ -59,11 +68,27 @@ const FLOORS = Dict{String, Function}(
         ("shows 0°", "0°" in drawn_labels(d, :lon)),
         ("shows 180°", "180°" in drawn_labels(d, :lon)),
     ],
+    # the bottom (pole) edge carries every longitude in the tick set, without a drop
+    "eqearth" => d -> [
+        ("every longitude tick is drawn", Set(d.xtickvalues.values) == Set(l.exit.value for l in d.labels[d.pixels.kept] if l.exit.family == :lon)),
+        ("bottom edge runs 180° … 180°", all(s -> s in drawn_labels(d, :lon), ("180°", "90°W", "0°", "90°E"))),
+        ("no collision drop", !any(s -> s.reason == :collision, d.suppressed)),
+    ],
+    "ortho" => d -> [
+        ("labels on the limb", length(d.pixels.kept) >= 10),
+        ("both families on the limb", "0°" in drawn_labels(d, :lon) && "45°N" in drawn_labels(d, :lat)),
+    ],
+    "moll" => d -> [
+        ("nothing drawn at the pole points", isempty(drawn_labels(d, :lon))),
+        ("pole exits are reported convergent", count(s -> s.reason == :convergent && s.family == :lon, d.suppressed) >= 3),
+    ],
+    # a 0..3° view: every whole degree is a tick with both endpoints, at the
+    # step each direction's room allows (the taller direction may go to 0.5°)
     "issue234" => d -> [
         ("x values are exactly 0,1,2,3", d.xtickvalues.values == [0.0, 1.0, 2.0, 3.0]),
-        ("y values are exactly 0,1,2,3", d.ytickvalues.values == [0.0, 1.0, 2.0, 3.0]),
+        ("y values are a:s:b with s dividing 1", d.ytickvalues.values == collect(0.0:d.ytickvalues.values[2]:3.0) && isinteger(1 / d.ytickvalues.values[2])),
         ("x labels", Set(drawn_labels(d, :lon)) == Set(["0°", "1°E", "2°E", "3°E"])),
-        ("y labels", Set(drawn_labels(d, :lat)) == Set(["0°", "1°N", "2°N", "3°N"])),
+        ("y labels", issubset(["0°", "1°N", "2°N", "3°N"], drawn_labels(d, :lat)) && length(drawn_labels(d, :lat)) == length(d.ytickvalues.values)),
     ],
     "issue388" => d -> [
         ("zero meridian prints 0°", "0°" in drawn_labels(d, :lon)),

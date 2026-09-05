@@ -169,10 +169,15 @@ end
     end
 end
 
-# Frames Phase 2 could not get right (PROJ's inverse of these is unusable:
-# cass folds the sphere onto a sliver, adams_ws2 comes back as a line), so
-# placement against them is not judged yet.
-const PATHOLOGICAL_FRAMES = Set(["most_cass", "most_adams_ws2"])
+# Frames Phase 2 could not get right (PROJ's inverse of cass folds the sphere
+# onto a sliver), so placement against them is not judged yet.
+const PATHOLOGICAL_FRAMES = Set(["most_cass"])
+# Cases where the default finder cannot prevent every same-family collision:
+# bipc's probed rim is a sawtooth (accepted as-is in Phase 2), and Denoyer
+# bunches its meridians non-uniformly along a short pole line, so the
+# interval sized to that line still leaves ±90° against 0°.  Their drops are
+# resolved by priority and reported.
+const CROWDED_FRAMES = Set(["most_bipc", "most_denoy"])
 
 @testset "most_projections decorate" begin
     for c in MOST_PROJECTION_CASES
@@ -187,6 +192,52 @@ const PATHOLOGICAL_FRAMES = Set(["most_cass", "most_adams_ws2"])
             v = phase3_violations(c.name, d)
             if c.name in PATHOLOGICAL_FRAMES
                 @test_broken isempty(v)
+            else
+                @test isempty(v)
+                isempty(v) || foreach(println, v)
+            end
+        end
+    end
+end
+
+# ---- Phase 4: family rule and crowding ---------------------------------------
+
+@testset "family rule and crowding" begin
+    for c in vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES)
+        fig, ax = build_case(c)
+        d = GM.decorations(ax)
+        @testset "$(c.name)" begin
+            v = phase4_violations(c.name, d)
+            @test isempty(v)
+            isempty(v) || foreach(println, v)
+            # the report accounts for every exit that did not become a drawn label
+            @test length(d.pixels.kept) + count(s -> s.reason != :noexit, d.suppressed) == length(d.exits)
+        end
+    end
+    # issue 388: no longitude label sits in the latitude column, and the zero
+    # meridian is labelled 0° on the bottom edge
+    fig, ax = build_case(decoration_case(ISSUE_CASES, "issue388"))
+    d = GM.decorations(ax)
+    lon = [l for l in d.labels[d.pixels.kept] if l.exit.family == :lon]
+    @test all(l -> GM.edge_side(l.exit.normal) in (:bottom, :top), lon)
+    @test any(l -> l.text == "0°" && GM.edge_side(l.exit.normal) === :bottom, lon)
+end
+
+@testset "most_projections family rule and crowding" begin
+    for c in MOST_PROJECTION_CASES
+        fig, ax = try
+            build_case(c; coastlines = false)
+        catch e
+            @warn "skipping $(c.name): $(sprint(showerror, e))"
+            continue
+        end
+        d = GM.decorations(ax)
+        @testset "$(c.name)" begin
+            v = phase4_violations(c.name, d)
+            if c.name in PATHOLOGICAL_FRAMES || c.name in CROWDED_FRAMES
+                @test_broken isempty(v)
+                # the residual drops are still resolved: no overlap, everything reported
+                @test isempty(no_overlap(c.name, d)) && isempty(every_absent_tick_reported(c.name, d))
             else
                 @test isempty(v)
                 isempty(v) || foreach(println, v)

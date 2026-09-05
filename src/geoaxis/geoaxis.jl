@@ -269,8 +269,19 @@ Makie.@Block GeoAxis <: Makie.AbstractAxis begin
         "Controls if rectangle zooming affects the y dimension."
         yrectzoom::Bool = true
 
+        "Which straight (viewport) edges carry longitude labels: `:bottom`, `:top` or `:both`.  Curved frame edges label both families regardless."
         xaxisposition::Symbol = :bottom
+        "Which straight (viewport) edges carry latitude labels: `:left`, `:right` or `:both`.  Curved frame edges label both families regardless."
         yaxisposition::Symbol = :left
+
+        "A graticule line leaving the frame at less than this angle (degrees) gets no label there."
+        ticklabelminangle::Float64 = 20.0
+        "The clearance (pixels) two tick labels must keep; of two closer labels the rounder value, then the one nearer the middle of its edge, is drawn."
+        ticklabelmingap::Float64 = 2.0
+        "Drop tick labels that collide with an already placed one.  `false` draws every label, overlaps included."
+        ticklabelcollisions::Bool = true
+        "Where the crowding report goes when labels are skipped: `:debug`, `:info` or `:none`."
+        ticklabelreport::Symbol = :debug
 
     end
 end

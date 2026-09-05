@@ -12,13 +12,16 @@ each stage is computed once per change of its inputs and pulled on demand:
     3  frame              ← rim_loops, finallimits
     3  spine              ← frame                      → lines!(spine)
     3  extent             ← frame, transform, view, finallimits
-    3  carriers           ← view, transform, finallimits, extent, viewport
+    3  carriers           ← view, transform, finallimits, extent, viewport, frame (a pole line caps the longitude interval)
     3  xtickvalues        ← xticks, extent, carriers, xticklabelsize   (ytickvalues likewise)
     3  graticule          ← x/ytickvalues, view, transform, finallimits, extent  → lines!(grid)
-    3  exits              ← graticule, frame, finallimits
-    3  labels             ← exits, frame, finallimits, formats, fonts, sizes, pads, tick sizes, rotations, aligns
+    2  rim_pieces         ← view                       (rim(view), for exit angles on the sphere)
+    3  exits              ← graticule, frame, finallimits, rim_pieces
+    3  labels, suppressed ← exits, frame, finallimits, formats, fonts, sizes, pads, tick sizes, rotations, aligns,
+                            x/yaxisposition, ticklabelminangle
     3  protrusion_bound   ← labels, x/yticklabelsvisible                → layoutobservables.protrusions (bridged)
-    4  pixels             ← frame, graticule, labels, projectionview, viewport, tick attributes → text!, linesegments!
+    4  pixels             ← frame, graticule, labels, projectionview, viewport, tick attributes,
+                            ticklabelmingap, ticklabelcollisions       → text!, linesegments!; the crowding report
 
 `lonlat_limits` is the user's lon/lat limit rectangle (the whole sphere by
 default); `reset_limits!` writes it.  Level 3 reads the viewport only to
@@ -65,13 +68,21 @@ function _pixel_scale(viewport, lims::Rect2d)
     return sqrt((w[1] / lw[1]) * (w[2] / lw[2]))
 end
 
-function _tickset(finder, ext::Extent, carrier::Carrier, px_scale, fontsize, family::Symbol)
+"""
+    _tickset(finder, ext, carrier, px_scale, fontsize, family; cap = Inf)
+
+The tick set of one direction.  `cap` is a second dest-space length the labels
+must also fit along (a pole line, where meridian labels land on a
+pseudocylindrical map); the interval is sized to the shorter of the two.
+"""
+function _tickset(finder, ext::Extent, carrier::Carrier, px_scale, fontsize, family::Symbol; cap::Real = Inf)
     range = family === :lon ? lon_range(ext) : lat_range(ext)
     carrier_px = carrier.length * px_scale
     if carrier.span > 0 && carrier_px > 0
         # the finder sees the extent's span; scale the carrier to it
         carrier_px *= (family === :lon ? lon_span(ext) : lat_span(ext)) / carrier.span
     end
+    carrier_px = min(carrier_px, cap * px_scale)
     vals, minors = tickvalues(finder, range, carrier_px, fontsize; wrap = family === :lon)
     labels = ticklabels_of(finder)
     if labels === nothing && !(finder isa LadderTicks)
@@ -122,7 +133,8 @@ function build_graph!(ax::GeoAxis)
     end
     for k in (:xticklabelsize, :yticklabelsize, :xticklabelpad, :yticklabelpad, :xticksize, :yticksize,
               :xticksvisible, :yticksvisible, :xtickalign, :ytickalign, :xticklabelrotation, :yticklabelrotation,
-              :xticklabelsvisible, :yticklabelsvisible)
+              :xticklabelsvisible, :yticklabelsvisible, :xaxisposition, :yaxisposition,
+              :ticklabelminangle, :ticklabelmingap, :ticklabelcollisions, :ticklabelreport)
         ComputePipeline.add_input!(g, k, getproperty(ax, k))
     end
 
@@ -143,6 +155,9 @@ function build_graph!(ax::GeoAxis)
     ComputePipeline.map!(g, [:rim_loops, :view, :transform, :lonlat_limits], :view_bbox) do rl, view, t, lims
         rl.bbox === nothing ? _rimless_bbox(view, t, lims) : rl.bbox
     end
+    ComputePipeline.map!(g, [:view], :rim_pieces) do view
+        rim(view)
+    end
 
     # ---- level 3: the frame and everything on it (dest space) -----------------
     ComputePipeline.map!(g, [:rim_loops, :finallimits], :frame) do rl, lims
@@ -154,13 +169,14 @@ function build_graph!(ax::GeoAxis)
     ComputePipeline.map!(g, [:frame, :transform, :view, :finallimits], :extent) do f, t, view, lims
         visible_extent(f, t, view, Rect2d(lims))
     end
-    ComputePipeline.map!(g, [:view, :transform, :finallimits, :extent, :viewport], :carriers) do view, t, lims, ext, vp
+    ComputePipeline.map!(g, [:view, :transform, :finallimits, :extent, :viewport, :frame], :carriers) do view, t, lims, ext, vp, f
         rect = Rect2d(lims)
         c = carriers(view, t, rect, ext, central_meridian(t); tol = frame_tolerance(rect))
-        (; lon = c.lon, lat = c.lat, px_scale = _pixel_scale(vp, rect))
+        # meridian labels land on a pole line when the frame has one: size to it
+        (; lon = c.lon, lat = c.lat, px_scale = _pixel_scale(vp, rect), pole_length = pole_line_length(f, ext))
     end
     ComputePipeline.map!(g, [:xticks, :extent, :carriers, :xticklabelsize], :xtickvalues) do finder, ext, c, size
-        _tickset(finder, ext, c.lon, c.px_scale, size, :lon)
+        _tickset(finder, ext, c.lon, c.px_scale, size, :lon; cap = c.pole_length)
     end
     ComputePipeline.map!(g, [:yticks, :extent, :carriers, :yticklabelsize], :ytickvalues) do finder, ext, c, size
         _tickset(finder, ext, c.lat, c.px_scale, size, :lat)
@@ -173,23 +189,24 @@ function build_graph!(ax::GeoAxis)
         lat = graticule_lines(:lat, yt.values, view, t, rect, ext; tol)
         (vcat(lon, lat), graticule_points(lon), graticule_points(lat))
     end
-    ComputePipeline.map!(g, [:graticule, :frame, :finallimits], :exits) do lines, f, lims
-        exits(lines, f, Rect2d(lims))
+    ComputePipeline.map!(g, [:graticule, :frame, :finallimits, :rim_pieces], :exits) do lines, f, lims, pieces
+        exits(lines, f, Rect2d(lims), pieces)
     end
     ComputePipeline.map!(g, [:exits, :frame, :finallimits, :xtickvalues, :ytickvalues, :xticks, :yticks,
                              :xtickformat, :ytickformat, :fonts,
                              :xticklabelsize, :yticklabelsize, :xticklabelfont, :yticklabelfont,
                              :xticklabelpad, :yticklabelpad, :xticksize, :yticksize, :xticksvisible, :yticksvisible,
-                             :xticklabelrotation, :yticklabelrotation, :xticklabelalign, :yticklabelalign],
-                         :labels) do ex, f, lims, xt, yt, xticks, yticks, xfmt, yfmt, fonts,
+                             :xticklabelrotation, :yticklabelrotation, :xticklabelalign, :yticklabelalign,
+                             :xaxisposition, :yaxisposition, :ticklabelminangle],
+                         [:labels, :suppressed]) do ex, f, lims, xt, yt, xticks, yticks, xfmt, yfmt, fonts,
                                      xsize, ysize, xfont, yfont, xpad, ypad, xtsize, ytsize, xtvis, ytvis,
-                                     xrot, yrot, xalign, yalign
+                                     xrot, yrot, xalign, yalign, xpos, ypos, minangle
         attrs = (;
             lon = (; labels = _label_table(xt, xfmt, xticks, :lon), size = xsize, font = xfont, pad = xpad,
                      ticksize = xtsize, ticksvisible = xtvis, rotation = xrot, align = xalign),
             lat = (; labels = _label_table(yt, yfmt, yticks, :lat), size = ysize, font = yfont, pad = ypad,
                      ticksize = ytsize, ticksvisible = ytvis, rotation = yrot, align = yalign),
-            fonts,
+            fonts, xaxisposition = xpos, yaxisposition = ypos, minangle,
         )
         place(ex, f, Rect2d(lims), attrs)
     end
@@ -198,12 +215,23 @@ function build_graph!(ax::GeoAxis)
     end
 
     # ---- level 4: pixels ----------------------------------------------------------
-    ComputePipeline.map!(g, [:frame, :graticule, :labels, :projectionview, :viewport,
-                             :xticksize, :yticksize, :xtickalign, :ytickalign, :xticksvisible, :yticksvisible],
+    last_report = Ref("")
+    ComputePipeline.map!(g, [:frame, :graticule, :labels, :suppressed, :projectionview, :viewport,
+                             :xticksize, :yticksize, :xtickalign, :ytickalign, :xticksvisible, :yticksvisible,
+                             :ticklabelmingap, :ticklabelcollisions, :ticklabelreport, :ticklabelminangle],
                          [:pixels, :xlabel_positions, :xlabel_strings, :ylabel_positions, :ylabel_strings,
-                          :xstubs, :ystubs]) do f, lines, labels, pv, vp, xts, yts, xta, yta, xtv, ytv
+                          :xstubs, :ystubs]) do f, lines, labels, sup3, pv, vp, xts, yts, xta, yta, xtv, ytv,
+                                                mingap, collisions, report, minangle
         px = pixels(f, lines, labels, pv, vp,
-            (; lon = (; size = xts, align = xta, visible = xtv), lat = (; size = yts, align = yta, visible = ytv)))
+            (; lon = (; size = xts, align = xta, visible = xtv), lat = (; size = yts, align = yta, visible = ytv));
+            mingap, collisions)
+        # the report is repeated only when what it says changes
+        msg = suppression_report(vcat(sup3, px.suppressed), mingap, minangle)
+        msg = something(msg, "")
+        if msg != last_report[]
+            last_report[] = msg
+            isempty(msg) || report_suppressions(vcat(sup3, px.suppressed), report, mingap, minangle)
+        end
         (px, px.positions[:lon], px.strings[:lon], px.positions[:lat], px.strings[:lat], px.stubs[:lon], px.stubs[:lat])
     end
 
@@ -218,7 +246,8 @@ end
 
 The axis' current decoration state, read back from the graph: the dest-space
 `frame`, `extent`, tick sets, `graticule`, `exits`, `labels`, the protrusion
-`bound`, and the pixel-space `pixels`, with `targetlimits`, `finallimits`,
+`bound`, the pixel-space `pixels`, and `suppressed` (every tick not drawn,
+with its reason, from both levels), with `targetlimits`, `finallimits`,
 `view`, `transform` and `viewport` beside them.
 """
 decorations(ax::GeoAxis) = (;
@@ -238,7 +267,10 @@ decorations(ax::GeoAxis) = (;
     labels = ax.graph[:labels][],
     bound = ax.graph[:protrusion_bound][],
     pixels = ax.graph[:pixels][],
+    suppressed = vcat(ax.graph[:suppressed][], ax.graph[:pixels][].suppressed),
     viewport = ax.scene.viewport[],
+    xaxisposition = ax.xaxisposition[],
+    yaxisposition = ax.yaxisposition[],
 )
 
 """

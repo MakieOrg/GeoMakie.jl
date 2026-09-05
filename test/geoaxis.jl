@@ -110,9 +110,12 @@ end
     # any Makie finder
     lon, _, _ = labels_of(; xticks = Makie.WilkinsonTicks(5))
     @test !isempty(lon) && all(s -> endswith(s, '°') || endswith(s, 'E') || endswith(s, 'W'), lon)
-    # a range
-    lon, _, _ = labels_of(; xticks = -180:2:180)
-    @test length(unique(lon)) == length(-10:2:30)
+    # a range: every value in the view is a tick; the ones that would collide are dropped and reported
+    lon, _, ax = labels_of(; xticks = -180:2:180)
+    d = GeoMakie.decorations(ax)
+    @test d.xtickvalues.values == collect(-10.0:2:30)
+    @test length(unique(lon)) + count(s -> s.reason == :collision && s.family == :lon, d.suppressed) == length(-10:2:30)
+    @test "0°" in lon && "10°W" in lon && "30°E" in lon
     # the default formatter prints hemispheres
     lon, lat, _ = labels_of()
     @test "0°" in lon && "10°E" in lon && "10°W" in lon && "35°N" in lat

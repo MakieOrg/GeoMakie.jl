@@ -300,6 +300,13 @@ Where a graticule line meets the frame: `p` (dest), the frame edge (`loop`,
 `edge` into `Frame.loops`), the edge's outward unit normal, the angle (degrees,
 0..90) between the line and the frame there, and the tangent of the line
 leaving the map.
+
+The angle is measured on the sphere where the exit is a sphere-clip endpoint
+on a rim piece: in the plane a projection's Jacobian is singular at a limb, so
+every graticule line is tangent to an orthographic limb there and a planar
+angle would call all of them grazing.  On a `:pole` edge the angle is 90° (a
+pole line is a parallel drawn as a line), and on a `:viewport` edge it is the
+planar angle between the last chord and the straight edge.
 """
 struct Exit
     family::Symbol
@@ -325,14 +332,23 @@ end
     GraticuleLine
 
 One graticule line after clipping: `pieces` are dest-space polylines;
-`closed[i]` marks a piece that is a closed loop (no exits).
+`closed[i]` marks a piece that is a closed loop (no exits); `ends[i]` holds
+the unit-sphere points of the piece's two ends where they are sphere-clip
+endpoints of the arc (`NaN` where the rect cut the piece).
 """
 struct GraticuleLine
     family::Symbol
     value::Float64
     pieces::Vector{Vector{Point2d}}
     closed::Vector{Bool}
+    ends::Vector{Tuple{Vec3d, Vec3d}}
 end
+
+const NO_SPHERE_POINT = Vec3d(NaN, NaN, NaN)
+_finite3(v) = isfinite(v[1]) && isfinite(v[2]) && isfinite(v[3])
+
+"The axis of the circle a graticule line lies on."
+graticule_axis(family::Symbol, value::Real) = family === :lon ? _cross3(_dir(value), ZHAT) : ZHAT
 
 """
     graticule_lines(family, values, view, t, rect, ext; tol) -> Vector{GraticuleLine}
@@ -347,7 +363,7 @@ function graticule_lines(family::Symbol, values, view::SphereRegion, t, rect::Re
         # a pole is a point (or a pole line already on the frame), not a parallel
         family === :lat && abs(v) >= 90 - 1e-9 && continue
         arc = family === :lon ? meridian_arc(v) : parallel_arc(v)
-        pieces = Vector{Point2d}[]; closed = Bool[]
+        pieces = Vector{Point2d}[]; closed = Bool[]; ends = Tuple{Vec3d, Vec3d}[]
         for a in clip(view, arc)
             pts = adaptive_project(t, a; tol, dropnan = false)
             runs = clip_polyline_rect(pts, rect, eps)
@@ -357,13 +373,20 @@ function graticule_lines(family::Symbol, values, view::SphereRegion, t, rect::Re
                 merged = vcat(runs[end][1], runs[1][1][2:end])
                 runs = vcat([(merged, runs[end][2], runs[1][3])], runs[2:(end - 1)])
             end
+            first_pt = isempty(pts) ? Point2d(NaN, NaN) : pts[1]
+            last_pt = isempty(pts) ? Point2d(NaN, NaN) : pts[end]
             for (r, sc, ec) in runs
                 push!(pieces, r)
-                push!(closed, isfull(a) && !sc && !ec)
+                full = isfull(a)
+                push!(closed, full && !sc && !ec)
+                # a run end that is the arc's own end (not the rect's cut) sits on the rim
+                s = (!full && !sc && _finite2(first_pt) && norm(r[1] - first_pt) <= eps) ? arcpoint(a, a.t0) : NO_SPHERE_POINT
+                e = (!full && !ec && _finite2(last_pt) && norm(r[end] - last_pt) <= eps) ? arcpoint(a, a.t1) : NO_SPHERE_POINT
+                push!(ends, (s, e))
             end
         end
         isempty(pieces) && continue
-        push!(out, GraticuleLine(family, v, pieces, closed))
+        push!(out, GraticuleLine(family, v, pieces, closed, ends))
     end
     return out
 end
@@ -378,7 +401,36 @@ function graticule_points(lines::Vector{GraticuleLine})
     return out
 end
 
-function _exit_at(l::GraticuleLine, pc::Vector{Point2d}, atstart::Bool, fr::Frame, idx::FrameIndex, tol)
+"""
+    sphere_angle(family, value, q, pieces, part) -> Union{Nothing, Float64}
+
+The angle (degrees, 0..90) at the unit-sphere point `q` between the graticule
+line and the rim piece of primitive `part` that passes through `q`; `nothing`
+when no piece of that part is there or a tangent is undefined.
+"""
+function sphere_angle(family::Symbol, value::Real, q, pieces::Vector{RimPiece}, part::Int)
+    tg = _cross3(graticule_axis(family, value), q)
+    ng = norm(tg)
+    ng <= 1e-9 && return nothing
+    best = nothing; best_d = Inf
+    for piece in pieces
+        piece.part == part || continue
+        d = abs(_dot3(q, piece.arc.axis) - piece.arc.cosθ)
+        if d < best_d
+            best = piece
+            best_d = d
+        end
+    end
+    # seam pieces sit SEAM_EPS off the cut and clip ends are inset up to MAX_INSET
+    (best === nothing || best_d > 2 * MAX_INSET) && return nothing
+    tr = _cross3(best.arc.axis, q)
+    nr = norm(tr)
+    nr <= 1e-9 && return nothing
+    return rad2deg(asin(clamp(norm(_cross3(tg, tr)) / (ng * nr), 0.0, 1.0)))
+end
+
+function _exit_at(l::GraticuleLine, k::Int, atstart::Bool, fr::Frame, idx::FrameIndex, tol, pieces::Vector{RimPiece})
+    pc = l.pieces[k]
     n = length(pc)
     n >= 2 || return nothing
     p = atstart ? pc[1] : pc[end]
@@ -393,26 +445,37 @@ function _exit_at(l::GraticuleLine, pc::Vector{Point2d}, atstart::Bool, fr::Fram
     i === nothing && return nothing
     a, b, loop, edge = idx.edges[i]
     nrm = outward_normal(a, b)
+    tag = fr.tags[loop][edge]
     e = b - a
     ne = norm(e)
     angle = ne <= 1e-300 ? 90.0 : rad2deg(asin(clamp(abs(e[1] * tangent[2] - e[2] * tangent[1]) / ne, 0.0, 1.0)))
-    return Exit(l.family, l.value, p, loop, edge, fr.tags[loop][edge], nrm, angle, tangent)
+    if tag === :pole
+        angle = 90.0
+    elseif tag !== :viewport
+        sp = atstart ? l.ends[k][1] : l.ends[k][2]
+        if _finite3(sp)
+            sa = sphere_angle(l.family, l.value, sp, pieces, fr.source[loop][edge])
+            sa === nothing || (angle = sa)
+        end
+    end
+    return Exit(l.family, l.value, p, loop, edge, tag, nrm, angle, tangent)
 end
 
 """
-    exits(lines, frame, rect) -> Vector{Exit}
+    exits(lines, frame, rect, pieces = RimPiece[]) -> Vector{Exit}
 
-Every piece endpoint that lies on the frame.
+Every piece endpoint that lies on the frame.  `pieces` is `rim(view)`, used to
+measure exit angles on the sphere.
 """
-function exits(lines::Vector{GraticuleLine}, fr::Frame, rect::Rect2d)
+function exits(lines::Vector{GraticuleLine}, fr::Frame, rect::Rect2d, pieces::Vector{RimPiece} = RimPiece[])
     out = Exit[]
     isempty(fr.loops) && return out
     idx = FrameIndex(fr, rect)
     tol = ON_FRAME_FRAC * max(maximum(widths(rect)), 1e-300)
-    for l in lines, (k, pc) in enumerate(l.pieces)
+    for l in lines, k in eachindex(l.pieces)
         l.closed[k] && continue
         for atstart in (true, false)
-            e = _exit_at(l, pc, atstart, fr, idx, tol)
+            e = _exit_at(l, k, atstart, fr, idx, tol, pieces)
             e === nothing || push!(out, e)
         end
     end
@@ -451,6 +514,22 @@ function _carrier(family::Symbol, value::Real, arc::CircleArc, view, t, rect::Re
     end
     span = min(span, family === :lon ? lon_span(ext) : lat_span(ext))
     return Carrier(family, float(value), pieces, len, span)
+end
+
+"""
+    pole_line_length(frame, ext) -> Float64
+
+The dest-space length of one pole line: the total length of the frame's
+`:pole` edges shared between the poles in view.  `Inf` when the frame has none.
+"""
+function pole_line_length(fr::Frame, ext::Extent)
+    total = 0.0; any = false
+    for (a, b, tag, _) in edges(fr)
+        tag === :pole || continue
+        total += norm(b - a); any = true
+    end
+    any || return Inf
+    return total / max(1, (ext.north ? 1 : 0) + (ext.south ? 1 : 0))
 end
 
 """
