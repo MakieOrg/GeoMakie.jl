@@ -928,13 +928,17 @@ end
     end
 end
 
-@testset "mask outside the frame" begin
-    # the mask covers the rect minus the map body, over the plots and under the frame
+@testset "background and mask" begin
+    # the background covers the map body in destination space, below all plots;
+    # the mask covers the rect minus that body, over the plots and under the frame
     fig, ax = build_case(decoration_case(DECORATION_CASES, "lcc_title"))
     d = GM.decorations(ax)
+    @test length(d.background) == 1 && isempty(d.background[1].interiors)
+    @test collect(d.background[1].exterior) == d.frame.loops[1]
+    @test ax.elements[:background].parent === ax.scene
     @test ax.maskoutside[] && haskey(ax.elements, :mask) && ax.elements[:mask].visible[]
     @test length(d.mask) == 1 && length(d.mask[1].interiors) == 1
-    @test Makie.to_color(ax.elements[:mask].color[]) == Makie.to_color(ax.backgroundcolor[])
+    @test Makie.to_color(ax.elements[:mask].color[]) == Makie.to_color(ax.blockscene.backgroundcolor[])
     @test ax.elements[:mask].parent === ax.scene
     z(k) = Makie.zvalue2d(ax.elements[k])
     @test z(:background) < z(:xgrid) < 0 < z(:mask) < z(:bands) < z(:spine) < z(:xticklabels) < z(:xinteriorlabels)
@@ -983,12 +987,54 @@ end
     @test Set(polys[2].exterior) == Set(hole) && isempty(polys[2].interiors)
     @test isempty(GM.mask_polygons(GM.Frame([lp], [fill(:viewport, 4)], [zeros(Int, 4)]), Rect2d(0, 0, 10, 10)))
     @test length(GM.mask_polygons(GM.Frame(), Rect2d(0, 0, 10, 10))) == 1
-    # the halo and the mask share the background colour and never meet: interior
-    # labels lie on the map, the mask lies off it, and the labels stay legible
+    # background polygons invert that topology: map exteriors are filled and
+    # clockwise frame loops punch holes in the containing exterior
+    bgpolys = GM.background_polygons(fr)
+    @test length(bgpolys) == 1
+    @test Set(bgpolys[1].exterior) == Set(lp)
+    @test length(bgpolys[1].interiors) == 1 && Set(bgpolys[1].interiors[1]) == Set(hole)
+    lp2 = Point2d[(20, 0), (30, 0), (30, 10), (20, 10)]
+    fr2 = GM.Frame([lp, hole, lp2], [fill(:limb, 4) for _ in 1:3], [ones(Int, 4) for _ in 1:3])
+    bgpolys2 = GM.background_polygons(fr2)
+    @test length(bgpolys2) == 2 && sort([length(p.interiors) for p in bgpolys2]) == [0, 1]
+    @test isempty(GM.background_polygons(GM.Frame()))
+    # unlike the mask, the background does not colour the rectangular corners
+    # outside a curved frame
+    fig = Figure(size = (500, 400), backgroundcolor = :blue)
+    ax = GeoAxis(fig[1, 1]; dest = "+proj=eqearth", backgroundcolor = :red,
+        spinevisible = false, xgridvisible = false, ygridvisible = false,
+        xticksvisible = false, yticksvisible = false, xticklabelsvisible = false, yticklabelsvisible = false)
+    Makie.update_state_before_display!(fig)
+    img = colorbuffer(fig; px_per_unit = 1)
+    vp = ax.scene.viewport[]
+    centre = Point2d(minimum(vp) .+ 0.5 .* widths(vp))
+    corner = Point2d(minimum(vp) .+ 5)
+    red = Makie.Colors.RGB(Makie.to_color(:red))
+    blue = Makie.Colors.RGB(Makie.to_color(:blue))
+    @test Makie.Colors.colordiff(Makie.Colors.RGB(pixel_color(img, centre)), red) < 1
+    @test Makie.Colors.colordiff(Makie.Colors.RGB(pixel_color(img, corner)), blue) < 1
+    ax.backgroundcolor = :green
+    @test Makie.to_color(ax.elements[:background].color[]) == Makie.to_color(:green)
+    @test Makie.to_color(ax.elements[:mask].color[]) == Makie.to_color(:blue)
+    # interactive zoom writes targetlimits.  The background and mask react to
+    # the resulting frame while retaining their distinct colours.
+    full = ax.targetlimits[]
+    ax.targetlimits[] = Rect2d(minimum(full) .- 0.25 .* widths(full), 1.5 .* widths(full))
+    zoomed_out = GM.decorations(ax)
+    @test zoomed_out.finallimits == ax.targetlimits[] && !isempty(zoomed_out.background) && !isempty(zoomed_out.mask)
+    @test Makie.to_color(ax.elements[:background].color[]) == Makie.to_color(:green)
+    @test Makie.to_color(ax.elements[:mask].color[]) == Makie.to_color(:blue)
+    ax.targetlimits[] = Rect2d(minimum(full) .+ 0.25 .* widths(full), 0.5 .* widths(full))
+    zoomed_in = GM.decorations(ax)
+    @test zoomed_in.finallimits == ax.targetlimits[] && all(==(:viewport), GM.edge_tags(zoomed_in.frame))
+    @test length(zoomed_in.background) == 1 && isempty(zoomed_in.mask)
+    # the halo uses the map background colour while the mask uses the surrounding
+    # scene colour; they never meet because labels lie on the map and the mask lies off it
     fig, ax = build_case(decoration_case(DECORATION_CASES, "laea_polar_nolimits"))
     d = GM.decorations(ax)
     @test !isempty(d.mask) && !isempty(interior_drawn(d, :lat))
-    @test Makie.to_color(ax.elements[:yinteriorhalo].color[]) == Makie.to_color(ax.elements[:mask].color[]) == Makie.to_color(ax.backgroundcolor[])
+    @test Makie.to_color(ax.elements[:yinteriorhalo].color[]) == Makie.to_color(ax.backgroundcolor[])
+    @test Makie.to_color(ax.elements[:mask].color[]) == Makie.to_color(ax.blockscene.backgroundcolor[])
     img = colorbuffer(fig; px_per_unit = 1)
     bg = Makie.Colors.RGB(Makie.to_color(ax.backgroundcolor[]))
     for (k, i) in enumerate(d.pixels.kept)
@@ -1006,7 +1052,9 @@ end
     with_theme(theme_dark()) do
         f, a = build_case(decoration_case(DECORATION_CASES, "lcc_title"))
         @test Makie.to_color(a.backgroundcolor[]) == Makie.to_color(Makie.theme(:backgroundcolor)[]) != Makie.to_color(:white)
-        @test Makie.to_color(a.elements[:mask].color[]) == Makie.to_color(a.elements[:background].color[]) == Makie.to_color(a.backgroundcolor[])
+        @test Makie.to_color(a.elements[:background].color[]) == Makie.to_color(a.backgroundcolor[])
+        @test Makie.to_color(a.elements[:mask].color[]) == Makie.to_color(a.blockscene.backgroundcolor[])
+        @test a.elements[:background].parent === a.scene
         @test isempty(nothing_outside_frame(decoration_case(DECORATION_CASES, "lcc_title")))
     end
 end
