@@ -490,3 +490,157 @@ end
 
 "Every Phase 6 predicate on one built case."
 phase6_violations(name, d) = frame_band(name, d)
+
+# ---- Phase 7: the layout ----------------------------------------------------------
+
+"The drawn text of a block-scene text plot as an axis-aligned box in pixels, or `nothing` when it is blank or hidden."
+function text_box(plot, label = first(plot.text[]))
+    plot.visible[] || return nothing
+    Makie.iswhitespace(label) && return nothing
+    bb = Makie.boundingbox(plot, :data)
+    w = widths(bb)
+    (all(isfinite, w) && w[1] > 0 && w[2] > 0) || return nothing
+    o = minimum(bb)
+    return GM.OBox(Point2d(o[1] + w[1] / 2, o[2] + w[2] / 2), Vec2d(w[1] / 2, w[2] / 2), 0.0)
+end
+
+"A rectangle as an axis-aligned box."
+rect_box(r) = (w = widths(r); o = minimum(r); GM.OBox(Point2d(o[1] + w[1] / 2, o[2] + w[2] / 2), Vec2d(w[1] / 2, w[2] / 2), 0.0))
+
+"The axis' title, subtitle and axis labels as `(name, box)` pairs, drawn ones only."
+function layout_text_boxes(ax)
+    out = Tuple{Symbol, GM.OBox}[]
+    for k in (:title, :subtitle, :xlabel, :ylabel)
+        b = text_box(ax.elements[k], getproperty(ax, k)[])
+        b === nothing || push!(out, (k, b))
+    end
+    return out
+end
+
+"""
+No drawn tick label box touches the title, subtitle or axis labels of any
+axis in `axes`, the map viewport of another axis, or another axis' tick
+labels and layout text.
+"""
+function layout_no_collision(name, axes::Vector{GeoAxis})
+    out = Violation[]
+    boxes = [(i, k, b) for (i, ax) in enumerate(axes) for (k, b) in enumerate(GM.decorations(ax).pixels.boxes)]
+    texts = [(i, k, b) for (i, ax) in enumerate(axes) for (k, b) in layout_text_boxes(ax)]
+    text_of(i, k) = GM.decorations(axes[i]).labels[GM.decorations(axes[i]).pixels.kept[k]].text
+    for (i, k, b) in boxes
+        for (j, t, tb) in texts
+            GM.collides(b, tb) && push!(out, Violation(name, :layout_no_collision, "axis $i label $(text_of(i, k)) touches axis $j $t"))
+        end
+        for (j, other) in enumerate(axes)
+            j == i && continue
+            GM.collides(b, rect_box(other.scene.viewport[])) &&
+                push!(out, Violation(name, :layout_no_collision, "axis $i label $(text_of(i, k)) lies over axis $j"))
+        end
+        for (j, m, ob) in boxes
+            (j == i || (j, m) <= (i, k)) && continue
+            GM.collides(b, ob) &&
+                push!(out, Violation(name, :layout_no_collision, "axis $i label $(text_of(i, k)) touches axis $j label $(text_of(j, m))"))
+        end
+    end
+    # the subtitle sits flush under the title (`subtitlegap = 0`, as on `Axis`), so
+    # texts collide only when they overlap
+    for (i, s, sb) in texts, (j, t, tb) in texts
+        (i, s) < (j, t) || continue
+        GM.collides(sb, tb; gap = -1e-3) && push!(out, Violation(name, :layout_no_collision, "axis $i $s touches axis $j $t"))
+    end
+    return out
+end
+
+"How far a box reaches past `side` of the rectangle `vp`."
+function overhang(b::GM.OBox, vp, side::Symbol)
+    x0, y0 = minimum(vp); x1, y1 = maximum(vp)
+    cs = GM.corners(b)
+    side === :left && return maximum(x0 - c[1] for c in cs)
+    side === :right && return maximum(c[1] - x1 for c in cs)
+    side === :bottom && return maximum(y0 - c[2] for c in cs)
+    return maximum(c[2] - y1 for c in cs)
+end
+
+"""
+The outermost extent of every drawn decoration per side: the tick reach
+(labels, stubs, band, each counting toward the sides its normal faces), the
+axis labels on their sides, and the title and subtitle on top.
+"""
+function drawn_extent(ax)
+    d = GM.decorations(ax)
+    vp = d.viewport
+    m = GM.measured_reach(d.pixels, d.labels, ax.graph[:band_polygons][], vp;
+                          visible = (; lon = ax.xticklabelsvisible[], lat = ax.yticklabelsvisible[]))
+    ext = Dict(:left => Float64(m.left), :right => Float64(m.right), :bottom => Float64(m.bottom), :top => Float64(m.top))
+    sides = Dict(:title => :top, :subtitle => :top, :xlabel => d.axislabels.lon.side, :ylabel => d.axislabels.lat.side)
+    for (k, b) in layout_text_boxes(ax)
+        s = sides[k]
+        ext[s] = max(ext[s], overhang(b, vp, s))
+    end
+    return GM.GridLayoutBase.RectSides{Float32}(ext[:left], ext[:right], ext[:bottom], ext[:top])
+end
+
+"""
+The layout reserved at least the outermost drawn extent on every side and no
+more than the dest-space bound (plus axis labels and title); after
+`tight_ticklabel_spacing!` (`tight = true`) reserved and drawn agree to `tol`.
+"""
+function layout_protrusions(name, ax; tight::Bool = false, tol = 0.5)
+    out = Violation[]
+    d = GM.decorations(ax)
+    reserved = ax.layoutobservables.protrusions[]
+    drawn = drawn_extent(ax)
+    bound = GM.with_title(GM.reach_sides(d.bound, nothing, (d.axislabels.lon, d.axislabels.lat)), d.titlespace, d.subtitlespace)
+    reserved == d.protrusions || push!(out, Violation(name, :layout_protrusions, "the layout holds $reserved, the graph says $(d.protrusions)"))
+    for side in (:left, :right, :bottom, :top)
+        r = GM.side_value(reserved, side); e = GM.side_value(drawn, side); b = GM.side_value(bound, side)
+        r >= e - 1e-3 || push!(out, Violation(name, :layout_protrusions, "$side reserves $r for a drawn extent of $e"))
+        r <= b + 1e-3 || push!(out, Violation(name, :layout_protrusions, "$side reserves $r beyond the bound $b"))
+        tight && abs(r - e) > tol && push!(out, Violation(name, :layout_protrusions, "$side reserves $r after tightening, drawn $e"))
+    end
+    return out
+end
+
+"The `Axis` plot that draws `k` (`:title`, `:subtitle`, `:xlabel`, `:ylabel`); the subtitle is found by its text."
+function axis_text_plot(ax::Axis, k::Symbol)
+    k === :title && return ax.elements[:title]
+    k === :xlabel && return ax.xaxis.elements[:labeltext]
+    k === :ylabel && return ax.yaxis.elements[:labeltext]
+    i = findfirst(p -> p isa Makie.Text && first(p.text[]) == ax.subtitle[], ax.blockscene.plots)
+    return ax.blockscene.plots[i]
+end
+
+"""
+A `GeoAxis` and an `Axis` with the same title, subtitle, axis labels, tick
+label strings and tick geometry on a rectangular frame report the same
+protrusions within a pixel.
+"""
+function axis_parity(name)
+    out = Violation[]
+    fig, ga, ax = build_axis_parity()
+    pg = ga.layoutobservables.protrusions[]; pa = ax.layoutobservables.protrusions[]
+    for side in (:left, :right, :bottom, :top)
+        g = GM.side_value(pg, side); a = GM.side_value(pa, side)
+        abs(g - a) <= 1.0 || push!(out, Violation(name, :axis_parity, "$side: GeoAxis $g, Axis $a"))
+    end
+    # the title, subtitle and axis labels sit at the same heights and offsets;
+    # `Axis` draws its axis labels a spine width further out than it reserves
+    # (`labelgap` counts the spine, `calculate_protrusion` does not), which the
+    # GeoAxis does not copy, so that width is allowed for
+    spine = ax.spinewidth[]
+    for k in (:title, :subtitle, :xlabel)
+        bg = text_box(ga.elements[k], getproperty(ga, k)[]); ba = text_box(axis_text_plot(ax, k), getproperty(ax, k)[])
+        (bg === nothing || ba === nothing) && continue
+        ya = ba.centre[2] + (k === :xlabel ? spine : 0.0)
+        abs(bg.centre[2] - ya) <= 1.0 || push!(out, Violation(name, :axis_parity, "$k sits at $(bg.centre[2]) on the GeoAxis, $(ba.centre[2]) on the Axis"))
+    end
+    bg = text_box(ga.elements[:ylabel], ga.ylabel[]); ba = text_box(axis_text_plot(ax, :ylabel), ax.ylabel[])
+    if bg !== nothing && ba !== nothing
+        og = minimum(ga.scene.viewport[])[1] - bg.centre[1]; oa = minimum(ax.scene.viewport[])[1] - ba.centre[1] - spine
+        abs(og - oa) <= 1.0 || push!(out, Violation(name, :axis_parity, "ylabel sits $og left of the GeoAxis, $oa left of the Axis"))
+    end
+    return out
+end
+
+"Every Phase 7 predicate on one built axis."
+phase7_violations(name, ax; tight::Bool = false) = vcat(layout_no_collision(name, [ax]), layout_protrusions(name, ax; tight))

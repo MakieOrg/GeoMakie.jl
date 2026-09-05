@@ -159,3 +159,39 @@ end
     @test ax.xminorgridcolor[] == a.xminorgridcolor[]
     @test ax.framestyle[] === :plain && ax.gridbehind[]
 end
+
+@testset "hidedecorations! parity" begin
+    fig = Figure(size = (600, 400))
+    ax = GeoAxis(fig[1, 1]; xlabel = "lon", ylabel = "lat", title = "t")
+    Makie.update_state_before_display!(fig)
+    @test haskey(ax.elements, :xlabel) && haskey(ax.elements, :ylabel) && haskey(ax.elements, :title)
+    @test only(ax.elements[:xlabel].text[]) == "lon" && ax.elements[:xlabel].visible[]
+    # hidexdecorations!(label = false) keeps the xlabel and hides the rest
+    hidexdecorations!(ax; label = false)
+    @test ax.xlabelvisible[] && ax.elements[:xlabel].visible[]
+    @test !ax.xticklabelsvisible[] && !ax.xticksvisible[] && !ax.xgridvisible[]
+    @test ax.ylabelvisible[] && ax.yticklabelsvisible[]
+    hideydecorations!(ax; ticklabels = false, ticks = false)
+    @test !ax.ylabelvisible[] && ax.yticklabelsvisible[] && ax.yticksvisible[] && !ax.ygridvisible[]
+    # hidedecorations! zeroes every protrusion but the title's
+    hidedecorations!(ax)
+    Makie.update_state_before_display!(fig)
+    @test !ax.xlabelvisible[] && !ax.ylabelvisible[] && !ax.elements[:xlabel].visible[]
+    p = ax.layoutobservables.protrusions[]
+    @test p.left == 0 && p.right == 0 && p.bottom == 0
+    @test p.top == GeoMakie.decorations(ax).titlespace > 0
+    ax.title = ""
+    @test ax.layoutobservables.protrusions[] == Makie.GridLayoutBase.RectSides{Float32}(0, 0, 0, 0)
+    # tick stubs alone still reserve their length, as on Axis
+    fig = Figure(size = (600, 400))
+    ax = GeoAxis(fig[1, 1]; dest = "+proj=merc", limits = ((-10, 30), (35, 60)))
+    Makie.update_state_before_display!(fig)
+    hidedecorations!(ax; ticks = false)
+    Makie.update_state_before_display!(fig)
+    p = ax.layoutobservables.protrusions[]
+    @test p.bottom == ax.xticksize[] && p.left == ax.yticksize[] && p.top == 0 && p.right == 0
+    # tight_ticklabel_spacing! exists and returns what it reserved
+    r = tight_ticklabel_spacing!(ax)
+    @test r isa Makie.GridLayoutBase.RectSides
+    @test r.bottom ≈ ax.xticksize[] atol = 1e-2
+end

@@ -31,6 +31,19 @@ const EXTRA_RENDERS = [
         fig, ax = build_case(decoration_case(DECORATION_CASES, "merc_reg"))
         fig
     end,
+    # a GeoAxis beside an Axis with the same title, labels and tick geometry: the
+    # same size on screen, the labels lined up (Phase 7's manual check)
+    "merc_reg_axis_parity" => () -> build_axis_parity()[1],
+    # issue 349: hidden y decorations leave equal column gaps
+    "issue349_row" => () -> build_issue349()[1],
+    # issue 268: a grid of GeoAxes packs like a grid of Axes
+    "issue268_grid" => () -> build_issue268()[1],
+    # issue 281: the exact space after tight_ticklabel_spacing! on a limb
+    "ortho_tight" => () -> begin
+        fig, ax = build_case(decoration_case(DECORATION_CASES, "ortho"))
+        tight_ticklabel_spacing!(ax)
+        fig
+    end,
 ]
 
 "Every render, by name: the case matrix and the extra renders."

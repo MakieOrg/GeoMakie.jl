@@ -528,10 +528,17 @@ function Makie.limits!(ax::GeoAxis, xlims, ylims)
     return
 end
 
+"""
+    hidexdecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true)
+
+Hide the x (longitude) decorations: the axis label, the tick labels, the
+tick marks and the graticule.  Keyword arguments keep a kind visible, as on
+`Axis`.  The spine stays; `hidespines!` removes it.
+"""
 function Makie.hidexdecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true,
     grid = true,#= minorgrid = true, minorticks = true=#)
     if label
-        ax.xticklabelsvisible[] = false
+        ax.xlabelvisible[] = false
     end
     if ticklabels
         ax.xticklabelsvisible[] = false
@@ -551,10 +558,17 @@ function Makie.hidexdecorations!(ax::GeoAxis; label = true, ticklabels = true, t
     return
 end
 
+"""
+    hideydecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true)
+
+Hide the y (latitude) decorations: the axis label, the tick labels, the
+tick marks and the graticule.  Keyword arguments keep a kind visible, as on
+`Axis`.  The spine stays; `hidespines!` removes it.
+"""
 function Makie.hideydecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true,
     grid = true,#= minorgrid = true, minorticks = true=#)
     if label
-        ax.yticklabelsvisible[] = false
+        ax.ylabelvisible[] = false
     end
     if ticklabels
         ax.yticklabelsvisible[] = false
@@ -574,9 +588,40 @@ function Makie.hideydecorations!(ax::GeoAxis; label = true, ticklabels = true, t
     return
 end
 
+"""
+    hidedecorations!(ax::GeoAxis; label = true, ticklabels = true, ticks = true, grid = true)
+
+Hide the decorations of both directions; see `hidexdecorations!`.  With
+everything hidden the axis reserves no layout space beyond its title.
+"""
 Makie.hidedecorations!(ax::GeoAxis; kw...) = begin
     hidexdecorations!(ax; kw...)
     hideydecorations!(ax; kw...)
+end
+
+"""
+    tight_ticklabel_spacing!(ax::GeoAxis; passes = 3) -> RectSides{Float32}
+
+Reserve exactly the space the drawn decorations occupy.  The layout
+normally receives a bound computed before the viewport is known, which on a
+curved frame over-reserves by the distance between the outermost label and
+the frame's extreme point.  This measures the drawn label boxes, tick stubs
+and band in pixels, writes that reach in place of the bound, lets the layout
+resize, and repeats up to `passes` times or until the measurement stops
+changing (a rectangular frame settles in one pass).  The measured reach
+stays until the next call, as `ticklabelspace` does on `Axis`.
+"""
+function Makie.tight_ticklabel_spacing!(ax::GeoAxis; passes::Int = 3)
+    g = ax.graph
+    fixed = g[:fixed_reach][]
+    for _ in 1:passes
+        m = measured_reach(g[:pixels][], g[:labels][], g[:band_polygons][], ax.scene.viewport[];
+                           visible = (; lon = g[:xticklabelsvisible][], lat = g[:yticklabelsvisible][]))
+        m == fixed && break
+        fixed = m
+        ComputePipeline.update!(g; fixed_reach = m)
+    end
+    return fixed
 end
 
 """

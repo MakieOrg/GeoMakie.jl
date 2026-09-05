@@ -619,3 +619,167 @@ end
     sp = ax.graph[:spine_px][]
     @test sp[1] == sp[end] && sp[1] == GM.decorations(ax).pixels.frame[1][1]
 end
+
+# ---- Phase 7: the axis owns its labels and reports its size honestly ---------
+
+@testset "layout" begin
+    for c in vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES, FANCY_CASES, LAYOUT_CASES)
+        fig, ax = build_case(c)
+        @testset "$(c.name)" begin
+            v = phase7_violations(c.name, ax)
+            @test isempty(v)
+            isempty(v) || foreach(println, v)
+            before = ax.layoutobservables.protrusions[]
+            fixed = tight_ticklabel_spacing!(ax)
+            @test GM.decorations(ax).fixed_reach == fixed
+            after = ax.layoutobservables.protrusions[]
+            # exact space is never more than the bound reserved
+            for side in (:left, :right, :bottom, :top)
+                @test GM.side_value(after, side) <= GM.side_value(before, side) + 1e-3
+            end
+            v = phase7_violations(c.name, ax; tight = true)
+            @test isempty(v)
+            isempty(v) || foreach(println, v)
+            # every predicate of the earlier phases still holds with the exact space
+            d = GM.decorations(ax)
+            v = vcat(phase3_violations(c.name, d), phase4_violations(c.name, d), phase5_violations(c.name, d))
+            @test isempty(v)
+            isempty(v) || foreach(println, v)
+        end
+    end
+    # a rectangular frame's bound is already exact: tightening changes nothing
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "merc_reg_labels"))
+    before = ax.layoutobservables.protrusions[]
+    tight_ticklabel_spacing!(ax)
+    after = ax.layoutobservables.protrusions[]
+    @test all(side -> abs(GM.side_value(after, side) - GM.side_value(before, side)) < 1e-3, (:left, :right, :bottom, :top))
+    # a limb over-reserves by the gap between the outermost label and the limb's extreme point, and tightening removes it
+    fig, ax = build_case(decoration_case(DECORATION_CASES, "ortho"))
+    before = ax.layoutobservables.protrusions[]
+    tight_ticklabel_spacing!(ax)
+    after = ax.layoutobservables.protrusions[]
+    @test after.left < before.left && after.right < before.right
+    @test isempty(layout_protrusions("ortho", ax; tight = true))
+end
+
+@testset "axis parity" begin
+    v = axis_parity("merc_reg")
+    @test isempty(v)
+    isempty(v) || foreach(println, v)
+    fig, ga, ax = build_axis_parity()
+    # the two axes are the same size on screen
+    @test abs(widths(ga.scene.viewport[])[2] - widths(ax.scene.viewport[])[2]) <= 1
+    @test abs(minimum(ga.scene.viewport[])[2] - minimum(ax.scene.viewport[])[2]) <= 1
+end
+
+@testset "axis labels" begin
+    c = decoration_case(DECORATION_CASES, "merc_reg_labels")
+    fig, ax = build_case(c)
+    d = GM.decorations(ax)
+    vp = d.viewport
+    # drawn on the sides the positions name, outside the tick reach by the padding
+    @test d.axislabels.lon.side == :bottom && d.axislabels.lat.side == :left
+    @test d.axislabels.lon.extent > 0 && d.axislabels.lat.extent > 0
+    @test d.reach.bottom ≈ d.bound.bottom + ax.xlabelpadding[] + d.axislabels.lon.extent
+    @test d.reach.left ≈ d.bound.left + ax.ylabelpadding[] + d.axislabels.lat.extent
+    @test d.reach.top == d.bound.top && d.reach.right == d.bound.right
+    @test d.xlabel_position[2] ≈ minimum(vp)[2] - d.bound.bottom - ax.xlabelpadding[] - d.axislabels.lon.extent / 2 atol = 1e-3
+    @test d.xlabel_position[1] ≈ minimum(vp)[1] + widths(vp)[1] / 2
+    @test d.ylabel_position[1] ≈ minimum(vp)[1] - d.bound.left - ax.ylabelpadding[] - d.axislabels.lat.extent / 2
+    @test ax.elements[:xlabel].rotation[] == Makie.to_rotation(0.0)
+    @test ax.elements[:ylabel].rotation[] == Makie.to_rotation(pi / 2)
+    # the label's box clears the tick labels by the padding
+    xb = text_box(ax.elements[:xlabel], ax.xlabel[])
+    @test maximum(c[2] for c in GM.corners(xb)) ≈ minimum(vp)[2] - d.bound.bottom - ax.xlabelpadding[] atol = 0.5
+    # the title sits above the top reach, the subtitle between
+    tb = text_box(ax.elements[:title], ax.title[]); sb = text_box(ax.elements[:subtitle], ax.subtitle[])
+    @test minimum(c[2] for c in GM.corners(sb)) ≈ maximum(vp)[2] + d.reach.top + ax.titlegap[] atol = 0.5
+    @test minimum(c[2] for c in GM.corners(tb)) >= maximum(c[2] for c in GM.corners(sb)) - 1e-3   # flush: subtitlegap = 0
+    @test ax.layoutobservables.protrusions[].top ≈ d.reach.top + d.titlespace + d.subtitlespace
+    # x/ylabelpadding pad the axis labels and nothing else
+    fig, ax2 = build_case(c; xlabelpadding = 20.0, ylabelpadding = 30.0)
+    d2 = GM.decorations(ax2)
+    @test d2.reach.bottom ≈ d.reach.bottom + 17 && d2.reach.left ≈ d.reach.left + 25
+    @test d2.bound == d.bound
+    # the tick labels keep their offsets from the frame (the viewport itself shrinks by the padding)
+    offsets(d) = (minimum(d.viewport)[2] - d.pixels.positions[:lon][1][2], minimum(d.viewport)[1] - d.pixels.positions[:lat][1][1])
+    @test all(isapprox.(offsets(d2), offsets(d); atol = 1e-3))
+    # label style attributes reach the plots
+    fig, ax3 = build_case(c; xlabelsize = 30.0, ylabelcolor = :red, xlabelfont = :bold, ylabelrotation = 0.0)
+    d3 = GM.decorations(ax3)
+    @test ax3.elements[:xlabel].fontsize[] == 30 && ax3.elements[:ylabel].color[] == Makie.to_color(:red)
+    @test d3.axislabels.lon.extent > d.axislabels.lon.extent
+    @test ax3.elements[:ylabel].rotation[] == Makie.to_rotation(0.0)
+    @test d3.axislabels.lat.extent > d.axislabels.lat.extent      # an upright ylabel is as wide as its text
+    # labels follow the axis positions, and the title still clears everything on top
+    fig, ax4 = build_case(decoration_case(DECORATION_CASES, "merc_reg_labels_topright"))
+    d4 = GM.decorations(ax4)
+    @test d4.axislabels.lon.side == :top && d4.axislabels.lat.side == :right
+    @test d4.reach.bottom == 0 && d4.reach.left == 0 && d4.reach.top > d4.bound.top && d4.reach.right > d4.bound.right
+    @test d4.xlabel_position[2] > maximum(d4.viewport)[2] && d4.ylabel_position[1] > maximum(d4.viewport)[1]
+    @test isempty(phase7_violations("merc_reg_labels_topright", ax4))
+    # :both keeps the Axis defaults, bottom and left
+    fig, ax5 = build_case(c; xaxisposition = :both, yaxisposition = :both)
+    d5 = GM.decorations(ax5)
+    @test d5.axislabels.lon.side == :bottom && d5.axislabels.lat.side == :left
+    # hiding a label frees its space; hidexdecorations! keeps it on request
+    fig, ax6 = build_case(c)
+    hidexdecorations!(ax6; label = false)
+    d6 = GM.decorations(ax6)
+    @test ax6.xlabelvisible[] && ax6.elements[:xlabel].visible[]
+    @test !ax6.xticklabelsvisible[] && !ax6.xticksvisible[] && !ax6.xgridvisible[]
+    @test d6.bound.bottom == 0 && d6.reach.bottom ≈ ax6.xlabelpadding[] + d6.axislabels.lon.extent
+    @test d6.xlabel_position[2] ≈ minimum(d6.viewport)[2] - ax6.xlabelpadding[] - d6.axislabels.lon.extent / 2
+    hidexdecorations!(ax6)
+    d6 = GM.decorations(ax6)
+    @test !ax6.xlabelvisible[] && d6.axislabels.lon.extent == 0 && d6.reach.bottom == 0
+    # a blank label reserves nothing
+    fig, ax7 = build_case(c; xlabel = "  ")
+    @test GM.decorations(ax7).axislabels.lon.extent == 0
+    # rich text and LaTeX labels measure through the drawn text
+    fig, ax8 = build_case(c; xlabel = L"\lambda", ylabel = rich("lat", subscript("N")))
+    d8 = GM.decorations(ax8)
+    @test d8.axislabels.lon.extent > 0 && d8.axislabels.lat.extent > 0
+    @test isempty(phase7_violations("merc_reg_rich", ax8))
+end
+
+@testset "several axes" begin
+    # issue 349: hidden y decorations leave no space, so the column gaps match
+    fig, axes = build_issue349()
+    @test isempty(layout_no_collision("issue349", axes))
+    for ax in axes
+        @test isempty(layout_protrusions("issue349", ax))
+    end
+    @test axes[2].layoutobservables.protrusions[].left == 0 && axes[3].layoutobservables.protrusions[].left == 0
+    @test axes[1].layoutobservables.protrusions[].left > 0
+    bb = [ax.layoutobservables.computedbbox[] for ax in axes]
+    gap12 = minimum(bb[2])[1] - maximum(bb[1])[1]
+    gap23 = minimum(bb[3])[1] - maximum(bb[2])[1]
+    @test abs(gap12 - gap23) <= 1
+    # issue 268: the space reserved around each axis is what its decorations draw
+    # (an eqearth frame carries latitude labels on both sides, tilted at the
+    # corners), not the wide margins of the old width-of-the-longest-label rule
+    fig, axes = build_issue268()
+    @test isempty(layout_no_collision("issue268", axes))
+    for ax in axes
+        p = ax.layoutobservables.protrusions[]
+        @test 0 < p.bottom <= ax.xticksize[] + ax.xticklabelpad[] + ax.xticklabelsize[] * 1.2 + 1
+        @test p.top < p.left && p.top < p.right
+        @test isempty(layout_protrusions("issue268", ax))
+    end
+    # the bound lets the tilted 60°N label reach above the frame wherever it sits;
+    # tightening measures that nothing does and hands the space back
+    for _ in 1:2, ax in axes
+        Makie.tight_ticklabel_spacing!(ax)
+        Makie.update_state_before_display!(fig)
+    end
+    for ax in axes
+        @test isempty(layout_protrusions("issue268", ax; tight = true))
+        @test ax.layoutobservables.protrusions[].top == 0
+    end
+    @test isempty(layout_no_collision("issue268", axes))
+    # the two rows sit as close as the bottom decorations allow
+    bb = [ax.layoutobservables.computedbbox[] for ax in axes]
+    top_row = filter(ax -> minimum(ax.layoutobservables.computedbbox[])[2] > minimum(bb[1])[2] - 1, axes)
+    @test length(top_row) == 2
+end

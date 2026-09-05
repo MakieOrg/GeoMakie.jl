@@ -10,4 +10,5 @@ include("predicates.jl")
     include("ticks.jl")
     include("suite.jl")
     include("placement.jl")
+    include("layout.jl")
 end

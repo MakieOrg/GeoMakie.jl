@@ -23,17 +23,27 @@ each stage is computed once per change of its inputs and pulled on demand:
     3  labels, suppressed ← exits, frame, finallimits, graticule, crossings, carriers, formats, fonts, sizes, pads,
                             tick sizes, rotations, aligns, x/yaxisposition, ticklabelminangle, ticklabelmingap, interiorlabels,
                             x/yinterior_size, interiorlabelrotation, framestyle, framewidth (a fancy band pushes labels out by its width)
-    3  protrusion_bound   ← labels, x/yticklabelsvisible, framestyle, framewidth   → layoutobservables.protrusions (bridged)
+    3  protrusion_bound   ← labels, x/yticklabelsvisible, band, tick sizes / aligns / visibility
+                            (the dest-space tick reach per side: band, stubs, label boxes)
+    3  axislabels         ← x/yaxisposition, x/ylabelpadding, x/ylabelextent, x/ylabelrotation
+                            (which side each axis label sits on, its padding and measured extent)
+    3  reach              ← protrusion_bound, fixed_reach, axislabels   (tick reach + axis labels; the title sits above reach.top)
+    3  protrusions        ← reach, titlespace, subtitlespace            → layoutobservables.protrusions (bridged)
     4  pixels             ← frame, graticule, labels, projectionview, viewport, tick attributes, framestyle,
                             ticklabelmingap, ticklabelcollisions       → text! (frame and interior), linesegments! (no stubs when fancy),
                                                                          lines!(spine_px); the crowding report
     4  bands              ← frame, exits, finallimits, ticklabelminangle, projectionview, viewport, framestyle, framewidth, framecolors
                                                                        → poly!(band_polygons; color = band_colors)
+    4  x/ylabel_position  ← viewport, protrusion_bound, fixed_reach, axislabels   → text!(xlabel), text!(ylabel)
 
 `lonlat_limits` is the user's lon/lat limit rectangle (the whole sphere by
 default); `reset_limits!` writes it.  Level 3 reads the viewport only to
 size the tick interval (pixels per degree along a carrier); the protrusion
 bound depends on which labels exist, not on where the viewport puts them.
+`fixed_reach` is `nothing` until `tight_ticklabel_spacing!` measures the
+drawn reach and writes it here in place of the bound.  `x/ylabelextent`,
+`titlespace` and `subtitlespace` are measured from the drawn text plots in
+`initialize_block!` and written back as inputs.
 =#
 
 const FULL_LONLAT = Rect2d(-180.0, -90.0, 360.0, 180.0)
@@ -149,9 +159,19 @@ function build_graph!(ax::GeoAxis)
               :xticksvisible, :yticksvisible, :xtickalign, :ytickalign, :xticklabelrotation, :yticklabelrotation,
               :xticklabelsvisible, :yticklabelsvisible, :xaxisposition, :yaxisposition,
               :ticklabelminangle, :ticklabelmingap, :ticklabelcollisions, :ticklabelreport,
-              :framestyle, :framewidth)
+              :framestyle, :framewidth, :xlabelpadding, :ylabelpadding)
         ComputePipeline.add_input!(g, k, getproperty(ax, k))
     end
+    for k in (:xlabelrotation, :ylabelrotation)
+        ComputePipeline.add_input!(boxed, g, k, getproperty(ax, k))
+    end
+    # measured from the drawn text plots once they exist (see initialize_block!)
+    ComputePipeline.add_input!(g, :xlabelextent, 0.0)
+    ComputePipeline.add_input!(g, :ylabelextent, 0.0)
+    ComputePipeline.add_input!(g, :titlespace, 0.0)
+    ComputePipeline.add_input!(g, :subtitlespace, 0.0)
+    # the reach tight_ticklabel_spacing! measured, in place of the bound
+    ComputePipeline.add_input!(boxed, g, :fixed_reach, nothing)
     # the band's width in pixels: what labels and the layout must clear beyond the frame
     ComputePipeline.map!(g, [:framestyle, :framewidth], :band) do style, width
         style === :fancy ? float(width) : 0.0
@@ -247,8 +267,27 @@ function build_graph!(ax::GeoAxis)
         )
         place(ex, f, Rect2d(lims), lines, crossings, attrs)
     end
-    ComputePipeline.map!(g, [:labels, :xticklabelsvisible, :yticklabelsvisible, :band], :protrusion_bound) do labels, xv, yv, band
-        protrusion_bound(labels, (; lon = xv, lat = yv); base = band)
+    ComputePipeline.map!(g, [:labels, :xticklabelsvisible, :yticklabelsvisible, :band, :xticksize, :yticksize,
+                             :xtickalign, :ytickalign, :xticksvisible, :yticksvisible],
+                         :protrusion_bound) do labels, xv, yv, band, xts, yts, xta, yta, xtv, ytv
+        # the band's edges mark the ticks: no stubs on a fancy frame
+        stubs = band == 0
+        protrusion_bound(labels, (; lon = xv, lat = yv); base = band,
+            ticks = (; lon = (; size = xts, align = xta, visible = xtv && stubs), lat = (; size = yts, align = yta, visible = ytv && stubs)))
+    end
+    # the axis labels: the side each sits on, its padding, and its measured extent along that side's normal
+    ComputePipeline.map!(g, [:xaxisposition, :yaxisposition, :xlabelpadding, :ylabelpadding, :xlabelextent, :ylabelextent,
+                             :xlabelrotation, :ylabelrotation],
+                         [:axislabels, :xlabel_rotation, :ylabel_rotation]) do xpos, ypos, xpad, ypad, xext, yext, xrot, yrot
+        labels = (; lon = AxisLabel(axis_label_side(:lon, xpos, ypos), float(xpad), float(xext)),
+                    lat = AxisLabel(axis_label_side(:lat, xpos, ypos), float(ypad), float(yext)))
+        (labels, axis_label_rotation(:lon, xrot), axis_label_rotation(:lat, yrot))
+    end
+    ComputePipeline.map!(g, [:protrusion_bound, :fixed_reach, :axislabels], :reach) do bound, fixed, labels
+        reach_sides(bound, fixed, (labels.lon, labels.lat))
+    end
+    ComputePipeline.map!(g, [:reach, :titlespace, :subtitlespace], :protrusions) do reach, title, subtitle
+        with_title(reach, title, subtitle)
     end
 
     # ---- level 4: pixels ----------------------------------------------------------
@@ -291,6 +330,12 @@ function build_graph!(ax::GeoAxis)
         bg = cols[min(2, end)]
         (b, vcat(b.polygons, b.cells), vcat(b.colors, fill(bg, length(b.cells))))
     end
+    # the axis labels sit outside the tick reach on their side of the viewport
+    ComputePipeline.map!(g, [:viewport, :protrusion_bound, :fixed_reach, :axislabels],
+                         [:xlabel_position, :ylabel_position]) do vp, bound, fixed, labels
+        base = fixed === nothing ? bound : fixed
+        (axis_label_position(vp, base, labels.lon), axis_label_position(vp, base, labels.lat))
+    end
 
     setfield!(ax, :graph, g)
     bbox_obs = ComputePipeline.get_observable!(g, :view_bbox; use_deepcopy = false)
@@ -303,11 +348,15 @@ end
 
 The axis' current decoration state, read back from the graph: the dest-space
 `frame`, `extent`, tick sets, `graticule`, `exits`, `labels`, the protrusion
-`bound`, the pixel-space `pixels`, and `suppressed` (every tick not drawn,
-with its reason, from both levels), with `targetlimits`, `finallimits`,
-`view`, `transform`, `viewport`, the carrier `crossings`, the
+`bound` (the tick reach), the pixel-space `pixels`, and `suppressed` (every
+tick not drawn, with its reason, from both levels), with `targetlimits`,
+`finallimits`, `view`, `transform`, `viewport`, the carrier `crossings`, the
 `interiorlabels` mode with the resolved `interiorlabelsize` per family and
 `interiorlabelrotation`, the `framestyle` and the fancy `bands` beside them.
+The layout's view of the axis is `axislabels`, `fixed_reach` (what
+`tight_ticklabel_spacing!` measured, or `nothing`), `reach` (tick reach plus
+axis labels), `titlespace`, `subtitlespace`, `protrusions` (what the layout
+was told) and the pixel `xlabel_position` / `ylabel_position`.
 """
 decorations(ax::GeoAxis) = (;
     frame = ax.graph[:frame][],
@@ -338,6 +387,14 @@ decorations(ax::GeoAxis) = (;
     interiorlabelsize = (; lon = ax.graph[:xinterior_size][], lat = ax.graph[:yinterior_size][]),
     framestyle = ax.framestyle[],
     bands = ax.graph[:bands][],
+    axislabels = ax.graph[:axislabels][],
+    fixed_reach = ax.graph[:fixed_reach][],
+    reach = ax.graph[:reach][],
+    titlespace = ax.graph[:titlespace][],
+    subtitlespace = ax.graph[:subtitlespace][],
+    protrusions = ax.graph[:protrusions][],
+    xlabel_position = ax.graph[:xlabel_position][],
+    ylabel_position = ax.graph[:ylabel_position][],
 )
 
 """

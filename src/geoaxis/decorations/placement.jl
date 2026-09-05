@@ -651,26 +651,31 @@ function _edge_middle_distance(fr::Frame, e::Exit, extent)
 end
 
 """
-    protrusion_bound(labels, visible; base = 0) -> RectSides{Float32}
+    protrusion_bound(labels, visible; base = 0, ticks = nothing) -> RectSides{Float32}
 
 Per side, the most any frame label pushes past its exit toward that side
 (tick, pad and glyph box), taking the exit to sit on that side of the limits
 rectangle, and at least `base` (the fancy band's width, which lies outside
 the frame on every side).  Interior labels are on the map and reserve
-nothing.  `visible` maps family to label visibility.
+nothing.  `visible` maps family to label visibility; `ticks` maps family to
+`(size, align, visible)` so a tick stub still reserves its length when its
+label is hidden.
 """
-function protrusion_bound(labels::Vector{TickLabel}, visible; base::Real = 0.0)
+function protrusion_bound(labels::Vector{TickLabel}, visible; base::Real = 0.0, ticks = nothing)
     left = right = bottom = top = float(base)
     for l in labels
         isinterior(l) && continue
-        visible[l.exit.family] || continue
+        tk = ticks === nothing ? nothing : ticks[l.exit.family]
+        stub = (tk !== nothing && tk.visible) ? max(0.0, tk.size * (1 - tk.align)) : 0.0
+        labelled = visible[l.exit.family]
+        (labelled || stub > 0) || continue
         b = OBox(Point2d(0, 0), l.half, l.rotation)
         n = l.normal
         hn = half_extent(b, n)
         d = l.offset + hn
         for (comp, u) in ((-n[1], Vec2d(-1, 0)), (n[1], Vec2d(1, 0)), (-n[2], Vec2d(0, -1)), (n[2], Vec2d(0, 1)))
             comp > 0.1 || continue
-            reach = comp * d + half_extent(b, u)
+            reach = max(labelled ? comp * d + half_extent(b, u) : 0.0, comp * stub)
             if u[1] < 0
                 left = max(left, reach)
             elseif u[1] > 0

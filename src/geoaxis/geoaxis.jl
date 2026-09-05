@@ -443,12 +443,39 @@ function Makie.initialize_block!(axis::GeoAxis)
     elements[:xinteriorhalo] = lonhalo
     elements[:yinteriorhalo] = lathalo
 
-    # The title sits above whatever the decorations push out at the top, so
-    # the bound is handed to Makie's title placement as an always-on top protrusion.
-    bound_obs = ComputePipeline.get_observable!(graph, :protrusion_bound; use_deepcopy = false)
-    top_bound = map(b -> Float32(b.top), axis.blockscene, bound_obs; ignore_equal_values=true)
+    # The axis labels sit outside the tick reach on the side their axis
+    # position names.  Their extent is measured from the drawn text (so rich
+    # text and LaTeX measure right) and written back into the graph, which
+    # positions them and adds them to the reach.
+    xlabelt = text!(axis.blockscene, graph[:xlabel_position];
+        text=axis.xlabel, rotation=graph[:xlabel_rotation], align=(:center, :center),
+        fontsize=axis.xlabelsize, font=axis.xlabelfont, color=axis.xlabelcolor,
+        visible=axis.xlabelvisible, markerspace=:data, inspectable=false)
+    ylabelt = text!(axis.blockscene, graph[:ylabel_position];
+        text=axis.ylabel, rotation=graph[:ylabel_rotation], align=(:center, :center),
+        fontsize=axis.ylabelsize, font=axis.ylabelfont, color=axis.ylabelcolor,
+        visible=axis.ylabelvisible, markerspace=:data, inspectable=false)
+    elements[:xlabel] = xlabelt
+    elements[:ylabel] = ylabelt
+    # the rotation is a trigger only: the drawn box is measured after it applies
+    xlabelextent = map(axis.blockscene, axis.xlabel, axis.xlabelsize, axis.xlabelfont, axis.xlabelvisible,
+        axis.xlabelrotation; ignore_equal_values=true) do label, _, _, visible, _
+        text_extent(xlabelt, label, visible, 2)
+    end
+    ylabelextent = map(axis.blockscene, axis.ylabel, axis.ylabelsize, axis.ylabelfont, axis.ylabelvisible,
+        axis.ylabelrotation; ignore_equal_values=true) do label, _, _, visible, _
+        text_extent(ylabelt, label, visible, 1)
+    end
+    on(v -> ComputePipeline.update!(graph; xlabelextent=v), axis.blockscene, xlabelextent; update=true)
+    on(v -> ComputePipeline.update!(graph; ylabelextent=v), axis.blockscene, ylabelextent; update=true)
 
-    subtitlepos = lift(axis.blockscene, scene.viewport, axis.titlegap, axis.titlealign, top_bound;
+    # The title sits above whatever the decorations push out at the top (tick
+    # labels and the axis label), so the reach is handed to Makie's title
+    # placement as an always-on top protrusion.
+    reach_obs = ComputePipeline.get_observable!(graph, :reach; use_deepcopy = false)
+    top_reach = map(r -> Float32(r.top), axis.blockscene, reach_obs; ignore_equal_values=true)
+
+    subtitlepos = lift(axis.blockscene, scene.viewport, axis.titlegap, axis.titlealign, top_reach;
         ignore_equal_values=true) do a, titlegap, align, xaxisprotrusion
         align_factor = Makie.halign2num(align, "Horizontal title align $align not supported.")
         x = a.origin[1] + align_factor * a.widths[1]
@@ -473,7 +500,7 @@ function Makie.initialize_block!(axis::GeoAxis)
         inspectable=false)
 
     titlepos = lift(Makie.calculate_title_position, axis.blockscene, scene.viewport, axis.titlegap, axis.subtitlegap,
-        axis.titlealign, Observable(:top), top_bound, axis.subtitlelineheight, axis, subtitlet; ignore_equal_values=true)
+        axis.titlealign, Observable(:top), top_reach, axis.subtitlelineheight, axis, subtitlet; ignore_equal_values=true)
 
     titlet = text!(
         axis.blockscene, titlepos,
@@ -486,38 +513,63 @@ function Makie.initialize_block!(axis::GeoAxis)
         lineheight=axis.titlelineheight,
         markerspace=:data,
         inspectable=false)
+    elements[:title] = titlet
+    elements[:subtitle] = subtitlet
 
-    # The protrusion bound leaves the graph as the second bridge.  The layout
-    # it feeds resizes the viewport, which the graph reads to size the tick
+    # The title and subtitle heights are measured from the drawn text, as on
+    # Axis, and enter the graph to top up the protrusions.
+    titlespace = map(axis.blockscene, axis.title, axis.titlesize, axis.titlefont, axis.titlevisible, axis.titlegap,
+        axis.titlelineheight; ignore_equal_values=true) do title, _, _, visible, gap, _
+        h = text_extent(titlet, title, visible, 2)
+        h > 0 ? h + gap : 0.0
+    end
+    subtitlespace = map(axis.blockscene, axis.subtitle, axis.subtitlesize, axis.subtitlefont, axis.subtitlevisible,
+        axis.subtitlegap, axis.subtitlelineheight; ignore_equal_values=true) do subtitle, _, _, visible, gap, _
+        h = text_extent(subtitlet, subtitle, visible, 2)
+        h > 0 ? h + gap : 0.0
+    end
+    on(v -> ComputePipeline.update!(graph; titlespace=v), axis.blockscene, titlespace; update=true)
+    on(v -> ComputePipeline.update!(graph; subtitlespace=v), axis.blockscene, subtitlespace; update=true)
+
+    # The protrusions leave the graph as the second bridge.  The layout they
+    # feed resizes the viewport, which the graph reads to size the tick
     # interval; the ladder is discrete and the bound only sees which labels
     # exist, so the loop settles at once in practice, and the depth guard
-    # bounds it regardless.
+    # bounds it regardless.  The first write waits until the limits are in,
+    # so construction writes the protrusions once here and once more when
+    # the layout hands the axis its viewport.
+    prots_obs = ComputePipeline.get_observable!(graph, :protrusions; use_deepcopy = false)
     depth = Ref(0)
-    onany(axis.blockscene, bound_obs, axis.title, axis.titlesize, axis.titlegap, axis.titlevisible,
-        axis.subtitle, axis.subtitlevisible, axis.subtitlesize, axis.subtitlegap,
-        axis.titlelineheight, axis.subtitlelineheight; update=true) do bound, args...
+    function write_protrusions(prots)
         depth[] >= PROTRUSION_DEPTH_CAP && return
         depth[] += 1
         try
-            prots = compute_protrusions(bound, args..., subtitlet, titlet)
-            prots == axis.layoutobservables.protrusions[] || (axis.layoutobservables.protrusions[] = prots)
+            if prots != axis.layoutobservables.protrusions[]
+                PROTRUSION_WRITES[] += 1
+                axis.layoutobservables.protrusions[] = prots
+            end
         finally
             depth[] -= 1
         end
         return
     end
+    on(write_protrusions, axis.blockscene, prots_obs)
 
     fl = axis.finallimits[]
     notify(axis.limits)
     if fl == axis.finallimits[]
         notify(axis.finallimits)
     end
+    write_protrusions(prots_obs[])
 
     return axis
 end
 
 "How deep the protrusion → layout → viewport → protrusion chain may re-enter before it is cut."
 const PROTRUSION_DEPTH_CAP = 8
+
+"How many times any GeoAxis has written its layout protrusions (a diagnostic read by the tests)."
+const PROTRUSION_WRITES = Ref(0)
 
 # The render order, fixed for every frame style: plots at 0, the graticule
 # behind them (or in front, `gridbehind = false`), then the band, the spine on
@@ -528,27 +580,6 @@ const SPINE_Z = 102
 const TICK_Z = 103
 const LABEL_Z = 104
 const INTERIOR_LABEL_Z = 200
-
-function compute_protrusions(bound, title, titlesize, titlegap, titlevisible,
-    subtitle, subtitlevisible, subtitlesize, subtitlegap, titlelineheight, subtitlelineheight,
-    subtitlet, titlet)
-
-    titleheight = Makie.boundingbox(titlet, :data).widths[2] + titlegap
-    subtitleheight = Makie.boundingbox(subtitlet, :data).widths[2] + subtitlegap
-
-    titlespace = if !titlevisible || Makie.iswhitespace(title)
-        0.0f0
-    else
-        titleheight
-    end
-    subtitlespace = if !subtitlevisible || Makie.iswhitespace(subtitle)
-        0.0f0
-    else
-        subtitleheight
-    end
-
-    return GridLayoutBase.RectSides{Float32}(bound.left, bound.right, bound.bottom, bound.top + titlespace + subtitlespace)
-end
 
 # This is where we override the stuff to make it our stuff.
 function Makie.plot!(axis::GeoAxis, plot::Makie.AbstractPlot)

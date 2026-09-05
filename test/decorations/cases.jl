@@ -51,7 +51,20 @@ const FANCY_CASES = DecorationCase[
     DecorationCase("robin150_fancy", "+proj=robin +lon_0=150", nothing, (; framestyle = :fancy)),
 ]
 
-const DECORATION_CASES = vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES, FANCY_CASES, MOST_PROJECTION_CASES)
+# The layout: titles, subtitles and axis labels on the sides the positions
+# name, the lcc title collision from the stage-1 log, and #281's request for
+# exact protrusions.
+const LAYOUT_CASES = DecorationCase[
+    DecorationCase("lcc_title", "+proj=lcc +lon_0=-96 +lat_1=33 +lat_2=45", ((-125, -65), (23, 52)),
+        (; title = "Lambert conformal conic", subtitle = "standard parallels 33°N and 45°N", xlabel = "Longitude", ylabel = "Latitude")),
+    DecorationCase("issue281", "+proj=eqearth", nothing, (; title = "issue 281", xlabel = "tight_ticklabel_spacing!")),
+    DecorationCase("merc_reg_labels", "+proj=merc", ((-10, 30), (35, 60)),
+        (; xlabel = "Longitude", ylabel = "Latitude", subtitle = "axis labels")),
+    DecorationCase("merc_reg_labels_topright", "+proj=merc", ((-10, 30), (35, 60)),
+        (; xaxisposition = :top, yaxisposition = :right, xlabel = "Longitude", ylabel = "Latitude", title = "labels on top and right")),
+]
+
+const DECORATION_CASES = vcat(BASELINE_CASES, ISSUE_CASES, VARIANT_CASES, FANCY_CASES, LAYOUT_CASES, MOST_PROJECTION_CASES)
 
 decoration_case(cases::Vector{DecorationCase}, name::AbstractString) = cases[findfirst(c -> c.name == name, cases)]
 
@@ -63,6 +76,49 @@ function build_case(c::DecorationCase; size = (600, 400), coastlines::Bool = tru
     coastlines && lines!(ax, GeoMakie.coastlines())
     Makie.update_state_before_display!(fig)
     return fig, ax
+end
+
+# Figures with several blocks, for the layout predicates.
+
+"The attributes a GeoAxis and an Axis must share for their protrusions to agree."
+const PARITY_ATTRS = (; title = "Title", subtitle = "Subtitle", xlabel = "Longitude", ylabel = "Latitude",
+    xticksize = 6.0, yticksize = 6.0, xticklabelpad = 5.0, yticklabelpad = 5.0)
+
+"A GeoAxis on merc_reg beside an Axis with the same title, labels, tick strings and tick geometry."
+function build_axis_parity(; size = (900, 420))
+    fig = Figure(; size)
+    ga = GeoAxis(fig[1, 1]; dest = "+proj=merc", limits = ((-10, 30), (35, 60)), PARITY_ATTRS...)
+    lines!(ga, GeoMakie.coastlines())
+    Makie.update_state_before_display!(fig)
+    d = GeoMakie.decorations(ga)
+    lon = d.pixels.strings[:lon]; lat = d.pixels.strings[:lat]
+    ax = Axis(fig[1, 2]; limits = (0, 1, 0, 1), xticks = (range(0, 1, length(lon)), lon), yticks = (range(0, 1, length(lat)), lat),
+        PARITY_ATTRS...)
+    Makie.update_state_before_display!(fig)
+    return fig, ga, ax
+end
+
+"Issue 349: three lon/lat axes in a row, the y decorations hidden on the second and third."
+function build_issue349(; size = (1200, 440))
+    fig = Figure(; size)
+    axes = GeoAxis[]
+    for i in 1:3
+        ax = GeoAxis(fig[1, i]; dest = "+proj=longlat +datum=WGS84", limits = ((-19, 55), (-38, 42)), title = "panel $i")
+        lines!(ax, GeoMakie.coastlines())
+        i > 1 && hideydecorations!(ax; grid = false)
+        push!(axes, ax)
+    end
+    Makie.update_state_before_display!(fig)
+    return fig, axes
+end
+
+"Issue 268: a 2 x 2 grid of GeoAxes with lon/lat limits and no titles."
+function build_issue268(; size = (800, 600))
+    fig = Figure(; size)
+    axes = [GeoAxis(fig[i, j]; limits = (-30, 55, -50, 80)) for i in 1:2, j in 1:2]
+    foreach(ax -> lines!(ax, GeoMakie.coastlines()), axes)
+    Makie.update_state_before_display!(fig)
+    return fig, vec(axes)
 end
 
 "The strings drawn on the frame for one family, in drawing order."
