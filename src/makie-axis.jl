@@ -342,9 +342,6 @@ end
 
 Makie.interactions(ax::GeoAxis) = ax.interactions
 
-Makie.timed_ticklabelspace_reset(ax::GeoAxis, reset_timer::Ref,
-    prev_xticklabelspace::Ref, prev_yticklabelspace::Ref, threshold_sec::Real) = nothing
-
 function Makie.update_state_before_display!(ax::GeoAxis)
     Makie.reset_limits!(ax)
     return
