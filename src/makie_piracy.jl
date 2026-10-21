@@ -22,6 +22,25 @@ function Makie.convert_arguments(trait::PointBased, ls::AbstractArray{<: Geometr
     return (ret,)
 end
 
+function _append_nanpoint_and_return(ls::GeometryBasics.LineString{N, T}) where {N, T}
+    return push!(copy(GeometryBasics.coordinates(ls)), Point{N, T}(NaN))
+end
+
+function Makie.convert_arguments(trait::PointBased, mps::AbstractVector{<: GeometryBasics.MultiPolygon{N, T}}) where {N, T}
+    return Makie.convert_arguments(
+        trait, 
+        GeometryBasics.LineString.(
+            GO.applyreduce.(
+                (_append_nanpoint_and_return,), 
+                (vcat,), 
+                (GO.TraitTarget{GO.AbstractCurveTrait}(),), 
+                mps; 
+                init = [Point{N, T}(NaN)]
+            )
+        )
+    )
+end
+
 #=
 function Makie.transform_bbox(scenelike, lims::Rect{N, T}) where {N, T}
     mini = Makie.to_ndim(Point3d, minimum(lims), 0.0)
