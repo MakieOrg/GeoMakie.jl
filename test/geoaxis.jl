@@ -90,3 +90,25 @@ end
 
     @test a1.scene.viewport[] == a2.scene.viewport[]
 end
+@testset "Default DragPan and ScrollZoom interactions" begin
+    # Makie's generic `DragPan` touches `Axis`-only ticklabelspace state,
+    # which GeoAxis must opt out of (see #398).
+    f = Figure()
+    ga = GeoAxis(f[1, 1])
+    Makie.update_state_before_display!(f)
+
+    dragpan = last(Makie.interactions(ga)[:dragpan])
+    lims_before = ga.targetlimits[]
+    event = Makie.MouseEvent(
+        Makie.MouseEventTypes.rightdrag,
+        1.0, Point2d(0, 0), Point2f(110, 100),
+        0.0, Point2d(0, 0), Point2f(100, 100),
+    )
+    @test Makie.process_interaction(dragpan, event, ga) == Makie.Consume(true)
+    @test ga.targetlimits[] != lims_before
+
+    scrollzoom = last(Makie.interactions(ga)[:scrollzoom])
+    lims_before = ga.targetlimits[]
+    @test Makie.process_interaction(scrollzoom, Makie.ScrollEvent(0, 1), ga) == Makie.Consume(true)
+    @test ga.targetlimits[] != lims_before
+end

@@ -342,8 +342,24 @@ end
 
 Makie.interactions(ax::GeoAxis) = ax.interactions
 
-Makie.timed_ticklabelspace_reset(ax::GeoAxis, reset_timer::Ref,
-    prev_xticklabelspace::Ref, prev_yticklabelspace::Ref, threshold_sec::Real) = nothing
+# Makie's generic `DragPan` interaction freezes the axis ticklabelspace while panning,
+# which accesses `Axis`-only fields.  GeoAxis has no such state, so make it a no-op.
+# Makie v0.24.16 renamed `timed_ticklabelspace_reset` to `freeze_ticklabelspace_until_idle!`.
+@static if isdefined(Makie, :freeze_ticklabelspace_until_idle!)
+    Makie.freeze_ticklabelspace_until_idle!(ax::GeoAxis, reset::Makie.TicklabelspaceReset) = nothing
+else
+    Makie.timed_ticklabelspace_reset(ax::GeoAxis, reset_timer::Ref,
+        prev_xticklabelspace::Ref, prev_yticklabelspace::Ref, threshold_sec::Real) = nothing
+end
+
+# `DragPan` also validates the new limits with an `Axis`-only check (Makie v0.24.14+).
+# GeoAxis has no axis scales, so only require finite limits with nonzero widths.
+@static if isdefined(Makie, :_axis_limits_are_valid)
+    function Makie._axis_limits_are_valid(ax::GeoAxis, lims::Rect)
+        mi, ma = extrema(lims)
+        return all(isfinite, mi) && all(isfinite, ma) && all(>(0), widths(lims))
+    end
+end
 
 function Makie.update_state_before_display!(ax::GeoAxis)
     Makie.reset_limits!(ax)
