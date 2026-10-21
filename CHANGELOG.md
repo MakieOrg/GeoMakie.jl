@@ -1,4 +1,5 @@
 # Unreleased
+- Compatible with Makie v0.24.16, which renamed the ticklabelspace freeze that `DragPan` calls; GeoMakie loads again and right-drag panning a `GeoAxis` still works.
 
 # 0.7.17 - 2026-08-29
 - `geo2basic` converts any GeoInterface geometry: it decomposes the input to geometries and hands each to `GeoInterface.convert`.
